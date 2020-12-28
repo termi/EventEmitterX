@@ -54,7 +54,7 @@ const errorMonitor = Symbol('events.errorMonitor');
 // const captureRejectionSymbol = Symbol('nodejs.rejection');
 
 /** Implemented event emitter */
-export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     private _events: {
         [eventName in keyof EventMap]?: Function|Function[]
     } = Object.create(null);
@@ -518,6 +518,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
     static EventEmitter = EventEmitterEx;
 }
+
+export default EventEmitterEx;
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
 // todo: export function defaultMaxListeners(n: number){}
