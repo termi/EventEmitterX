@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": "./build_ts",
+    "baseUrl": ".",
+    "lib": [ "DOM", "ESNext", "ES2021", "ES2020", "ES2019", "ES2018", "ES2017", "ES2016", "ES2015" ],
+    "jsx": "react",
+    "allowJs": true,
+    "moduleDetection": "force",
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "strictNullChecks": true,
+    "noUncheckedIndexedAccess": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
+    "useUnknownInCatchVariables": true,
+    "stripInternal": true,
+    "target": "ES2020",
+    "noResolve": false,
+    "diagnostics": false,
+    "extendedDiagnostics": false,
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "disableSizeLimit": false,
+    "strictBindCallApply": true,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": true,
+    "preserveConstEnums": true,
+    "newLine": "lf",
+    "composite": false,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": true,
+    "paths": {
+      "~/*": ["./*"]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "./utils/es2024.collections.d.ts"
+  ]
+}

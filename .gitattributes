@@ -1,0 +1,107 @@
+# .gitattributes snippet to force users to use same line endings for project.
+#
+# see [Please Add .gitattributes To Your Git Repository](https://dev.to/deadlybyte/please-add-gitattributes-to-your-git-repository-1jld)
+# todo [.gitattributes Best Practices / Git Large File System (LFS)](https://rehansaeed.com/gitattributes-best-practices/#git-large-file-system-lfs)
+#
+# Handle line endings automatically for files detected as text
+# and leave all files detected as binary untouched.
+# Auto detect text files and perform LF normalization
+* text=auto eol=lf autocrlf=false safecrlf=false filemode=false
+
+# Force batch scripts to always use CRLF line endings so that if a repo is accessed
+# in Windows via a file share from Linux, the scripts will work.
+*.{cmd,[cC][mM][dD]} text eol=crlf
+*.{bat,[bB][aA][tT]} text eol=crlf
+
+# Force bash scripts to always use LF line endings so that if a repo is accessed
+# in Unix via a file share from Windows, the scripts will work.
+*.sh text eol=lf filemode=on
+
+#
+# The above will handle all files NOT found below
+# https://help.github.com/articles/dealing-with-line-endings/
+# https://github.com/Danimoth/gitattributes/blob/master/Web.gitattributes
+
+# These files are text and should be normalized (Convert crlf => lf)
+*.php text
+*.css text
+*.sass text
+*.scss text
+*.less text
+*.tsx text
+*.jsx text
+*.ts text
+*.js text
+*.cjs text
+*.mjs text
+*.cjs text
+*.mjs text
+*.json text
+*.json5 text
+*.htm text
+*.html text
+*.htmx text
+*.xml text
+*.txt text
+*.ini text
+*.inc text
+*.pl text
+*.rb text
+*.py text
+*.scm text
+*.sql text
+.htaccess text
+*.sh text
+*.svg text
+*.md text
+*.rst text
+*.log text
+
+# These files are binary and should be left untouched
+# (binary is a macro for -text -diff)
+# Images
+*.png binary
+*.pnga binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+# Video & Audio
+*.mov binary
+*.webm binary
+*.mp4 binary
+*.mp3 binary
+*.oga binary
+*.ogv binary
+*.flv binary
+*.fla binary
+*.swf binary
+# Archives
+*.gz binary
+*.zip binary
+*.7z binary
+*.br binary
+*.tar binary
+# Fonts
+*.ttf binary
+*.woff binary
+*.woff2 binary
+# Other
+*.pyc binary
+*.exe binary
+
+# Custom for Visual Studio
+*.cs diff=csharp
+
+# Standard to msysgit
+*.doc diff=astextplain
+*.DOC diff=astextplain
+*.docx diff=astextplain
+*.DOCX diff=astextplain
+*.dot diff=astextplain
+*.DOT diff=astextplain
+*.pdf diff=astextplain
+*.PDF diff=astextplain
+*.rtf diff=astextplain
+*.RTF diff=astextplain
