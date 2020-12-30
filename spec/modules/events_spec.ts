@@ -26,6 +26,275 @@ describe('EventEmitter', function() {
         });
     });
 
+    describe('#on/#removeListener', function () {
+        it('should call listener multiple times', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.emit('test');
+
+            expect(counter).toBe(2);
+
+            ee.removeListener('test', listener);
+        });
+
+        it('should call listener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+
+            expect(counter1).toBe(1);
+            expect(counter2).toBe(2);
+            expect(counter3).toBe(3);
+
+            ee.removeListener('test1', listener1);
+            ee.removeListener('test2', listener2);
+            ee.removeListener('test3', listener3);
+        });
+
+        it('should not call listener after removeListener', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.removeListener('test', listener);
+            ee.emit('test');
+
+            expect(counter).toBe(1);
+        });
+
+        it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.removeListener('test1', listener1);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.removeListener('test2', listener2);
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.removeListener('test3', listener3);
+            ee.emit('test3');
+
+            expect(counter1).toBe(1);
+            expect(counter2).toBe(2);
+            expect(counter3).toBe(3);
+        });
+    });
+
+    describe('#on/#removeListener - use same listener multiple times', function () {
+        it('should call listener multiple times', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.emit('test');
+
+            expect(counter).toBe(4);
+
+            ee.removeListener('test', listener);
+        });
+
+        it('should call listener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+
+            expect(counter1).toBe(2);
+            expect(counter2).toBe(4);
+            expect(counter3).toBe(6);
+
+            ee.removeListener('test1', listener1);
+            ee.removeListener('test2', listener2);
+            ee.removeListener('test3', listener3);
+        });
+
+        it('should not call listener after removeListener', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.removeListener('test', listener);
+            ee.emit('test');
+            ee.emit('test');
+
+            expect(counter).toBe(2);
+        });
+
+        it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.removeListener('test1', listener1);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.removeListener('test2', listener2);
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.removeListener('test3', listener3);
+            ee.emit('test3');
+
+            expect(counter1).toBe(2);
+            expect(counter2).toBe(4);
+            expect(counter3).toBe(6);
+        });
+    });
+
+    describe('#on/#removeListener - use same listener multiple times - with listenerOncePerEventType=true', function () {
+        const ee = new EventEmitter({ listenerOncePerEventType: true });
+
+        it('should call listener multiple times', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.emit('test');
+
+            expect(counter).toBe(2);
+
+            ee.removeListener('test', listener);
+        });
+
+        it('should call listener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+
+            expect(counter1).toBe(1);
+            expect(counter2).toBe(2);
+            expect(counter3).toBe(3);
+
+            ee.removeListener('test1', listener1);
+            ee.removeListener('test2', listener2);
+            ee.removeListener('test3', listener3);
+        });
+
+        it('should not call listener after removeListener', function () {
+            let counter = 0;
+            const listener = () => { counter++ };
+
+            ee.on('test', listener);
+            ee.on('test', listener);
+            ee.emit('test');
+            ee.removeListener('test', listener);
+            ee.emit('test');
+            ee.emit('test');
+
+            expect(counter).toBe(1);
+        });
+
+        it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            let counter1 = 0;
+            let counter2 = 0;
+            let counter3 = 0;
+            const listener1 = () => { counter1++ };
+            const listener2 = () => { counter2++ };
+            const listener3 = () => { counter3++ };
+
+            ee.on('test1', listener1);
+            ee.on('test1', listener1);
+            ee.on('test2', listener2);
+            ee.on('test2', listener2);
+            ee.on('test3', listener3);
+            ee.on('test3', listener3);
+            ee.emit('test1');
+            ee.removeListener('test1', listener1);
+            ee.emit('test1');
+            ee.emit('test2');
+            ee.emit('test2');
+            ee.removeListener('test2', listener2);
+            ee.emit('test2');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.emit('test3');
+            ee.removeListener('test3', listener3);
+            ee.emit('test3');
+
+            expect(counter1).toBe(1);
+            expect(counter2).toBe(2);
+            expect(counter3).toBe(3);
+        });
+    });
+
     describe('#once', function () {
         it('should emit once', function () {
             let counter = 0;
@@ -33,6 +302,7 @@ describe('EventEmitter', function() {
             ee.once('test', () => {
                 counter++;
             });
+            ee.emit('test');
             ee.emit('test');
 
             expect(counter).toBe(1);
@@ -46,6 +316,7 @@ describe('EventEmitter', function() {
 
             ee.once('test', listener);
             ee.removeListener('test', listener);
+            ee.emit('test');
             ee.emit('test');
 
             expect(counter).toBe(0);

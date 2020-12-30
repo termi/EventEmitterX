@@ -303,8 +303,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     removeListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
         checkListener(listener);
 
-        const {_events} = this;
-        const hasAnyListenerWithOptions = this._halwo;
+        const {
+            _events,
+            _lopet: listenerOncePerEventType,
+            _halwo: hasAnyListenerWithOptions,
+        } = this;
         const handler = _events[event];
 
         if (handler === void 0) {
@@ -333,7 +336,59 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 delete _events[event];
             }
         }
+        else if (!listenerOncePerEventType) {
+            // remove all links to listener
+            const listeners = (handler as Function[]);
+
+            if (hasAnyOnceListener) {
+                for (let i = listeners.length ; i-- > 0 ; ) {
+                    const handler = listeners[i];
+
+                    if (handler === listener) {
+                        listeners.splice(i, 1);
+                    }
+                    else if (
+                        (handler[sOnceListenerWrapperId] !== void 0)
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        && handler.listener === listener
+                    ) {
+                        const onceWrapperId = handler[sOnceListenerWrapperId];
+                        const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                        if (idIndex !== -1) {
+                            this._onceIds.splice(idIndex, 1);
+                        }
+
+                        // originalListener = listeners[i].listener;
+                        listeners.splice(i, 1);
+                    }
+                }
+            }
+            else {
+                const listeners = (handler as Function[]);
+                let index;
+
+                while ((index = listeners.indexOf(listener)) !== -1) {
+                    if (index === 0) {
+                        listeners.shift();
+                    }
+                    else {
+                        // spliceOne(listeners, index);
+                        listeners.splice(index, 1);
+                    }
+                }
+            }
+
+            if (listeners.length === 0) {
+                delete _events[event];
+            }
+            else if (listeners.length === 1) {
+                _events[event] = listeners[0];
+            }
+        }
         else if (hasAnyOnceListener) {
+            // listenerOncePerEventType = true, so remove only first link to listener
             const listeners = (handler as Function[]);
             let position = -1;
 
@@ -388,11 +443,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
         else {
+            // listenerOncePerEventType = true, so remove only first link to listener
             const listeners = (handler as Function[]);
             const index = listeners.indexOf(listener);
 
             if (index !== -1) {
-                if (index == 0) {
+                if (index === 0) {
                     listeners.shift();
                 }
                 else {
