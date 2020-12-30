@@ -167,23 +167,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 switch (args.length) {
                     // fast cases
                     case 0:
-                        emitNone_array(array_handler, this, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0);
-                        break;
+                        return emitNone_array(array_handler, this, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
                     case 1:
-                        emitOne_array(array_handler, this, args[0], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0);
-                        break;
+                        return emitOne_array(array_handler, this, args[0], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
                     case 2:
-                        emitTwo_array(array_handler, this, args[0], args[1], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0);
-                        break;
+                        return emitTwo_array(array_handler, this, args[0], args[1], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
                     case 3:
-                        emitThree_array(array_handler, this, args[0], args[1], args[2], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0);
-                        break;
+                        return emitThree_array(array_handler, this, args[0], args[1], args[2], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
                     // slower
                     default:
-                        emitMany_array(array_handler, this, args, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0);
+                        return emitMany_array(array_handler, this, args, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
                 }
-
-                return true;
             }
         }
         else if (isErrorEvent) {
@@ -939,6 +933,8 @@ function emitOne_array(handlers: Function[], self: EventEmitterEx, arg1: any, ha
         for (let i = 0; i < len; ++i) {
             listeners[i].call(self, arg1);
         }
+
+        return len;
     }
 }
 
@@ -970,6 +966,8 @@ function emitTwo_array(handlers: Function[], self: EventEmitterEx, arg1: any, ar
         for (let i = 0; i < len; ++i) {
             listeners[i].call(self, arg1, arg2);
         }
+
+        return len;
     }
 }
 
@@ -1001,6 +999,8 @@ function emitThree_array(handlers: Function[], self: EventEmitterEx, arg1: any, 
         for (let i = 0; i < len; ++i) {
             listeners[i].call(self, arg1, arg2, arg3);
         }
+
+        return len;
     }
 }
 
@@ -1032,6 +1032,8 @@ function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[],
         for (let i = 0; i < len; ++i) {
             listeners[i].apply(self, args);
         }
+
+        return len;
     }
 }
 
