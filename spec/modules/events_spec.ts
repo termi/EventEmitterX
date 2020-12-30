@@ -9,6 +9,8 @@ import events from '../../modules/events';
 const {EventEmitter} = events;
 
 describe('EventEmitter', function() {
+    const ee = new EventEmitter();
+
     describe('constructor', function () {
         it('instanceof', function () {
             expect(new EventEmitter()).toBeInstanceOf(EventEmitter);
@@ -25,7 +27,6 @@ describe('EventEmitter', function() {
 
     describe('#once', function () {
         it('should emit once', function () {
-            const ee = new EventEmitter();
             let counter = 0;
 
             ee.once('test', () => {
@@ -35,11 +36,23 @@ describe('EventEmitter', function() {
 
             expect(counter).toBe(1);
         });
+
+        it('should not emit after removeListener', function () {
+            let counter = 0;
+            const listener = () => {
+                counter++;
+            };
+
+            ee.once('test', listener);
+            ee.removeListener('test', listener);
+            ee.emit('test');
+
+            expect(counter).toBe(0);
+        });
     });
 
     describe('EventEmitter.once', function () {
         it('should emit once', function (done) {
-            const ee = new EventEmitter();
             const expectedError = null;
             let error = null;
             const expectedArgs = [ 'test', 1, {} ];
@@ -64,7 +77,6 @@ describe('EventEmitter', function() {
         });
 
         it('should emit once (async/await)', async function () {
-            const ee = new EventEmitter();
             const expectedArgs = [ 'test', 1, {} ];
             const argsArray: any[] = [];
 
@@ -82,7 +94,6 @@ describe('EventEmitter', function() {
         });
 
         it(`should reject with error on 'error' event`, function (done) {
-            const ee = new EventEmitter();
             const expectedError = new Error('REJECT PROMISE');
             let error = null;
 
@@ -101,7 +112,6 @@ describe('EventEmitter', function() {
         });
 
         it(`should reject with error on 'error' event (async/await)`, async function () {
-            const ee = new EventEmitter();
             const expectedError = new Error('REJECT PROMISE');
             let error = null;
 
@@ -117,6 +127,41 @@ describe('EventEmitter', function() {
             }
 
             expect(error).toBe(expectedError);
+        });
+
+        it('once with options.checkFn', function (done) {
+            const expectedError = null;
+            let error = null;
+            const expectedArgs = [
+                [ 'test', 1, {} ],
+                [ 'test', 5, {} ],
+                [ 'test', 9, {} ],
+            ];
+            const argsArray: any[] = [];
+
+            Promise.all([
+                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 9})
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch(err => (error = err)),
+                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 5})
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch(err => (error = err)),
+                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 1})
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch(err => (error = err)),
+            ]).then(() => {
+                expect(error).toBe(expectedError);
+                expect(argsArray).toEqual(expectedArgs);
+
+                done();
+            });
+
+            ee.emit('test', ...[ 'test', 0, {} ]);
+            ee.emit('test', ...[ 'test', 1, {} ]);
+            ee.emit('test', ...[ 'test', 3, {} ]);
+            ee.emit('test', ...[ 'test', 5, {} ]);
+            ee.emit('test', ...[ 'test', 7, {} ]);
+            ee.emit('test', ...[ 'test', 9, {} ]);
         });
     });
 });
