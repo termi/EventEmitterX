@@ -5,6 +5,7 @@
 require('termi@polyfills');
 
 import events from '../../modules/events';
+import ServerTiming from 'termi@ServerTiming';
 
 const {EventEmitter} = events;
 
@@ -162,6 +163,113 @@ describe('EventEmitter', function() {
             ee.emit('test', ...[ 'test', 5, {} ]);
             ee.emit('test', ...[ 'test', 7, {} ]);
             ee.emit('test', ...[ 'test', 9, {} ]);
+        });
+
+        it('with AbortSignal', function (done) {
+            let error: DOMException|void = void 0;
+            let counter = 0;
+            const ac = new AbortController();
+
+            EventEmitter.once(ee, 'test', { signal: ac.signal })
+                .then(() => {
+                    counter++;
+                })
+                .catch(err => {
+                    error = err;
+                })
+                .then(() => {
+                    expect(counter).toBe(0);
+                    expect(error).toBeDefined();
+                    expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                    expect(error && error.name).toBe('AbortError');
+
+                    done();
+                })
+            ;
+
+            ac.abort();
+            ee.emit('test', ...[1, 2, 3]);
+        });
+
+        it('with ServerTiming', async function () {
+            {
+                const st = new ServerTiming();
+
+                process.nextTick(() => {
+                    ee.emit('test', 1);
+                });
+
+                await EventEmitter.once(ee, 'test', { timing: st });
+
+                expect(st.length).toBe(1);
+            }
+            {
+                const st = new ServerTiming();
+
+                process.nextTick(() => {
+                    ee.emit('error', 1);
+                });
+
+                try {
+                    await EventEmitter.once(ee, 'test', { timing: st });
+                }
+                catch(err) {
+                    //
+                }
+
+                expect(st.length).toBe(1);
+            }
+        });
+
+        it('with ServerTiming and few events', async function () {
+            const st = new ServerTiming();
+            let error: Error|void = void 0;
+
+            process.nextTick(() => {
+                ee.emit('test1', 1);
+                ee.emit('test2', 2);
+                ee.emit('error', 3);
+            });
+
+            await Promise.all([
+                EventEmitter.once(ee, 'test1', { timing: st }),
+                EventEmitter.once(ee, 'test2', { timing: st }),
+                EventEmitter.once(ee, 'test3', { timing: st }).catch(err => {
+                    error = err;
+                }),
+            ]);
+
+            expect(st.length).toBe(3);
+            expect(st.getTimings().map(a => a.description)).toEqual(['test1', 'test2', 'test3']);
+            expect(error).toBeDefined();
+        });
+
+        it('with AbortSignal and ServerTiming', function (done) {
+            const st = new ServerTiming();
+            let error: DOMException|void = void 0;
+            let counter = 0;
+            const ac = new AbortController();
+
+            EventEmitter.once(ee, 'test', { signal: ac.signal, timing: st })
+                .then(() => {
+                    counter++;
+                })
+                .catch(err => {
+                    error = err;
+                })
+                .then(() => {
+                    expect(st.length).toBe(1);
+                    expect(counter).toBe(0);
+                    expect(error).toBeDefined();
+                    expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                    expect(error && error.name).toBe('AbortError');
+
+                    done();
+                })
+            ;
+
+            ac.abort();
+            ee.emit('test', ...[1, 2, 3]);
         });
     });
 });

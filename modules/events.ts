@@ -1,5 +1,8 @@
 /// <reference types="node" />
 
+import type ServerTiming from 'termi@ServerTiming';
+import AbortController, {errorFabric} from 'termi@abortable';
+
 export declare type Listener = (...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
@@ -51,8 +54,11 @@ interface IEventEmitter_Options {
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
 interface IEventEmitter_StaticOnceOptions {
-    signal?: Object;
+    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
+    signal?: AbortSignal;
+    timing?: ServerTiming;
     checkFn?: (number: EventName, eventEmitter: EventEmitterEx, args: any[]) => boolean;
+    // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
     [key: string]: any;
 }
 
@@ -62,6 +68,8 @@ let _onceListenerIdCounter = 0;
 const errorMonitor = Symbol('events.errorMonitor');
 // const captureRejectionSymbol = Symbol('nodejs.rejection');
 const sListenerOptions = Symbol('events.listenerOptions');
+// Symbol for EventEmitterEx.once
+const sClearPromiseSymbol = Symbol();
 
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
@@ -614,36 +622,89 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     // todo:
-    //   once: [Function: once],
     //   on: [Function: on],
-    //   EventEmitterEx: [Circular *1],
-    //   usingDomains: false,
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
-    //   errorMonitor: Symbol(events.errorMonitor),
     //   defaultMaxListeners: [Getter/Setter],
     //   init: [Function (anonymous)],
-    //   listenerCount: [Function (anonymous)]
 
-    // Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
-    // This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
+    /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
+     *
+     * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
+     *
+     * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
+     *
+     * @param emitter
+     * @param name
+     * @param options?
+     * @param {AbortSignal} options.signal? - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
+     * @param {ServerTiming} options.timing?
+     * @param {Function} options.checkFn?
+     */
     static once(emitter: EventEmitterEx, name: EventName, options?: IEventEmitter_StaticOnceOptions): Promise<any[]> {
-        if (options && options.signal) {
-            throw new Error('AbortSignal is not supported for now');
-            /** todo: support options.signal as [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal)
-             *   as described in here [events.once(emitter, name, options)](https://nodejs.org/api/events.html#events_events_once_emitter_name_options)
-             * */
-            // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
+        const signal = options && options.signal || void 0;
+        const hasSignal = !!signal;
+        let listenersCleanUpByAbort: Function|void = void 0;
+        let timing = options && options.timing || void 0;
+        let hasTiming = !!timing;
+        // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
+
+        if (signal) {
+            {
+                const invalidSignalError = checkAbortSignal(signal);
+
+                if (invalidSignalError) {
+                    return Promise.reject(invalidSignalError);
+                }
+            }
+
+            // Return early if already aborted, thus avoiding making an HTTP request
+            if (signal.aborted) {
+                return Promise.reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+            }
         }
 
-        return new Promise<any[]>((resolve, reject) => {
+        if (hasTiming) {
+            timing!.time(String(name));
+        }
+
+        const promise = new Promise<any[]>((resolve, reject) => {
             const onceListener = (...args) => {
+                if (hasSignal) {
+                    listenersCleanUpByAbort = void 0;
+                }
+                if (hasTiming) {
+                    timing!.timeEnd(String(name), true);
+                    // cleanup
+                    timing = void 0;
+                    hasTiming = false;
+                }
+
                 emitter.removeListener('error', errorListener);
                 resolve(args);
             };
             const errorListener = error => {
+                if (hasSignal) {
+                    listenersCleanUpByAbort = void 0;
+                }
+                if (hasTiming) {
+                    timing!.timeEnd(String(name), true);
+                    // cleanup
+                    timing = void 0;
+                    hasTiming = false;
+                }
+
                 emitter.removeListener(name, onceListener);
                 reject(error);
+            }
+
+            if (hasSignal) {
+                listenersCleanUpByAbort = function() {
+                    emitter.removeListener('error', errorListener);
+                    emitter.removeListener(name, onceListener);
+
+                    listenersCleanUpByAbort = void 0;
+                };
             }
 
             if (options && options.checkFn) {
@@ -657,6 +718,77 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
             emitter.once('error', errorListener);
         });
+
+        if (signal) {
+            let abortCallback;
+
+            // Turn an event into a promise, reject it once `abort` is dispatched
+            const cancellation = new Promise<void>((resolve, reject) => {
+                abortCallback = function(clearPromiseSymbol) {
+                    signal.removeEventListener('abort', abortCallback);
+
+                    if (clearPromiseSymbol === sClearPromiseSymbol) {
+                        // Очищаем Promise, чтобы он не висел нереализованным
+                        resolve();
+                    }
+                    else {
+                        // todo: Мне кажется, тут это лишнее. Нужно проверить
+                        if (hasTiming) {
+                            timing!.timeEnd(String(name), true);
+                            // cleanup
+                            timing = void 0;
+                            hasTiming = false;
+                        }
+
+                        if (listenersCleanUpByAbort) {
+                            listenersCleanUpByAbort();
+                        }
+
+                        reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+                    }
+
+                    abortCallback = void 0;
+                };
+
+                signal.addEventListener('abort', abortCallback);
+            });
+
+            // Return the fastest promise (don't need to wait for request to finish)
+            return Promise.race([
+                cancellation,
+                promise,
+            ]).then(result => {
+                if (abortCallback) {
+                    // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
+                    abortCallback(sClearPromiseSymbol);
+                }
+
+                if (hasTiming) {
+                    timing!.timeEnd(String(name), true);
+                    // cleanup
+                    timing = void 0;
+                    hasTiming = false;
+                }
+
+                return result as any[];
+            }).catch(error => {
+                if (abortCallback) {
+                    // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
+                    abortCallback(sClearPromiseSymbol);
+                }
+
+                if (hasTiming) {
+                    timing!.timeEnd(String(name), true);
+                    // cleanup
+                    timing = void 0;
+                    hasTiming = false;
+                }
+
+                throw error;
+            });
+        }
+
+        return promise;
     }
 
     static errorMonitor = errorMonitor;
@@ -664,6 +796,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     static usingDomains = false;
 
     static EventEmitter = EventEmitterEx;
+    /** alias for global AbortController */
+    static AbortController = AbortController;
 }
 
 export default EventEmitterEx;
@@ -681,6 +815,18 @@ function checkListener(listener: Function, supportHandleEvent = false) {
         else {
             throw new TypeError('"listener" argument must be a function');
         }
+    }
+}
+
+function checkAbortSignal(signal: AbortSignal): TypeError|void {
+    if (typeof signal !== 'object'
+        || !(
+            signal instanceof AbortSignal
+            // AbortSignal can be from another context
+            || (signal as AbortSignal).constructor.name === 'AbortSignal'
+        )
+    ) {
+        return new TypeError(`Failed to execute 'fetch' on 'Window': member signal is not of type AbortSignal.`);
     }
 }
 
