@@ -60,11 +60,11 @@ interface Options {
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
-interface StaticOnceOptions<E extends EventEmitterEx|NodeEventEmitter|DOMEventTarget> {
+interface StaticOnceOptions<EE, E> {
     /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
     signal?: AbortSignal;
     timing?: ServerTiming;
-    checkFn?: (number: EventName, eventEmitter: E, args: any[]) => boolean;
+    checkFn?: (number: E, eventEmitter: EE, args: any[]) => boolean;
     timeout?: number;
     // [key: string]: any;
 }
@@ -438,16 +438,24 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             const index = listeners.indexOf(listener);
 
             if (index !== -1) {
-                if (index === 0) {
-                    listeners.shift();
+                const newLen = listeners.length - 1;
+
+                if (newLen === 0) {
+                    listeners.length = 0;
+                    delete _events[event];
                 }
                 else {
-                    // spliceOne(listeners, index);
-                    listeners.splice(index, 1);
-                }
+                    if (index === 0) {
+                        listeners.shift();
+                    }
+                    else {
+                        // spliceOne(listeners, index);
+                        listeners.splice(index, 1);
+                    }
 
-                if (listeners.length === 1) {
-                    _events[event] = listeners[0];
+                    if (newLen === 1) {
+                        _events[event] = listeners[0];
+                    }
                 }
             }
         }
@@ -619,6 +627,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     //   defaultMaxListeners: [Getter/Setter],
     //   init: [Function (anonymous)],
 
+    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
+    static once(emitter: DOMEventTarget, name: string, options?: StaticOnceOptions<DOMEventTarget, string>): Promise<any[]>;
+    static once(emitter: NodeEventEmitter, name: string|symbol, options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
@@ -627,22 +638,20 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      *
      * @param emitter
      * @param name
-     * @param options?
-     * @param {AbortSignal} options.signal? - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
-     * @param {ServerTiming} options.timing?
-     * @param {Function} options.checkFn?
+     * @param {StaticOnceOptions=} options
+     * @param {AbortSignal=} options.signal - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
+     * @param {ServerTiming=} options.timing
+     * @param {Function=} options.checkFn
+     * @param {number=} options.timeout
      */
-    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions<EventEmitterEx>): Promise<any[]>;
-    static once(emitter: DOMEventTarget, name: string, options?: StaticOnceOptions<DOMEventTarget>): Promise<any[]>;
-    static once(emitter: NodeEventEmitter, name: string|symbol, options?: StaticOnceOptions<NodeEventEmitter>): Promise<any[]>;
-    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions<EventEmitterEx|NodeEventEmitter|DOMEventTarget>): Promise<any[]> {
+    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions<typeof emitter, typeof name>): Promise<any[]> {
         if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|NodeEventEmitter)) {
             // todo: make _once_DOMEventTarget
             throw new Error('DOMEventTarget compatible mode not implemented yet');
         }
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
-        const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx>;
+        const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
         const signal = staticOnceOptions.signal || void 0;
         const timeout = staticOnceOptions.timeout || void 0;
         // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
