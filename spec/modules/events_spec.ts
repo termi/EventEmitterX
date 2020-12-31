@@ -4,16 +4,19 @@
 
 require('termi@polyfills');
 
-import events from '../../modules/events';
+import {EventEmitter as NodeEventEmitter} from 'events';
+import events, {EventEmitterEx} from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 
 const {EventEmitter} = events;
+const {once} = EventEmitterEx;
 
 describe('EventEmitter', function() {
     const ee = new EventEmitter();
 
     describe('constructor', function () {
         it('instanceof', function () {
+            expect(new EventEmitterEx()).toBeInstanceOf(EventEmitterEx);
             expect(new EventEmitter()).toBeInstanceOf(EventEmitter);
             expect(new events()).toBeInstanceOf(events);
         });
@@ -23,6 +26,13 @@ describe('EventEmitter', function() {
         it('instanceof', function () {
             expect(new EventEmitter()).toBeInstanceOf(events);
             expect(new events()).toBeInstanceOf(EventEmitter);
+        });
+    });
+
+    describe('EventEmitterEx is an alias for EventEmitter', function () {
+        it('instanceof', function () {
+            expect(new EventEmitter()).toBeInstanceOf(EventEmitterEx);
+            expect(new EventEmitterEx()).toBeInstanceOf(EventEmitter);
         });
     });
 
@@ -323,14 +333,32 @@ describe('EventEmitter', function() {
         });
     });
 
-    describe('EventEmitter.once', function () {
+    describe('EventEmitter.once', function _EventEmitter_once() {
+        let EventEmitter = EventEmitterEx;
+
+        {
+            // eslint-disable-next-line prefer-rest-params
+            const eventEmitterConstructor = arguments[0] as Function;
+
+            if (!eventEmitterConstructor) {
+                describe('EventEmitter.once with NodeJS.EventEmitter', _EventEmitter_once.bind(null, NodeEventEmitter));
+            }
+            else {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                EventEmitter = eventEmitterConstructor;
+            }
+        }
+
+        const ee = new EventEmitter();
+
         it('should emit once', function (done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [ 'test', 1, {} ];
             const argsArray: any[] = [];
 
-            EventEmitter.once(ee, 'test')
+            once(ee, 'test1')
                 .then(actualArgs => {
                     argsArray.push(actualArgs as any[]);
                 })
@@ -345,7 +373,7 @@ describe('EventEmitter', function() {
                 })
             ;
 
-            ee.emit('test', ...expectedArgs);
+            ee.emit('test1', ...expectedArgs);
         });
 
         it('should emit once (async/await)', async function () {
@@ -353,14 +381,14 @@ describe('EventEmitter', function() {
             const argsArray: any[] = [];
 
             process.nextTick(() => {
-                ee.emit('test', ...expectedArgs);
+                ee.emit('test2', ...expectedArgs);
             });
 
-            const actualArgs = await EventEmitter.once(ee, 'test') as any[];
+            const actualArgs = await once(ee, 'test2') as any[];
 
             argsArray.push(actualArgs);
 
-            ee.emit('test', ...expectedArgs);
+            ee.emit('test2', ...expectedArgs);
 
             expect(argsArray).toEqual([ expectedArgs ]);
         });
@@ -369,7 +397,7 @@ describe('EventEmitter', function() {
             const expectedError = new Error('REJECT PROMISE');
             let error = null;
 
-            EventEmitter.once(ee, 'test')
+            once(ee, 'test3')
                 .catch(err => {
                     error = err;
                 })
@@ -392,7 +420,7 @@ describe('EventEmitter', function() {
             });
 
             try {
-                await EventEmitter.once(ee, 'test');
+                await once(ee, 'test4');
             }
             catch(err) {
                 error = err;
@@ -412,13 +440,13 @@ describe('EventEmitter', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 9})
+                once(ee, 'test5', {checkFn: (type, ee, args) => args[1] === 9})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 5})
+                once(ee, 'test5', {checkFn: (type, ee, args) => args[1] === 5})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                EventEmitter.once(ee, 'test', {checkFn: (type, ee, args) => args[1] === 1})
+                once(ee, 'test5', {checkFn: (type, ee, args) => args[1] === 1})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
             ]).then(() => {
@@ -428,12 +456,12 @@ describe('EventEmitter', function() {
                 done();
             });
 
-            ee.emit('test', ...[ 'test', 0, {} ]);
-            ee.emit('test', ...[ 'test', 1, {} ]);
-            ee.emit('test', ...[ 'test', 3, {} ]);
-            ee.emit('test', ...[ 'test', 5, {} ]);
-            ee.emit('test', ...[ 'test', 7, {} ]);
-            ee.emit('test', ...[ 'test', 9, {} ]);
+            ee.emit('test5', ...[ 'test', 0, {} ]);
+            ee.emit('test5', ...[ 'test', 1, {} ]);
+            ee.emit('test5', ...[ 'test', 3, {} ]);
+            ee.emit('test5', ...[ 'test', 5, {} ]);
+            ee.emit('test5', ...[ 'test', 7, {} ]);
+            ee.emit('test5', ...[ 'test', 9, {} ]);
         });
 
         it('with AbortSignal', function (done) {
@@ -441,7 +469,7 @@ describe('EventEmitter', function() {
             let counter = 0;
             const ac = new AbortController();
 
-            EventEmitter.once(ee, 'test', { signal: ac.signal })
+            once(ee, 'test6', { signal: ac.signal })
                 .then(() => {
                     counter++;
                 })
@@ -459,18 +487,45 @@ describe('EventEmitter', function() {
             ;
 
             ac.abort();
-            ee.emit('test', ...[1, 2, 3]);
+            ee.emit('test6', ...[1, 2, 3]);
+        });
+
+        it('with timeout', function (done) {
+            let error: DOMException|void = void 0;
+            let counter = 0;
+
+            once(ee, 'test7', { timeout: 10 })
+                .then(() => {
+                    counter++;
+                })
+                .catch(err => {
+                    error = err;
+                })
+                .then(() => {
+                    expect(counter).toBe(0);
+                    expect(error).toBeDefined();
+                    expect(error && error.name).toBe('Error');
+
+                    done();
+                })
+            ;
+
+            setTimeout(() => {
+                ee.emit('test7', ...[1, 2, 3]);
+            }, 100);
         });
 
         it('with ServerTiming', async function () {
+            const ee = new EventEmitter();
+
             {
                 const st = new ServerTiming();
 
                 process.nextTick(() => {
-                    ee.emit('test', 1);
+                    ee.emit('test8', 1);
                 });
 
-                await EventEmitter.once(ee, 'test', { timing: st });
+                await once(ee, 'test8', { timing: st });
 
                 expect(st.length).toBe(1);
             }
@@ -482,7 +537,7 @@ describe('EventEmitter', function() {
                 });
 
                 try {
-                    await EventEmitter.once(ee, 'test', { timing: st });
+                    await once(ee, 'test8', { timing: st });
                 }
                 catch(err) {
                     //
@@ -493,25 +548,26 @@ describe('EventEmitter', function() {
         });
 
         it('with ServerTiming and few events', async function () {
+            const ee = new EventEmitter();
             const st = new ServerTiming();
             let error: Error|void = void 0;
 
             process.nextTick(() => {
-                ee.emit('test1', 1);
-                ee.emit('test2', 2);
+                ee.emit('test9-1', 1);
+                ee.emit('test9-2', 2);
                 ee.emit('error', 3);
             });
 
             await Promise.all([
-                EventEmitter.once(ee, 'test1', { timing: st }),
-                EventEmitter.once(ee, 'test2', { timing: st }),
-                EventEmitter.once(ee, 'test3', { timing: st }).catch(err => {
+                once(ee, 'test9-1', { timing: st }),
+                once(ee, 'test9-2', { timing: st }),
+                once(ee, 'test9-3', { timing: st }).catch(err => {
                     error = err;
                 }),
             ]);
 
             expect(st.length).toBe(3);
-            expect(st.getTimings().map(a => a.description)).toEqual(['test1', 'test2', 'test3']);
+            expect(st.getTimings().map(a => a.description)).toEqual(['test9-1', 'test9-2', 'test9-3']);
             expect(error).toBeDefined();
         });
 
@@ -521,7 +577,7 @@ describe('EventEmitter', function() {
             let counter = 0;
             const ac = new AbortController();
 
-            EventEmitter.once(ee, 'test', { signal: ac.signal, timing: st })
+            once(ee, 'test10', { signal: ac.signal, timing: st })
                 .then(() => {
                     counter++;
                 })
@@ -540,7 +596,7 @@ describe('EventEmitter', function() {
             ;
 
             ac.abort();
-            ee.emit('test', ...[1, 2, 3]);
+            ee.emit('test10', ...[1, 2, 3]);
         });
     });
 });

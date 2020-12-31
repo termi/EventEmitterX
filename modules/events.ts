@@ -2,12 +2,14 @@
 
 // todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
 
+import type {EventEmitter} from "events";
 import type ServerTiming from 'termi@ServerTiming';
 import AbortController, {errorFabric} from 'termi@abortable';
 
 type Timeout = NodeJS.Timeout;
-type DOMEventTarget = typeof EventTarget;
+type DOMEventTarget = EventTarget;
 type NodeEventEmitter = NodeJS.EventEmitter;
+// type NodeEventEmitter = EventEmitter;
 export declare type Listener = (...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
@@ -58,23 +60,13 @@ interface Options {
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
-interface StaticOnceOptions {
+interface StaticOnceOptions<E extends EventEmitterEx|NodeEventEmitter|DOMEventTarget> {
     /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
     signal?: AbortSignal;
     timing?: ServerTiming;
-    checkFn?: (number: EventName, eventEmitter: EventEmitterEx, args: any[]) => boolean;
+    checkFn?: (number: EventName, eventEmitter: E, args: any[]) => boolean;
     timeout?: number;
     // [key: string]: any;
-}
-
-interface NodeCompatibleStaticOnceOptions {
-    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
-    signal?: AbortSignal;
-}
-
-interface DOMCompatibleStaticOnceOptions {
-    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
-    signal?: AbortSignal;
 }
 
 let _onceListenerIdCounter = 0;
@@ -82,7 +74,6 @@ let _onceListenerIdCounter = 0;
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 const errorMonitor = Symbol('events.errorMonitor');
 // const captureRejectionSymbol = Symbol('nodejs.rejection');
-const sListenerOptions = Symbol('events.listenerOptions');
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
 
@@ -91,15 +82,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     private _events: {
         [eventName in keyof EventMap]?: Function|Function[]
     } = Object.create(null);
-    /** listeners with attached IEventEmitter_ListenerOptions object by symbol listenerOptions */
-    private _lsWOpts: Function[] = [];
 
-    maxListeners = Infinity;
+    _maxListeners = Infinity;
 
     // listenerOncePerEventType, listener can be registered at most once per event type
     private _lopet = false;
-    // hasAnyListenerWithOptions
-    private _halwo = false;
     /* todo: add handleEvent support
     // supportHandleEvent, support EventTarget.handleEvent
     private _she = false;
@@ -116,7 +103,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             } = options;
 
             if (maxListeners !== void 0) {
-                this.maxListeners = maxListeners;
+                this._maxListeners = maxListeners;
             }
             if (listenerOncePerEventType !== void 0) {
                 this._lopet = listenerOncePerEventType;
@@ -131,7 +118,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]>) {
         const {_events} = this;
-        const hasAnyListenerWithOptions = this._halwo;
         const isErrorEvent = event === 'error';
         const handler = _events[event];
 
@@ -147,13 +133,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
             if (isFn) {
                 const func_handler = handler as Function;
-                const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-                if (options && options.checkFn) {
-                    if (!options.checkFn(event, this, args)) {
-                        return false;
-                    }
-                }
 
                 switch (args.length) {
                     case 0:
@@ -182,17 +161,23 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 switch (args.length) {
                     // fast cases
                     case 0:
-                        return emitNone_array(array_handler, this, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
+                        emitNone_array(array_handler, this);
+                        break;
                     case 1:
-                        return emitOne_array(array_handler, this, args[0], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
+                        emitOne_array(array_handler, this, args[0]);
+                        break;
                     case 2:
-                        return emitTwo_array(array_handler, this, args[0], args[1], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
+                        emitTwo_array(array_handler, this, args[0], args[1]);
+                        break;
                     case 3:
-                        return emitThree_array(array_handler, this, args[0], args[1], args[2], hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
+                        emitThree_array(array_handler, this, args[0], args[1], args[2]);
+                        break;
                     // slower
                     default:
-                        return emitMany_array(array_handler, this, args, hasAnyListenerWithOptions, hasAnyListenerWithOptions ? event : 0) > 0;
+                        emitMany_array(array_handler, this, args);
                 }
+
+                return true;
             }
         }
         else if (isErrorEvent) {
@@ -233,7 +218,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     // private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
-    private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey], prepend: boolean, once: boolean, options?: StaticOnceOptions): this {
+    private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey], prepend: boolean, once: boolean): this {
         // const {_she: supportHandleEvent} = this;
         // if (typeof listener === 'object') {
         //     console.log(listener);
@@ -245,18 +230,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             listener = _onceWrap<EventMap, EventKey>(this, event, listener);
         }
 
-        if (options) {
-            // hasAnyListenerWithOptions
-            this._halwo = true;
-
-            listener[sListenerOptions] = options;
-
-            this._lsWOpts.push(listener);
-        }
-
         const {
             _events,
-            maxListeners,
+            _maxListeners,
             _lopet: listenerOncePerEventType,
         } = this;
         // todo: add handleEvent support
@@ -302,7 +278,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
 
-        if (maxListeners !== Infinity && maxListeners <= newLen) {
+        if (_maxListeners !== Infinity && _maxListeners <= newLen) {
             // todo: EventEmitterEx.sOnMaxListeners = Symbol('sOnMaxListeners');
             //  emit(EventEmitterEx.sOnMaxListeners, newLen, event, `Maximum event listeners for "${event}" event!`);
             console.warn(`Maximum event listeners for "${event}" event!`);
@@ -321,7 +297,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const {
             _events,
             _lopet: listenerOncePerEventType,
-            _halwo: hasAnyListenerWithOptions,
         } = this;
         const handler = _events[event];
 
@@ -477,20 +452,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
 
-        if (hasAnyListenerWithOptions && listener[sListenerOptions] !== void 0) {
-            delete listener[sListenerOptions];
-
-            const index = this._lsWOpts.indexOf(listener);
-
-            if (index !== -1) {
-                this._lsWOpts.splice(index, 1);
-            }
-
-            if (this._lsWOpts.length === 0) {
-                this._halwo = false;
-            }
-        }
-
         // if (_events.removeListener) this.emit('removeListener', type, originalListener || listener);
 
         return this;
@@ -524,45 +485,23 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     removeAllListeners<EventKey extends keyof EventMap = EventName>(event?: EventKey): this {
-        const hasAnyListenerWithOptions = this._halwo;
-
         if (!event) {
-            if (hasAnyListenerWithOptions) {
-                for (const handler of this._lsWOpts) {
-                    delete handler[sListenerOptions];
-                }
-
-                this._lsWOpts.length = 0;
-                this._halwo = false;
-            }
-
             this._onceIds.length = 0;
             this._events = Object.create(null);
         }
         else {
-            if (hasAnyListenerWithOptions || this._onceIds.length > 0) {
+            if (this._onceIds.length > 0) {
                 const handler = this._events[event];
 
                 if (typeof handler === 'function') {
-                    if (handler[sListenerOptions] !== void 0) {
-                        delete handler[sListenerOptions];
-
-                        const index = this._lsWOpts.indexOf(handler);
-
-                        if (index !== -1) {
-                            this._lsWOpts.splice(index, 1);
-                        }
-
-                        if (this._lsWOpts.length === 0) {
-                            this._halwo = false;
-                        }
-                    }
-
                     const onceWrapperId = handler[sOnceListenerWrapperId];
-                    const idIndex = this._onceIds.indexOf(onceWrapperId);
 
-                    if (idIndex !== -1) {
-                        this._onceIds.splice(idIndex, 1);
+                    if (onceWrapperId !== void 0) {
+                        const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                        if (idIndex !== -1) {
+                            this._onceIds.splice(idIndex, 1);
+                        }
                     }
                 }
                 else {
@@ -571,26 +510,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     for (let i = listeners.length ; i-- > 0 ; ) {
                         const handler = listeners[i];
 
-                        if (handler[sListenerOptions] !== void 0) {
-                            delete handler[sListenerOptions];
-
-                            const index = this._lsWOpts.indexOf(handler);
-
-                            if (index !== -1) {
-                                this._lsWOpts.splice(index, 1);
-                            }
-                        }
-
                         const onceWrapperId = handler[sOnceListenerWrapperId];
                         const idIndex = this._onceIds.indexOf(onceWrapperId);
 
                         if (idIndex !== -1) {
                             this._onceIds.splice(idIndex, 1);
                         }
-                    }
-
-                    if (this._lsWOpts.length === 0) {
-                        this._halwo = false;
                     }
                 }
             }
@@ -602,12 +527,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     setMaxListeners(n: number): this {
-        this.maxListeners = n;
+        this._maxListeners = n;
         return this;
     }
 
     getMaxListeners(): number {
-        return this.maxListeners;
+        return this._maxListeners;
     }
 
     /**
@@ -707,20 +632,24 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {ServerTiming} options.timing?
      * @param {Function} options.checkFn?
      */
-    static once(emitter: DOMEventTarget, name: string, options?: DOMCompatibleStaticOnceOptions): Promise<any[]>;
-    static once(emitter: NodeEventEmitter, name: string|symbol, options?: NodeCompatibleStaticOnceOptions): Promise<any[]>;
-    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions): Promise<any[]>;
-    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions|NodeCompatibleStaticOnceOptions|DOMCompatibleStaticOnceOptions): Promise<any[]> {
-        if (!(emitter instanceof EventEmitterEx)) {
-            // todo: make _once_DOMEventTarget and _once_NodeEventEmitter
-            throw new Error('NodeJS.EventEmitter compatible mode not implemented yet');
+    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions<EventEmitterEx>): Promise<any[]>;
+    static once(emitter: DOMEventTarget, name: string, options?: StaticOnceOptions<DOMEventTarget>): Promise<any[]>;
+    static once(emitter: NodeEventEmitter, name: string|symbol, options?: StaticOnceOptions<NodeEventEmitter>): Promise<any[]>;
+    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions<EventEmitterEx|NodeEventEmitter|DOMEventTarget>): Promise<any[]> {
+        if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|NodeEventEmitter)) {
+            // todo: make _once_DOMEventTarget
+            throw new Error('DOMEventTarget compatible mode not implemented yet');
         }
 
-        const staticOnceOptions = (options || {}) as StaticOnceOptions;
+        const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
+        const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx>;
         const signal = staticOnceOptions.signal || void 0;
-        const hasSignal = !!signal;
         const timeout = staticOnceOptions.timeout || void 0;
-        let listenersCleanUpByAbort: Function|void = void 0;
+        // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
+        //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
+        //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
+        const checkFn = staticOnceOptions.checkFn && typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0;
+        let listenersCleanUp: Function|void = void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
 
@@ -744,10 +673,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         const promise = new Promise<any[]>((resolve, reject) => {
-            const onceListener = (...args) => {
-                if (hasSignal) {
-                    listenersCleanUpByAbort = void 0;
+            const eventListener = (...args) => {
+                if (checkFn && !checkFn(name, _emitter, args)) {
+                    return;
                 }
+
                 if (hasTiming) {
                     timing!.timeEnd(String(name), true);
                     // cleanup
@@ -755,13 +685,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     hasTiming = false;
                 }
 
-                emitter.removeListener('error', errorListener);
+                if (listenersCleanUp) {
+                    listenersCleanUp();
+                }
+
                 resolve(args);
             };
             const errorListener = error => {
-                if (hasSignal) {
-                    listenersCleanUpByAbort = void 0;
-                }
                 if (hasTiming) {
                     timing!.timeEnd(String(name), true);
                     // cleanup
@@ -769,29 +699,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     hasTiming = false;
                 }
 
-                emitter.removeListener(name, onceListener);
+                if (listenersCleanUp) {
+                    listenersCleanUp();
+                }
+
                 reject(error);
-            }
+            };
 
-            if (hasSignal) {
-                listenersCleanUpByAbort = function() {
-                    emitter.removeListener('error', errorListener);
-                    emitter.removeListener(name, onceListener);
+            listenersCleanUp = function() {
+                _emitter.removeListener(name as string|symbol, eventListener);
+                _emitter.removeListener('error', errorListener);
 
-                    listenersCleanUpByAbort = void 0;
-                };
-            }
+                listenersCleanUp = void 0;
+            };
 
-            if (staticOnceOptions && staticOnceOptions.checkFn) {
-                // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
-                //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
-                //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
-                emitter._addListener(name, onceListener, false, true, staticOnceOptions);
-            }
-            else {
-                emitter.once(name, onceListener);
-            }
-            emitter.once('error', errorListener);
+            _emitter.on(name as string|symbol, eventListener);
+            _emitter.once('error', errorListener);
         });
 
         if (signal || timeout) {
@@ -819,8 +742,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             hasTiming = false;
                         }
 
-                        if (listenersCleanUpByAbort) {
-                            listenersCleanUpByAbort();
+                        if (listenersCleanUp) {
+                            listenersCleanUp();
                         }
 
                         reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
@@ -842,6 +765,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         hasTiming = false;
                     }
 
+                    if (listenersCleanUp) {
+                        listenersCleanUp();
+                    }
+
                     reject(new Error(`TIMEOUT`));
                 }, timeout);
 
@@ -858,12 +785,20 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
             }) : void 0;
 
+            const promises: Promise<any[]|void>[] = [ promise ];
+
+            if (cancelPromise) {
+                promises.push(cancelPromise);
+            }
+            if (timeoutPromise) {
+                promises.push(timeoutPromise);
+            }
+
             // Return the fastest promise (don't need to wait for request to finish)
-            return Promise.race([
-                cancelPromise,
-                timeoutPromise,
-                promise,
-            ]).then(result => {
+            return Promise.race(promises).then(result => {
+                if (listenersCleanUp) {
+                    listenersCleanUp();
+                }
                 if (abortCallback) {
                     // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
                     abortCallback(sCleanAbortPromise);
@@ -881,6 +816,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 return result as any[];
             }).catch(error => {
+                if (listenersCleanUp) {
+                    listenersCleanUp();
+                }
                 if (abortCallback) {
                     // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
                     abortCallback(sCleanAbortPromise);
@@ -908,6 +846,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     static usingDomains = false;
 
     static EventEmitter = EventEmitterEx;
+    static EventEmitterEx = EventEmitterEx;
     /** alias for global AbortController */
     static AbortController = AbortController;
 }
@@ -928,6 +867,19 @@ function checkListener(listener: Function, supportHandleEvent = false) {
             throw new TypeError('"listener" argument must be a function');
         }
     }
+}
+
+function isDOMEventTarget(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter) {
+    return typeof (emitter as DOMEventTarget).addEventListener === 'function'
+        && typeof (emitter as DOMEventTarget).removeEventListener === 'function'
+    ;
+}
+
+function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter) {
+    return typeof emitter.on === 'function'
+        && typeof emitter.once === 'function'
+        && typeof emitter.removeListener === 'function'
+    ;
 }
 
 function checkAbortSignal(signal: AbortSignal): TypeError|void {
@@ -990,168 +942,48 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     return wrapped as EventMap[EventKey];
 }
 
-function emitNone_array(handlers: Function[], self: EventEmitterEx, hasAnyListenerWithOptions: boolean, event: EventName) {
+function emitNone_array(handlers: Function[], self: EventEmitterEx) {
     // arrayClone
     const listeners = [ ...handlers ];
     const len = listeners.length;
-
-    if (hasAnyListenerWithOptions) {
-        let calledLen = 0;
-
-        for (let i = 0 ; i < len ; ++i) {
-            const func_handler = listeners[i];
-            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-            if (options && options.checkFn) {
-                if (!options.checkFn(event, this, [])) {
-                    continue;
-                }
-            }
-
-            calledLen++;
-            listeners[i].call(self);
-        }
-
-        return calledLen;
-    }
-    else {
-        for (let i = 0 ; i < len ; ++i) {
-            listeners[i].call(self);
-        }
-
-        return len;
+    for (let i = 0 ; i < len ; ++i) {
+        listeners[i].call(self);
     }
 }
 
-function emitOne_array(handlers: Function[], self: EventEmitterEx, arg1: any, hasAnyListenerWithOptions: boolean, event: EventName) {
+function emitOne_array(handlers: Function[], self: EventEmitterEx, arg1: any) {
     // arrayClone
     const listeners = [ ...handlers ];
     const len = listeners.length;
-
-    if (hasAnyListenerWithOptions) {
-        let calledLen = 0;
-
-        for (let i = 0 ; i < len ; ++i) {
-            const func_handler = listeners[i];
-            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-            if (options && options.checkFn) {
-                if (!options.checkFn(event, this, [ arg1 ])) {
-                    continue;
-                }
-            }
-
-            calledLen++;
-            listeners[i].call(self, arg1);
-        }
-
-        return calledLen;
-    }
-    else {
-        for (let i = 0; i < len; ++i) {
-            listeners[i].call(self, arg1);
-        }
-
-        return len;
+    for (let i = 0 ; i < len ; ++i) {
+        listeners[i].call(self, arg1);
     }
 }
 
-function emitTwo_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any, hasAnyListenerWithOptions: boolean, event: EventName) {
+function emitTwo_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any) {
     // arrayClone
     const listeners = [ ...handlers ];
     const len = listeners.length;
-
-    if (hasAnyListenerWithOptions) {
-        let calledLen = 0;
-
-        for (let i = 0 ; i < len ; ++i) {
-            const func_handler = listeners[i];
-            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-            if (options && options.checkFn) {
-                if (!options.checkFn(event, this, [ arg1, arg2 ])) {
-                    continue;
-                }
-            }
-
-            calledLen++;
-            listeners[i].call(self, arg1, arg2);
-        }
-
-        return calledLen;
-    }
-    else {
-        for (let i = 0; i < len; ++i) {
-            listeners[i].call(self, arg1, arg2);
-        }
-
-        return len;
+    for (let i = 0 ; i < len ; ++i) {
+        listeners[i].call(self, arg1, arg2);
     }
 }
 
-function emitThree_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any, hasAnyListenerWithOptions: boolean, event: EventName) {
+function emitThree_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any) {
     // arrayClone
     const listeners = [ ...handlers ];
     const len = listeners.length;
-
-    if (hasAnyListenerWithOptions) {
-        let calledLen = 0;
-
-        for (let i = 0 ; i < len ; ++i) {
-            const func_handler = listeners[i];
-            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-            if (options && options.checkFn) {
-                if (!options.checkFn(event, this, [ arg1, arg2, arg3 ])) {
-                    continue;
-                }
-            }
-
-            calledLen++;
-            listeners[i].call(self, arg1, arg2, arg3);
-        }
-
-        return calledLen;
-    }
-    else {
-        for (let i = 0; i < len; ++i) {
-            listeners[i].call(self, arg1, arg2, arg3);
-        }
-
-        return len;
+    for (let i = 0 ; i < len ; ++i) {
+        listeners[i].call(self, arg1, arg2, arg3);
     }
 }
 
-function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[], hasAnyListenerWithOptions: boolean, event: EventName) {
+function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[]) {
     // arrayClone
     const listeners = [ ...handlers ];
     const len = listeners.length;
-
-    if (hasAnyListenerWithOptions) {
-        let calledLen = 0;
-
-        for (let i = 0 ; i < len ; ++i) {
-            const func_handler = listeners[i];
-            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
-
-            if (options && options.checkFn) {
-                if (!options.checkFn(event, this, args)) {
-                    continue;
-                }
-            }
-
-            calledLen++;
-            listeners[i].call(self);
-        }
-
-        return calledLen;
-    }
-    else {
-        for (let i = 0; i < len; ++i) {
-            listeners[i].apply(self, args);
-        }
-
-        return len;
+    for (let i = 0 ; i < len ; ++i) {
+        listeners[i].apply(self, args);
     }
 }
 
