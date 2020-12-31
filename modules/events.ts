@@ -5,6 +5,7 @@
 import type ServerTiming from 'termi@ServerTiming';
 import AbortController, {errorFabric} from 'termi@abortable';
 
+type Timeout = NodeJS.Timeout;
 type DOMEventTarget = typeof EventTarget;
 type NodeEventEmitter = NodeJS.EventEmitter;
 export declare type Listener = (...args: any[]) => Promise<any> | void;
@@ -62,8 +63,8 @@ interface StaticOnceOptions {
     signal?: AbortSignal;
     timing?: ServerTiming;
     checkFn?: (number: EventName, eventEmitter: EventEmitterEx, args: any[]) => boolean;
-    // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
-    [key: string]: any;
+    timeout?: number;
+    // [key: string]: any;
 }
 
 interface NodeCompatibleStaticOnceOptions {
@@ -83,7 +84,7 @@ const errorMonitor = Symbol('events.errorMonitor');
 // const captureRejectionSymbol = Symbol('nodejs.rejection');
 const sListenerOptions = Symbol('events.listenerOptions');
 // Symbol for EventEmitterEx.once
-const sClearPromiseSymbol = Symbol();
+const sCleanAbortPromise = Symbol();
 
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
@@ -715,13 +716,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             throw new Error('NodeJS.EventEmitter compatible mode not implemented yet');
         }
 
-        const staticOnceOptions = options as StaticOnceOptions;
-        const signal = staticOnceOptions && staticOnceOptions.signal || void 0;
+        const staticOnceOptions = (options || {}) as StaticOnceOptions;
+        const signal = staticOnceOptions.signal || void 0;
         const hasSignal = !!signal;
+        const timeout = staticOnceOptions.timeout || void 0;
         let listenersCleanUpByAbort: Function|void = void 0;
-        let timing = staticOnceOptions && staticOnceOptions.timing || void 0;
+        let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
-        // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
 
         if (signal) {
             {
@@ -793,15 +794,19 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             emitter.once('error', errorListener);
         });
 
-        if (signal) {
-            let abortCallback;
+        if (signal || timeout) {
+            let abortCallback: ((this: AbortSignal|void, ev: typeof sCleanAbortPromise|AbortSignalEventMap["abort"]) => void)|void;
+            let cleanTimeoutCallback: Function|void;
 
             // Turn an event into a promise, reject it once `abort` is dispatched
-            const cancellation = new Promise<void>((resolve, reject) => {
+            const cancelPromise = signal ? new Promise<void>((resolve, reject) => {
                 abortCallback = function(clearPromiseSymbol) {
-                    signal.removeEventListener('abort', abortCallback);
+                    if (abortCallback) {
+                        signal.removeEventListener('abort', abortCallback);
+                    }
 
-                    if (clearPromiseSymbol === sClearPromiseSymbol) {
+                    if (clearPromiseSymbol === sCleanAbortPromise) {
+                        // Call resolve only in cleanup purpose. It should be called when it cannot affect Promise.race!
                         // Очищаем Promise, чтобы он не висел нереализованным
                         resolve();
                     }
@@ -825,16 +830,46 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
 
                 signal.addEventListener('abort', abortCallback);
-            });
+            }) : void 0;
+            const timeoutPromise = timeout ? new Promise<void>((resolve, reject) => {
+                let timeoutId: Timeout|void = setTimeout(() => {
+                    timeoutId = void 0;
+
+                    if (hasTiming) {
+                        timing!.timeEnd(String(name), true);
+                        // cleanup
+                        timing = void 0;
+                        hasTiming = false;
+                    }
+
+                    reject(new Error(`TIMEOUT`));
+                }, timeout);
+
+                cleanTimeoutCallback = function() {
+                    if (timeoutId) {
+                        clearTimeout(timeoutId);
+
+                        timeoutId = void 0;
+                    }
+
+                    // Call resolve only in cleanup purpose. It should be called when it cannot affect Promise.race!
+                    // Очищаем Promise, чтобы он не висел нереализованным
+                    resolve();
+                };
+            }) : void 0;
 
             // Return the fastest promise (don't need to wait for request to finish)
             return Promise.race([
-                cancellation,
+                cancelPromise,
+                timeoutPromise,
                 promise,
             ]).then(result => {
                 if (abortCallback) {
                     // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
-                    abortCallback(sClearPromiseSymbol);
+                    abortCallback(sCleanAbortPromise);
+                }
+                if (cleanTimeoutCallback) {
+                    cleanTimeoutCallback();
                 }
 
                 if (hasTiming) {
@@ -848,7 +883,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }).catch(error => {
                 if (abortCallback) {
                     // Вызываем abortCallback передавая в неё sClearPromiseSymbol, чтобы она сама за собой подчистила
-                    abortCallback(sClearPromiseSymbol);
+                    abortCallback(sCleanAbortPromise);
+                }
+                if (cleanTimeoutCallback) {
+                    cleanTimeoutCallback();
                 }
 
                 if (hasTiming) {
