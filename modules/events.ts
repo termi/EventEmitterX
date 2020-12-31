@@ -1,8 +1,12 @@
 /// <reference types="node" />
 
+// todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
+
 import type ServerTiming from 'termi@ServerTiming';
 import AbortController, {errorFabric} from 'termi@abortable';
 
+type DOMEventTarget = typeof EventTarget;
+type NodeEventEmitter = NodeJS.EventEmitter;
 export declare type Listener = (...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
@@ -39,9 +43,9 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     listenerCount<EventKey extends keyof EventMap = EventName>(type: EventKey): number;
 }
 /** cast type of any event emitter to typed event emitter */
-export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends NodeJS.EventEmitter>(x: X): IEventEmitter<EventMap>;
+export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends NodeEventEmitter>(x: X): IEventEmitter<EventMap>;
 
-interface IEventEmitter_Options {
+interface Options {
     maxListeners?: number;
     // listener can be registered at most once per event type
     listenerOncePerEventType?: boolean;
@@ -53,13 +57,23 @@ interface IEventEmitter_Options {
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
-interface IEventEmitter_StaticOnceOptions {
+interface StaticOnceOptions {
     /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
     signal?: AbortSignal;
     timing?: ServerTiming;
     checkFn?: (number: EventName, eventEmitter: EventEmitterEx, args: any[]) => boolean;
     // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
     [key: string]: any;
+}
+
+interface NodeCompatibleStaticOnceOptions {
+    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
+    signal?: AbortSignal;
+}
+
+interface DOMCompatibleStaticOnceOptions {
+    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
+    signal?: AbortSignal;
 }
 
 let _onceListenerIdCounter = 0;
@@ -92,7 +106,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     // list of local id's for once listeners
     _onceIds: number[] = [];
 
-    constructor(options?: IEventEmitter_Options) {
+    constructor(options?: Options) {
         if (options) {
             const {
                 maxListeners,
@@ -132,7 +146,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
             if (isFn) {
                 const func_handler = handler as Function;
-                const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+                const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
                 if (options && options.checkFn) {
                     if (!options.checkFn(event, this, args)) {
@@ -218,7 +232,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     // private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
-    private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey], prepend: boolean, once: boolean, options?: IEventEmitter_StaticOnceOptions): this {
+    private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey], prepend: boolean, once: boolean, options?: StaticOnceOptions): this {
         // const {_she: supportHandleEvent} = this;
         // if (typeof listener === 'object') {
         //     console.log(listener);
@@ -671,8 +685,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return (handler as EventMap[EventKey][]).length;
     }
 
+
     // todo:
-    //   on: [Function: on],
+    //   static on(emitter: EventEmitter, event: string): AsyncIterableIterator<any>;
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
@@ -691,11 +706,20 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {ServerTiming} options.timing?
      * @param {Function} options.checkFn?
      */
-    static once(emitter: EventEmitterEx, name: EventName, options?: IEventEmitter_StaticOnceOptions): Promise<any[]> {
-        const signal = options && options.signal || void 0;
+    static once(emitter: DOMEventTarget, name: string, options?: DOMCompatibleStaticOnceOptions): Promise<any[]>;
+    static once(emitter: NodeEventEmitter, name: string|symbol, options?: NodeCompatibleStaticOnceOptions): Promise<any[]>;
+    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions): Promise<any[]>;
+    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions|NodeCompatibleStaticOnceOptions|DOMCompatibleStaticOnceOptions): Promise<any[]> {
+        if (!(emitter instanceof EventEmitterEx)) {
+            // todo: make _once_DOMEventTarget and _once_NodeEventEmitter
+            throw new Error('NodeJS.EventEmitter compatible mode not implemented yet');
+        }
+
+        const staticOnceOptions = options as StaticOnceOptions;
+        const signal = staticOnceOptions && staticOnceOptions.signal || void 0;
         const hasSignal = !!signal;
         let listenersCleanUpByAbort: Function|void = void 0;
-        let timing = options && options.timing || void 0;
+        let timing = staticOnceOptions && staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
         // todo: support options.timeout as non-standard promise rejecter. Wile on timeout, promise will reject with `new TimeoutError`
 
@@ -757,11 +781,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
             }
 
-            if (options && options.checkFn) {
+            if (staticOnceOptions && staticOnceOptions.checkFn) {
                 // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
                 //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
                 //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
-                emitter._addListener(name, onceListener, false, true, options);
+                emitter._addListener(name, onceListener, false, true, staticOnceOptions);
             }
             else {
                 emitter.once(name, onceListener);
@@ -938,7 +962,7 @@ function emitNone_array(handlers: Function[], self: EventEmitterEx, hasAnyListen
 
         for (let i = 0 ; i < len ; ++i) {
             const func_handler = listeners[i];
-            const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
             if (options && options.checkFn) {
                 if (!options.checkFn(event, this, [])) {
@@ -971,7 +995,7 @@ function emitOne_array(handlers: Function[], self: EventEmitterEx, arg1: any, ha
 
         for (let i = 0 ; i < len ; ++i) {
             const func_handler = listeners[i];
-            const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
             if (options && options.checkFn) {
                 if (!options.checkFn(event, this, [ arg1 ])) {
@@ -1004,7 +1028,7 @@ function emitTwo_array(handlers: Function[], self: EventEmitterEx, arg1: any, ar
 
         for (let i = 0 ; i < len ; ++i) {
             const func_handler = listeners[i];
-            const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
             if (options && options.checkFn) {
                 if (!options.checkFn(event, this, [ arg1, arg2 ])) {
@@ -1037,7 +1061,7 @@ function emitThree_array(handlers: Function[], self: EventEmitterEx, arg1: any, 
 
         for (let i = 0 ; i < len ; ++i) {
             const func_handler = listeners[i];
-            const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
             if (options && options.checkFn) {
                 if (!options.checkFn(event, this, [ arg1, arg2, arg3 ])) {
@@ -1070,7 +1094,7 @@ function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[],
 
         for (let i = 0 ; i < len ; ++i) {
             const func_handler = listeners[i];
-            const options: IEventEmitter_StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
+            const options: StaticOnceOptions = hasAnyListenerWithOptions && func_handler[sListenerOptions];
 
             if (options && options.checkFn) {
                 if (!options.checkFn(event, this, args)) {
