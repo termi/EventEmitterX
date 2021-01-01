@@ -1,6 +1,10 @@
 /// <reference types="node" />
 
 // todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
+// todo: Реализовать EventTarget (для старых версий nodejs):
+//  копировать код из https://github.com/nodejs/node/blob/master/lib/internal/event_target.js
+//  - тесты:
+//    - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget.js
 
 // import type {EventEmitter} from "events";
 import type ServerTiming from 'termi@ServerTiming';
@@ -621,11 +625,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
 
     // todo:
-    //   static on(emitter: EventEmitter, event: string): AsyncIterableIterator<any>;
+    //   static on(emitter: EventEmitter|EventTarget, event: string): AsyncIterableIterator<any>;
+    //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-event-on-async-iterator.js
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
     //   init: [Function (anonymous)],
+    //   static getEventListeners(emitter: EventEmitter|EventTarget, type: string)
+    //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
     static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
     static once(emitter: DOMEventTarget, name: string, options?: StaticOnceOptions<DOMEventTarget, string>): Promise<any[]>;

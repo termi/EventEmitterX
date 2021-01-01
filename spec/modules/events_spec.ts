@@ -23,6 +23,44 @@ import ServerTiming from 'termi@ServerTiming';
 const {EventEmitter} = events;
 const {once} = EventEmitterEx;
 
+// todo: тесты можно взять тут:
+//  EventEmitter:
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-add-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-check-listener-leaks.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-error-monitor.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-errors.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-get-max-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-invalid-listener.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-listener-count.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-listeners-side-effects.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-max-listeners-warning-for-null.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-max-listeners-warning-for-symbol.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-max-listeners-warning.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-max-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-method-names.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-modify-in-emit.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-no-error-provided-to-error-event.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-num-args.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-once.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-prepend.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-all-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-listeners.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-set-max-listeners-side-effects.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-special-event-names.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-symbols.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-events-list.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-events-uncaught-exception-stack.js
+//  EventTarget:
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-memoryleakwarning.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-once-twice.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-whatwg-customevent.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-whatwg-once.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-whatwg-passive.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget-whatwg-signal.js
+//  - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget.js
+
 describe('EventEmitter', function() {
     const ee = new EventEmitter();
 
@@ -317,6 +355,7 @@ describe('EventEmitter', function() {
         });
     });
 
+    // todo: more tests here: https://github.com/nodejs/node/blob/master/test/parallel/test-events-once.js
     describe('#once', function () {
         it('should emit once', function () {
             let counter = 0;
