@@ -2,9 +2,9 @@
 
 // todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
 
-import type {EventEmitter} from "events";
+// import type {EventEmitter} from "events";
 import type ServerTiming from 'termi@ServerTiming';
-import AbortController, {errorFabric} from 'termi@abortable';
+import AbortController, {errorFabric, isAbortSignal} from 'termi@abortable';
 
 type Timeout = NodeJS.Timeout;
 type DOMEventTarget = EventTarget;
@@ -663,12 +663,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let hasTiming = !!timing;
 
         if (signal) {
-            {
-                const invalidSignalError = checkAbortSignal(signal);
-
-                if (invalidSignalError) {
-                    return Promise.reject(invalidSignalError);
-                }
+            if (!isAbortSignal(signal)) {
+                return Promise.reject(new TypeError(`Failed to execute 'fetch' on 'Window': member signal is not of type AbortSignal.`));
             }
 
             // Return early if already aborted, thus avoiding making an HTTP request
@@ -878,29 +874,19 @@ function checkListener(listener: Function, supportHandleEvent = false) {
     }
 }
 
+/*
 function isDOMEventTarget(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter) {
     return typeof (emitter as DOMEventTarget).addEventListener === 'function'
         && typeof (emitter as DOMEventTarget).removeEventListener === 'function'
     ;
 }
+*/
 
 function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter) {
     return typeof emitter.on === 'function'
         && typeof emitter.once === 'function'
         && typeof emitter.removeListener === 'function'
     ;
-}
-
-function checkAbortSignal(signal: AbortSignal): TypeError|void {
-    if (typeof signal !== 'object'
-        || !(
-            signal instanceof AbortSignal
-            // AbortSignal can be from another context
-            || (signal as AbortSignal).constructor.name === 'AbortSignal'
-        )
-    ) {
-        return new TypeError(`Failed to execute 'fetch' on 'Window': member signal is not of type AbortSignal.`);
-    }
 }
 
 type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> = {

@@ -4,6 +4,18 @@
 
 require('termi@polyfills');
 
+const NativeAbortController = AbortController;
+
+// also check AbortController polyfill
+{
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    delete globalThis["AbortController"];
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    delete globalThis["AbortSignal"];
+}
+
 import {EventEmitter as NodeEventEmitter} from 'events';
 import events, {EventEmitterEx} from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
@@ -488,6 +500,48 @@ describe('EventEmitter', function() {
 
             ac.abort();
             ee.emit('test6', ...[1, 2, 3]);
+        });
+
+        it('with AbortSignal 2', async function () {
+            let error1: DOMException|void = void 0;
+            let error2: DOMException|void = void 0;
+            let counter = 0;
+            const ac1 = new AbortController();
+            const ac2 = new NativeAbortController();
+
+            process.nextTick(() => {
+                ac1.abort();
+                ac2.abort();
+                ee.emit('test6', ...[1, 2, 3]);
+                ee.emit('test6', ...[1, 2, 3]);
+            });
+
+            try {
+                await once(ee, 'test6', { signal: ac1.signal });
+
+                counter++;
+            }
+            catch(err) {
+                error1 = err;
+            }
+            try {
+                await once(ee, 'test6', { signal: ac2.signal });
+
+                counter++;
+            }
+            catch(err) {
+                error2 = err;
+            }
+
+            expect(counter).toBe(0);
+            expect(error1).toBeDefined();
+            expect(error2).toBeDefined();
+            expect(error1 && error1.code).toBe(/*DOMException.ABORT_ERR*/20);
+            expect(error1 && error1.name).toBe('AbortError');
+            expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
+            expect(error2 && error2.name).toBe('AbortError');
+
+
         });
 
         it('with timeout', function (done) {
