@@ -1,5 +1,7 @@
 /// <reference types="node" />
 
+// see: https://github.com/nodejs/node/blob/master/lib/events.js
+
 // todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
 // todo: Реализовать EventTarget (для старых версий nodejs):
 //  копировать код из https://github.com/nodejs/node/blob/master/lib/internal/event_target.js
@@ -8,7 +10,7 @@
 
 // import type {EventEmitter} from "events";
 import type ServerTiming from 'termi@ServerTiming';
-import AbortController, {errorFabric, isAbortSignal} from 'termi@abortable';
+import AbortController, {errorFabric, isAbortSignal, AbortControllersGroup} from 'termi@abortable';
 
 type Timeout = NodeJS.Timeout;
 type DOMEventTarget = EventTarget;
@@ -57,20 +59,49 @@ interface Options {
     // listener can be registered at most once per event type
     listenerOncePerEventType?: boolean;
     /* todo: add handleEvent support
-    // support EventTarget.handleEvent
+    // support DOMEventTarget.handleEvent
     supportHandleEvent?: boolean;
      */
 }
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
-interface StaticOnceOptions<EE, E> {
-    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
+interface StaticOnceOptionsDefault {
+    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal)
+     * If option "signal" is defined, {@link abortControllers} option is not available
+     * */
     signal?: AbortSignal;
+    /** A list of AbortController's to subscribe to it's signal's 'abort' event.
+     * If option "abortControllers" is defined, {@link signal} option is not available.
+     */
+    abortControllers?: (AbortController|void)[];
     timing?: ServerTiming;
-    checkFn?: (number: E, eventEmitter: EE, args: any[]) => boolean;
+    /** timeout in ms */
     timeout?: number;
+    /** Custom error event name. Default is 'error'. */
+    errorEventName?: EventName;
+    checkFn?: Function;
     // [key: string]: any;
+}
+interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
+    /** You can throw a Error inside checkFn to reject once() with your error */
+    checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
+    abortControllers?: never;
+}
+interface StaticOnceOptions_AC<EE, E> extends StaticOnceOptionsDefault {
+    /** You can throw a Error inside checkFn to reject once() with your error */
+    checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
+    signal?: never;
+}
+interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
+    /** You can throw a Error inside checkFn to reject once() with your error */
+    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
+    abortControllers?: never;
+}
+interface StaticOnceOptionsEventTarget_AC extends StaticOnceOptionsDefault {
+    /** You can throw a Error inside checkFn to reject once() with your error */
+    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
+    signal?: never;
 }
 
 let _onceListenerIdCounter = 0;
@@ -92,7 +123,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     // listenerOncePerEventType, listener can be registered at most once per event type
     private _lopet = false;
     /* todo: add handleEvent support
-    // supportHandleEvent, support EventTarget.handleEvent
+    // supportHandleEvent, support DOMEventTarget.handleEvent
     private _she = false;
     */
     // list of local id's for once listeners
@@ -625,18 +656,21 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
 
     // todo:
-    //   static on(emitter: EventEmitter|EventTarget, event: string): AsyncIterableIterator<any>;
+    //   static on(emitter: EventEmitter|DOMEventTarget, event: string): AsyncIterableIterator<any>;
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-event-on-async-iterator.js
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
     //   init: [Function (anonymous)],
-    //   static getEventListeners(emitter: EventEmitter|EventTarget, type: string)
+    //   static getEventListeners(emitter: EventEmitter|DOMEventTarget, type: string)
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
-    static once(emitter: EventEmitterEx, name: EventName, options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
-    static once(emitter: DOMEventTarget, name: string, options?: StaticOnceOptions<DOMEventTarget, string>): Promise<any[]>;
-    static once(emitter: NodeEventEmitter, name: string|symbol, options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
+    static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
+    static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions_AC<EventEmitterEx, EventName>): Promise<any[]>;
+    static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
+    static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions_AC<NodeEventEmitter, string|symbol>): Promise<any[]>;
+    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<Event>;
+    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget_AC): Promise<Event>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
@@ -644,22 +678,37 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
      *
      * @param emitter
-     * @param name
+     * @param types
      * @param {StaticOnceOptions=} options
      * @param {AbortSignal=} options.signal - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
+     * @param {(AbortController|void)[]=} options.abortControllers
      * @param {ServerTiming=} options.timing
-     * @param {Function=} options.checkFn
      * @param {number=} options.timeout
+     * @param {Function=} options.checkFn
      */
-    static once(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter, name: EventName, options?: StaticOnceOptions<typeof emitter, typeof name>): Promise<any[]> {
+    static once(
+            emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter,
+            types: EventName|EventName[],
+            // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
+            options?: StaticOnceOptionsDefault,
+    ): Promise<any[]|Event> {
+        let isEventTarget = false;
+
         if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|NodeEventEmitter)) {
-            // todo: make _once_DOMEventTarget
-            throw new Error('DOMEventTarget compatible mode not implemented yet');
+            isEventTarget = isEventTargetCompatible(emitter as DOMEventTarget);
+
+            if (!isEventTarget) {
+                throw new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE');
+            }
+            // throw new EventsTypeError('DOMEventTarget compatible mode not implemented yet', 'ERR_INVALID_ARG_TYPE');
         }
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
         const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
-        const signal = staticOnceOptions.signal || void 0;
+        const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
+        let signal = staticOnceOptions.signal || void 0;
+        const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
+        const isValidAbortControllers = Array.isArray(abortControllers) && abortControllers.length > 0;
         const timeout = staticOnceOptions.timeout || void 0;
         // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
         //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
@@ -668,10 +717,21 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let listenersCleanUp: Function|void = void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
+        let abortControllersGroup: AbortControllersGroup|void;
+
+        if (abortControllers && isValidAbortControllers) {
+            if (signal) {
+                // Можно использовать либо signal, либо abortController, но не обоих одновременно
+                return Promise.reject(new EventsTypeError(`Pick one option: signal or abortControllers`, 'ERR_INVALID_ARG_TYPE'));
+            }
+
+            abortControllersGroup = new AbortControllersGroup(abortControllers);
+            signal = abortControllersGroup.signal;
+        }
 
         if (signal) {
             if (!isAbortSignal(signal)) {
-                return Promise.reject(new TypeError(`Failed to execute 'fetch' on 'Window': member signal is not of type AbortSignal.`));
+                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_ARG_TYPE'));
             }
 
             // Return early if already aborted, thus avoiding making an HTTP request
@@ -681,53 +741,181 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         if (hasTiming) {
-            timing!.time(String(name));
+            timing!.time(types as string[]);
         }
 
-        const promise = new Promise<any[]>((resolve, reject) => {
-            const eventListener = (...args) => {
-                if (checkFn && !checkFn(name, _emitter, args)) {
-                    return;
+        let promise;
+
+        if (Array.isArray(types)) {
+            let winnerEventType: void|(typeof types extends Array<infer T> ? T : typeof types);
+
+            promise = new Promise<any[]>((resolve, reject) => {
+                const eventListenersByType: [ type: typeof types extends Array<infer T> ? T : never, listener: Listener ][] = [];
+
+                listenersCleanUp = function() {
+                    for (const [ type, listener ] of eventListenersByType) {
+                        if (isEventTarget) {
+                            (emitter as DOMEventTarget).removeEventListener(type as string, listener);
+                        }
+                        else {
+                            _emitter.removeListener(type as string|symbol, listener);
+                        }
+
+                        if (hasTiming && type !== winnerEventType) {
+                            timing!.timeClear(type as string, true);
+                        }
+                    }
+
+                    if (isEventTarget) {
+                        (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                    }
+                    else {
+                        _emitter.removeListener(errorEventName, errorListener);
+                    }
+
+                    eventListenersByType.length = 0;
+                    listenersCleanUp = void 0;
+
+                    if (hasTiming) {
+                        // cleanup
+                        timing = void 0;
+                        hasTiming = false;
+                    }
+                };
+
+                for (const type of types) {
+                    const eventListener = (...args) => {
+                        if (checkFn) {
+                            try {
+                                if (!checkFn(_emitter, type, args)) {
+                                    return;
+                                }
+                            }
+                            catch(err) {
+                                reject(err);
+                            }
+                        }
+
+                        winnerEventType = type;
+
+                        if (hasTiming) {
+                            timing!.timeEnd(type as string, true);
+                        }
+
+                        if (listenersCleanUp) {
+                            listenersCleanUp();
+                        }
+
+                        resolve(args);
+                    };
+
+                    eventListenersByType.push([ type, eventListener ]);
+
+                    if (isEventTarget) {
+                        (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
+                    }
+                    else {
+                        _emitter.on(type as string|symbol, eventListener);
+                    }
                 }
 
-                if (hasTiming) {
-                    timing!.timeEnd(String(name), true);
-                    // cleanup
-                    timing = void 0;
-                    hasTiming = false;
+                const errorListener = error => {
+                    if (hasTiming) {
+                        // В случае ошибки, удаляем все метки времени.
+                        // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
+                        timing!.timeClear(types as string[], true);
+                        // cleanup
+                        timing = void 0;
+                        hasTiming = false;
+                    }
+
+                    if (listenersCleanUp) {
+                        listenersCleanUp();
+                    }
+
+                    reject(error);
+                };
+
+                if (isEventTarget) {
+                    // EventTarget does not have `error` event semantics like Node
+                    (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
                 }
-
-                if (listenersCleanUp) {
-                    listenersCleanUp();
+                else {
+                    _emitter.on(errorEventName, errorListener);
                 }
+            });
+        }
+        else {
+            const type = types;
 
-                resolve(args);
-            };
-            const errorListener = error => {
-                if (hasTiming) {
-                    timing!.timeEnd(String(name), true);
-                    // cleanup
-                    timing = void 0;
-                    hasTiming = false;
+            promise = new Promise<any[]>((resolve, reject) => {
+                const eventListener = (...args) => {
+                    if (checkFn) {
+                        try {
+                            if (!checkFn(_emitter, type, args)) {
+                                return;
+                            }
+                        }
+                        catch(err) {
+                            reject(err);
+                        }
+                    }
+
+                    if (hasTiming) {
+                        timing!.timeEnd(type as string, true);
+                        // cleanup
+                        timing = void 0;
+                        hasTiming = false;
+                    }
+
+                    if (listenersCleanUp) {
+                        listenersCleanUp();
+                    }
+
+                    resolve(args);
+                };
+                const errorListener = error => {
+                    if (hasTiming) {
+                        // В случае ошибки, удаляем все метки времени.
+                        // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
+                        //  timing!.timeClear(type as string, true);
+                        timing!.timeEnd(type as string, true);
+                        // cleanup
+                        timing = void 0;
+                        hasTiming = false;
+                    }
+
+                    if (listenersCleanUp) {
+                        listenersCleanUp();
+                    }
+
+                    reject(error);
+                };
+
+                listenersCleanUp = function() {
+                    if (isEventTarget) {
+                        (emitter as DOMEventTarget).removeEventListener(type as string, eventListener);
+                        (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                    }
+                    else {
+                        _emitter.removeListener(type as string|symbol, eventListener);
+                        _emitter.removeListener(errorEventName, errorListener);
+                    }
+
+                    listenersCleanUp = void 0;
+                };
+
+                if (isEventTarget) {
+                    (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
+                    // EventTarget does not have `error` event semantics like Node
+                    (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
                 }
-
-                if (listenersCleanUp) {
-                    listenersCleanUp();
+                else {
+                    _emitter.on(type as string|symbol, eventListener);
+                    _emitter.on(errorEventName, errorListener);
                 }
-
-                reject(error);
-            };
-
-            listenersCleanUp = function() {
-                _emitter.removeListener(name as string|symbol, eventListener);
-                _emitter.removeListener('error', errorListener);
-
-                listenersCleanUp = void 0;
-            };
-
-            _emitter.on(name as string|symbol, eventListener);
-            _emitter.once('error', errorListener);
-        });
+            });
+        }
 
         if (signal || timeout) {
             let abortCallback: ((this: AbortSignal|void, ev: typeof sCleanAbortPromise|AbortSignalEventMap["abort"]) => void)|void;
@@ -737,7 +925,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             const cancelPromise = signal ? new Promise<void>((resolve, reject) => {
                 abortCallback = function(clearPromiseSymbol) {
                     if (abortCallback) {
-                        signal.removeEventListener('abort', abortCallback);
+                        signal!.removeEventListener('abort', abortCallback);
                     }
 
                     if (clearPromiseSymbol === sCleanAbortPromise) {
@@ -746,14 +934,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         resolve();
                     }
                     else {
-                        // todo: Мне кажется, тут это лишнее. Нужно проверить
-                        if (hasTiming) {
-                            timing!.timeEnd(String(name), true);
-                            // cleanup
-                            timing = void 0;
-                            hasTiming = false;
-                        }
-
                         if (listenersCleanUp) {
                             listenersCleanUp();
                         }
@@ -764,14 +944,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     abortCallback = void 0;
                 };
 
-                signal.addEventListener('abort', abortCallback);
+                signal!.addEventListener('abort', abortCallback);
             }) : void 0;
             const timeoutPromise = timeout ? new Promise<void>((resolve, reject) => {
                 let timeoutId: Timeout|void = setTimeout(() => {
                     timeoutId = void 0;
 
                     if (hasTiming) {
-                        timing!.timeEnd(String(name), true);
+                        // todo: Создавать метку времени для 'timeout' и закрывать её в случае таймаута. Если ошибки не было - удалять метку времени для 'timeout' из timing.
+                        //  timing!.timeClear(type as string, true);
+                        timing!.timeEnd(types as string[], true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -818,9 +1000,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (cleanTimeoutCallback) {
                     cleanTimeoutCallback();
                 }
+                if (abortControllersGroup) {
+                    abortControllersGroup.close();
+                }
 
                 if (hasTiming) {
-                    timing!.timeEnd(String(name), true);
+                    timing!.timeEnd(types as string[], true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -838,9 +1023,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (cleanTimeoutCallback) {
                     cleanTimeoutCallback();
                 }
+                if (abortControllersGroup) {
+                    abortControllersGroup.close();
+                }
 
                 if (hasTiming) {
-                    timing!.timeEnd(String(name), true);
+                    timing!.timeEnd(types as string[], true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -864,6 +1052,41 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 }
 
 export default EventEmitterEx;
+
+class EventsTypeError extends TypeError {
+    code: string|void;
+
+    constructor(message = '', code?: string) {
+        message = String(message || '');
+
+        super(message && code ? `[${code}]: ${message}` : message ? message : (code || ''));
+
+        // this.name = 'TypeError';
+        this.code = code ? String(code) : void 0;
+        this.message = message;
+    }
+
+    toString() {
+        const {code, message} = this;
+
+        if (code) {
+            return `TypeError [${code}]: ${message}`;
+        }
+
+        return `TypeError: ${message}`;
+    }
+
+    static fromObject(error) {
+        if (error instanceof EventsTypeError) {
+            return error;
+        }
+        else {
+            const { code, message } = error;
+
+            return new EventsTypeError(message, code);
+        }
+    }
+}
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
 // todo: export function defaultMaxListeners(n: number){}
@@ -889,10 +1112,20 @@ function isDOMEventTarget(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitte
 }
 */
 
-function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter) {
-    return typeof emitter.on === 'function'
-        && typeof emitter.once === 'function'
-        && typeof emitter.removeListener === 'function'
+export function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter|Object) {
+    return !!emitter
+        && typeof (emitter as NodeEventEmitter).on === 'function'
+        && typeof (emitter as NodeEventEmitter).once === 'function'
+        && typeof (emitter as NodeEventEmitter).removeListener === 'function'
+        && typeof (emitter as NodeEventEmitter).emit === 'function'
+    ;
+}
+
+export function isEventTargetCompatible(emitter: DOMEventTarget|Object) {
+    return !!emitter
+        && typeof (emitter as DOMEventTarget).addEventListener === 'function'
+        && typeof (emitter as DOMEventTarget).removeEventListener === 'function'
+        && typeof (emitter as DOMEventTarget).dispatchEvent === 'function'
     ;
 }
 
