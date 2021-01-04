@@ -434,6 +434,7 @@ describe('events', function() {
         }
 
         const ee = new EventEmitter();
+        const isEventTarget = isEventTargetCompatible(ee);
 
         // Если EventEmitter - это ссылка на конструктор NodeEventTarget, то нужно его API немного "прокачать", чтобы
         //  у него были методы аналогичные EventEmitter.
@@ -491,7 +492,9 @@ describe('events', function() {
                 const expectedError = new Error('REJECT PROMISE');
                 let error = void 0;
 
-                once(ee, 'test3')
+                once(ee, 'test3', {
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                })
                     .catch(err => {
                         error = err;
                     })
@@ -517,7 +520,9 @@ describe('events', function() {
                 });
 
                 try {
-                    await once(ee, 'test4');
+                    await once(ee, 'test4', {
+                        errorEventName: isEventTarget ? 'error' : void 0,
+                    });
                 }
                 catch(err) {
                     error = err;
@@ -648,7 +653,6 @@ describe('events', function() {
 
             it.skip = itSkip;
         });
-
 
         it('with options.checkFn', function (done) {
             const expectedError = null;
@@ -950,7 +954,9 @@ describe('events', function() {
             let error: DOMException|void = void 0;
             let counter = 0;
 
-            once(ee, 'test7', { timeout: 10 })
+            once(ee, 'test7', {
+                timeout: 10,
+            })
                 .then(() => {
                     counter++;
                 })
@@ -984,7 +990,10 @@ describe('events', function() {
                     ee.emit('test8', 1);
                 });
 
-                await once(ee, 'test8', { timing: st });
+                await once(ee, 'test8', {
+                    timing: st,
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                });
 
                 expect(st.length).toBe(1);
                 expect(ee.listenerCount('test8')).toBe(0);
@@ -997,7 +1006,10 @@ describe('events', function() {
                 });
 
                 try {
-                    await once(ee, 'test8', { timing: st });
+                    await once(ee, 'test8', {
+                        timing: st,
+                        errorEventName: isEventTarget ? 'error' : void 0,
+                    });
                 }
                 catch(err) {
                     //
@@ -1022,9 +1034,18 @@ describe('events', function() {
             });
 
             await Promise.all([
-                once(ee, 'test9-1', { timing: st }),
-                once(ee, 'test9-2', { timing: st }),
-                once(ee, 'test9-3', { timing: st }).catch(err => {
+                once(ee, 'test9-1', {
+                    timing: st,
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                }),
+                once(ee, 'test9-2', {
+                    timing: st,
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                }),
+                once(ee, 'test9-3', {
+                    timing: st,
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                }).catch(err => {
                     error = err;
                 }),
             ]);

@@ -10,9 +10,20 @@
 
 // import type {EventEmitter} from "events";
 import type ServerTiming from 'termi@ServerTiming';
-import AbortController, {errorFabric, isAbortSignal, AbortControllersGroup} from 'termi@abortable';
+import type {
+    // default as TAbortController,
+    AbortControllersGroup as TAbortControllersGroup,
+} from 'termi@abortable';
+import * as AbortController_Module from '../common/AbortController';
 
-type Timeout = NodeJS.Timeout;
+const {
+    default: AbortController,
+    errorFabric,
+    isAbortSignal,
+    AbortControllersGroup,
+} = AbortController_Module;
+
+type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
 type NodeEventEmitter = NodeJS.EventEmitter;
 // type NodeEventEmitter = EventEmitter;
@@ -27,6 +38,14 @@ export declare type DefaultEventMap = {
     // [event in EventName]: Listener|EventListenerObject;
     [event in EventName]: Listener;
 };
+
+/* todo: как-то нужно добавить эти типы в EventMap передаваемый в EventEmitterEx
+type InnerListeners = {
+    'newListener': (eventName: EventName, listener: Listener) => void|((eventName: EventName, listener: Listener) => void)[];
+    'removeListener': (eventName: EventName, listener: Listener) => void|((eventName: EventName, listener: Listener) => void)[];
+    'error': ((error: Error) => void)|((error: Error) => void)[]|((error: any) => void)|((error: any) => void)[];
+};
+*/
 
 // todo: add handleEvent support
 // interface EventListenerObject {
@@ -118,6 +137,13 @@ const errorMonitor = Symbol('events.errorMonitor');
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
 
+// listenerOncePerEventType, listener can be registered at most once per event type
+const EventEmitterEx_Flags_listenerOncePerEventType = 1 << 1;
+const EventEmitterEx_Flags_has_error_listener = 1 << 10;
+const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
+const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
+const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
+
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     private _events: {
@@ -126,8 +152,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     _maxListeners = Infinity;
 
-    // listenerOncePerEventType, listener can be registered at most once per event type
-    private _lopet = false;
+    private _f = 0;
+
     /* todo: add handleEvent support
     // supportHandleEvent, support DOMEventTarget.handleEvent
     private _she = false;
@@ -147,7 +173,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 this._maxListeners = maxListeners;
             }
             if (listenerOncePerEventType !== void 0) {
-                this._lopet = listenerOncePerEventType;
+                this._f |= EventEmitterEx_Flags_listenerOncePerEventType;
             }
             /*
             if (supportHandleEvent !== void 0) {
@@ -163,11 +189,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const handler = _events[event];
 
         if (handler) {
+            const {_f} = this;
+            // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
+            const has_errorMonitor_listener = _checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+
             if (isErrorEvent) {
-                /** todo: check errorMonitor was set in {@link this._addListener} */
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                this.emit(errorMonitor, ...args);
+                if (has_errorMonitor_listener) {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    this.emit(errorMonitor, ...args);
+                }
             }
 
             const isFn = typeof handler === 'function';
@@ -274,12 +305,34 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const {
             _events,
             _maxListeners,
-            _lopet: listenerOncePerEventType,
+            _f,
         } = this;
+        const listenerOncePerEventType = _checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType);
+        const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         // todo: add handleEvent support
         const listenerAs_objectWith_handleEvent = false;//supportHandleEvent && typeof listener === 'object';
         const handler = _events[event];
         let newLen: number;
+
+        if (event === 'error') {
+            this._f |= EventEmitterEx_Flags_has_error_listener;
+        }
+        else if (event === errorMonitor) {
+            this._f |= EventEmitterEx_Flags_has_errorMonitor_listener;
+        }
+        else if (event === 'newListener') {
+            this._f |= EventEmitterEx_Flags_has_newListener_listener;
+        }
+        else if (event === 'removeListener') {
+            this._f |= EventEmitterEx_Flags_has_removeListener_listener;
+        }
+
+        if (has_newListener_listener) {
+            // todo: Разобраться, почему тут TypeScript ругается, хотя описание для 'newListener' в DefaultEventMap есть.
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            this.emit('newListener', event, listener);
+        }
 
         if (!handler) {
             if (listenerAs_objectWith_handleEvent) {
@@ -337,18 +390,28 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         const {
             _events,
+            _f,
         } = this;
+        // const listenerOncePerEventType = _checkBit(_flgs, EventEmitterEx_Flags_listenerOncePerEventType);
         const handler = _events[event];
 
         if (handler === void 0) {
             return this;
         }
 
+        const has_error_listener = _checkBit(_f, EventEmitterEx_Flags_has_error_listener);
+        const has_errorMonitor_listener = _checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+        const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+        let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+
         const hasAnyOnceListener = this._onceIds.length > 0;
+        let newListenersCount: void|number = void 0;
+        // let originalListener: void|Function = void 0;
 
         if (typeof handler === 'function') {
             if (handler === listener) {
                 delete _events[event];
+                newListenersCount = 0;
             }
             else if (hasAnyOnceListener
                 && (handler[sOnceListenerWrapperId] !== void 0)
@@ -364,18 +427,21 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
 
                 delete _events[event];
+                newListenersCount = 0;
             }
         }
         else if (hasAnyOnceListener) {
-            // listenerOncePerEventType = true, so remove only first link to listener
+            // remove only first link to once listener
             const listeners = (handler as Function[]);
-            let position = -1;
+            let index = -1;
+
+            newListenersCount = listeners.length;
 
             for (let i = listeners.length ; i-- > 0 ; ) {
                 const handler = listeners[i];
 
                 if (handler === listener) {
-                    position = i;
+                    index = i;
                     break;
                 }
                 else if (
@@ -392,13 +458,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     // originalListener = listeners[i].listener;
-                    position = i;
+                    index = i;
                     break;
                 }
             }
 
-            if (position >= 0) {
-                if (listeners.length === 1) {
+            if (index !== -1) {
+                newListenersCount--;
+
+                if (newListenersCount === 0) {
                     listeners.length = 0;
                     // if (--this._eventsCount === 0) {
                     // this._events = Object.create(null);
@@ -407,29 +475,31 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     delete _events[event];
                 }
                 else {
-                    if (position === 0) {
+                    if (index === 0) {
                         listeners.shift();
                     }
                     else {
                         // spliceOne(listeners, position);
-                        listeners.splice(position, 1);
+                        listeners.splice(index, 1);
                     }
 
-                    if (listeners.length === 1) {
+                    if (newListenersCount === 1) {
                         _events[event] = listeners[0];
                     }
                 }
             }
         }
         else {
-            // listenerOncePerEventType = true, so remove only first link to listener
+            // remove only first link to listener
             const listeners = (handler as Function[]);
             const index = listeners.indexOf(listener);
 
-            if (index !== -1) {
-                const newLen = listeners.length - 1;
+            newListenersCount = listeners.length;
 
-                if (newLen === 0) {
+            if (index !== -1) {
+                newListenersCount--;
+
+                if (newListenersCount === 0) {
                     listeners.length = 0;
                     delete _events[event];
                 }
@@ -442,14 +512,42 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         listeners.splice(index, 1);
                     }
 
-                    if (newLen === 1) {
+                    if (newListenersCount === 1) {
                         _events[event] = listeners[0];
                     }
                 }
             }
         }
 
-        // if (_events.removeListener) this.emit('removeListener', type, originalListener || listener);
+        if (newListenersCount !== void 0) {
+            if (newListenersCount === 0) {
+                if (has_error_listener && event === 'error') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
+                }
+                else if (has_errorMonitor_listener && event === errorMonitor) {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+                }
+                else if (has_newListener_listener && event === 'newListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+                }
+                else if (has_removeListener_listener && event === 'removeListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                    // Если мы удаляем последний 'removeListener', то и кидать событие некому.
+                    // Именно так работает нативный nodejs 'events' - 'removeListener' не вызывается, когда мы удаляем сам 'removeListener'.
+                    has_removeListener_listener = false;
+                }
+            }
+        }
+        else {
+            // this code should be unreachable
+            throw new Error('Normally unreachable error');
+        }
+
+        if (has_removeListener_listener) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            this.emit('removeListener', event, listener);
+        }
 
         return this;
     }
@@ -482,42 +580,158 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     removeAllListeners<EventKey extends keyof EventMap = EventName>(event?: EventKey): this {
-        if (!event) {
-            this._onceIds.length = 0;
-            this._events = Object.create(null);
-        }
-        else {
-            if (this._onceIds.length > 0) {
-                const handler = this._events[event];
+        const {_f} = this;
+        const has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
-                if (typeof handler === 'function') {
-                    const onceWrapperId = handler[sOnceListenerWrapperId];
+        if (has_removeListener_listener && event !== 'removeListener') {
+            if (!event) {
+                // Emit removeListener for all listeners on all events
+                const {_events} = this;
 
-                    if (onceWrapperId !== void 0) {
-                        const idIndex = this._onceIds.indexOf(onceWrapperId);
+                for (const key of Object.keys(_events)) {
+                    if (key === 'removeListener') {
+                        continue;
+                    }
 
-                        if (idIndex !== -1) {
-                            this._onceIds.splice(idIndex, 1);
+                    this.removeAllListeners(key);
+                }
+
+                this.removeAllListeners('removeListener');
+
+                this._onceIds.length = 0;
+                this._events = Object.create(null);
+                this._f = _unsetBit(_f,
+                    EventEmitterEx_Flags_has_error_listener
+                    | EventEmitterEx_Flags_has_newListener_listener
+                    | EventEmitterEx_Flags_has_removeListener_listener
+                    | EventEmitterEx_Flags_has_errorMonitor_listener
+                );
+            }
+            else {
+                if (this._onceIds.length > 0) {
+                    const handler = this._events[event];
+
+                    if (typeof handler === 'function') {
+                        const onceWrapperId = handler[sOnceListenerWrapperId];
+
+                        if (onceWrapperId !== void 0) {
+                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                            if (idIndex !== -1) {
+                                this._onceIds.splice(idIndex, 1);
+                            }
+
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit('removeListener', event, handler["listener"]);
+                        }
+                        else {
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit('removeListener', event, handler);
+                        }
+                    }
+                    else {
+                        const listeners = (handler as Function[]);
+
+                        for (let i = listeners.length ; i-- > 0 ; ) {
+                            const handler = listeners[i];
+
+                            const onceWrapperId = handler[sOnceListenerWrapperId];
+                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                            if (idIndex !== -1) {
+                                this._onceIds.splice(idIndex, 1);
+                            }
+
+                            if (onceWrapperId !== void 0) {
+                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                                // @ts-ignore
+                                this.emit('removeListener', event, handler["listener"]);
+                            }
+                            else {
+                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                                // @ts-ignore
+                                this.emit('removeListener', event, handler);
+                            }
                         }
                     }
                 }
-                else {
-                    const listeners = (handler as Function[]);
 
-                    for (let i = listeners.length ; i-- > 0 ; ) {
-                        const handler = listeners[i];
+                delete this._events[event];
 
-                        const onceWrapperId = handler[sOnceListenerWrapperId];
-                        const idIndex = this._onceIds.indexOf(onceWrapperId);
-
-                        if (idIndex !== -1) {
-                            this._onceIds.splice(idIndex, 1);
-                        }
-                    }
+                if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
+                }
+                else if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener) && event === errorMonitor) {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+                }
+                else if (_checkBit(_f, EventEmitterEx_Flags_has_newListener_listener) && event === 'newListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+                }
+                else if (has_removeListener_listener && event === 'removeListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
                 }
             }
+        }
+        else {
+            // Not listening for removeListener, no need to emit
+            if (!event) {
+                this._onceIds.length = 0;
+                this._events = Object.create(null);
+                this._f = _unsetBit(_f,
+                    EventEmitterEx_Flags_has_error_listener
+                    | EventEmitterEx_Flags_has_newListener_listener
+                    | EventEmitterEx_Flags_has_removeListener_listener
+                    | EventEmitterEx_Flags_has_errorMonitor_listener
+                );
+            }
+            else {
+                if (this._onceIds.length > 0) {
+                    const handler = this._events[event];
 
-            delete this._events[event];
+                    if (typeof handler === 'function') {
+                        const onceWrapperId = handler[sOnceListenerWrapperId];
+
+                        if (onceWrapperId !== void 0) {
+                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                            if (idIndex !== -1) {
+                                this._onceIds.splice(idIndex, 1);
+                            }
+                        }
+                    }
+                    else {
+                        const listeners = (handler as Function[]);
+
+                        for (let i = listeners.length ; i-- > 0 ; ) {
+                            const handler = listeners[i];
+
+                            const onceWrapperId = handler[sOnceListenerWrapperId];
+                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+
+                            if (idIndex !== -1) {
+                                this._onceIds.splice(idIndex, 1);
+                            }
+                        }
+                    }
+                }
+
+                delete this._events[event];
+
+                if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
+                }
+                else if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener) && event === errorMonitor) {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+                }
+                else if (_checkBit(_f, EventEmitterEx_Flags_has_newListener_listener) && event === 'newListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+                }
+                else if (has_removeListener_listener && event === 'removeListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                }
+            }
         }
 
         return this;
@@ -660,6 +874,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
         const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
         const prependListeners = !!staticOnceOptions.prepend;
+        const errorEventNameIsDefined = staticOnceOptions.errorEventName !== void 0;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         let signal = staticOnceOptions.signal || void 0;
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
@@ -672,7 +887,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let listenersCleanUp: Function|void = void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
-        let abortControllersGroup: AbortControllersGroup|void;
+        let abortControllersGroup: TAbortControllersGroup|void;
 
         if (prependListeners && isEventTarget) {
             return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
@@ -726,7 +941,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     if (isEventTarget) {
-                        (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                        if (errorEventNameIsDefined) {
+                            // EventTarget does not have `error` event semantics like Node
+                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                        }
                     }
                     else {
                         _emitter.removeListener(errorEventName, errorListener);
@@ -799,8 +1017,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
 
                 if (isEventTarget) {
-                    // EventTarget does not have `error` event semantics like Node
-                    (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                    if (errorEventNameIsDefined) {
+                        // EventTarget does not have `error` event semantics like Node
+                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                    }
                 }
                 else if (prependListeners) {
                     _emitter.prependListener(errorEventName, errorListener);
@@ -860,7 +1080,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 listenersCleanUp = function() {
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).removeEventListener(type as string, eventListener);
-                        (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                        if (errorEventNameIsDefined) {
+                            // EventTarget does not have `error` event semantics like Node
+                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                        }
                     }
                     else {
                         _emitter.removeListener(type as string|symbol, eventListener);
@@ -872,8 +1095,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 if (isEventTarget) {
                     (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
-                    // EventTarget does not have `error` event semantics like Node
-                    (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                    if (errorEventNameIsDefined) {
+                        // EventTarget does not have `error` event semantics like Node
+                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                    }
                 }
                 else if (prependListeners) {
                     _emitter.prependListener(type as string|symbol, eventListener);
@@ -1190,6 +1415,13 @@ function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[])
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].apply(self, args);
     }
+}
+
+function _checkBit(mask: number, bit: number): boolean {
+    return (mask & bit) !== 0;
+}
+function _unsetBit(mask: number, bit: number): number {
+    return mask & ~bit;
 }
 
 /*
