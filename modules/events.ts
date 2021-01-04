@@ -337,7 +337,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         const {
             _events,
-            _lopet: listenerOncePerEventType,
         } = this;
         const handler = _events[event];
 
@@ -365,57 +364,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
 
                 delete _events[event];
-            }
-        }
-        else if (!listenerOncePerEventType) {
-            // remove all links to listener
-            const listeners = (handler as Function[]);
-
-            if (hasAnyOnceListener) {
-                for (let i = listeners.length ; i-- > 0 ; ) {
-                    const handler = listeners[i];
-
-                    if (handler === listener) {
-                        listeners.splice(i, 1);
-                    }
-                    else if (
-                        (handler[sOnceListenerWrapperId] !== void 0)
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-ignore
-                        && handler.listener === listener
-                    ) {
-                        const onceWrapperId = handler[sOnceListenerWrapperId];
-                        const idIndex = this._onceIds.indexOf(onceWrapperId);
-
-                        if (idIndex !== -1) {
-                            this._onceIds.splice(idIndex, 1);
-                        }
-
-                        // originalListener = listeners[i].listener;
-                        listeners.splice(i, 1);
-                    }
-                }
-            }
-            else {
-                const listeners = (handler as Function[]);
-                let index;
-
-                while ((index = listeners.indexOf(listener)) !== -1) {
-                    if (index === 0) {
-                        listeners.shift();
-                    }
-                    else {
-                        // spliceOne(listeners, index);
-                        listeners.splice(index, 1);
-                    }
-                }
-            }
-
-            if (listeners.length === 0) {
-                delete _events[event];
-            }
-            else if (listeners.length === 1) {
-                _events[event] = listeners[0];
             }
         }
         else if (hasAnyOnceListener) {

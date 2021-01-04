@@ -225,21 +225,22 @@ describe('events', function() {
                 ee.removeListener('test3', listener3);
             });
 
-            it('should not call listener after removeListener', function () {
+            it('removeListener should remove only first matched listener', function () {
                 let counter = 0;
                 const listener = () => { counter++ };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
-                ee.emit('test');
+                ee.emit('test');// counter = 2
                 ee.removeListener('test', listener);
-                ee.emit('test');
-                ee.emit('test');
+                ee.emit('test');// counter = 3
+                ee.removeListener('test', listener);
+                ee.emit('test');// counter = 3
 
-                expect(counter).toBe(2);
+                expect(counter).toBe(3);
             });
 
-            it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            it('removeListener should remove only first matched listener for multiple listeners', function () {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
@@ -253,22 +254,37 @@ describe('events', function() {
                 ee.on('test2', listener2);
                 ee.on('test3', listener3);
                 ee.on('test3', listener3);
-                ee.emit('test1');
-                ee.removeListener('test1', listener1);
-                ee.emit('test1');
-                ee.emit('test2');
-                ee.emit('test2');
-                ee.removeListener('test2', listener2);
-                ee.emit('test2');
-                ee.emit('test3');
-                ee.emit('test3');
-                ee.emit('test3');
-                ee.removeListener('test3', listener3);
-                ee.emit('test3');
 
-                expect(counter1).toBe(2);
-                expect(counter2).toBe(4);
-                expect(counter3).toBe(6);
+                ee.emit('test1');// counter1 = 2
+                // remove first listener1
+                ee.removeListener('test1', listener1);
+                ee.emit('test1');// counter1 = 3
+                ee.emit('test2');// counter2 = 2
+                ee.emit('test2');// counter2 = 4
+                // remove first listener2
+                ee.removeListener('test2', listener2);
+                ee.emit('test2');// counter2 = 5
+                ee.emit('test3');// counter3 = 2
+                ee.emit('test3');// counter3 = 4
+                ee.emit('test3');// counter3 = 6
+                // remove first listener3
+                ee.removeListener('test3', listener3);
+                ee.emit('test3');// counter3 = 7
+
+                // remove second listener1
+                ee.removeListener('test1', listener1);
+                // remove second listener2
+                ee.removeListener('test2', listener2);
+                // remove second listener3
+                ee.removeListener('test3', listener3);
+
+                ee.emit('test1');// counter1 = 3
+                ee.emit('test2');// counter2 = 5
+                ee.emit('test3');// counter3 = 7
+
+                expect(counter1).toBe(3);
+                expect(counter2).toBe(5);
+                expect(counter3).toBe(7);
             });
         });
 
