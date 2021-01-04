@@ -67,6 +67,8 @@ interface Options {
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
 interface StaticOnceOptionsDefault {
+    /** Add listener in the beginning of listeners list */
+    prepend?: boolean;
     /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal)
      * If option "signal" is defined, {@link abortControllers} option is not available
      * */
@@ -94,11 +96,15 @@ interface StaticOnceOptions_AC<EE, E> extends StaticOnceOptionsDefault {
     signal?: never;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
+    /** prepend option is not supported for EventTarget emitter */
+    prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
     abortControllers?: never;
 }
 interface StaticOnceOptionsEventTarget_AC extends StaticOnceOptionsDefault {
+    /** prepend option is not supported for EventTarget emitter */
+    prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
     signal?: never;
@@ -698,13 +704,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             isEventTarget = isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
-                throw new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE');
+                return Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
             }
             // throw new EventsTypeError('DOMEventTarget compatible mode not implemented yet', 'ERR_INVALID_ARG_TYPE');
         }
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
         const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
+        const prependListeners = !!staticOnceOptions.prepend;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         let signal = staticOnceOptions.signal || void 0;
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
@@ -719,10 +726,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let hasTiming = !!timing;
         let abortControllersGroup: AbortControllersGroup|void;
 
+        if (prependListeners && isEventTarget) {
+            return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
+        }
+
         if (abortControllers && isValidAbortControllers) {
             if (signal) {
                 // Можно использовать либо signal, либо abortController, но не обоих одновременно
-                return Promise.reject(new EventsTypeError(`Pick one option: signal or abortControllers`, 'ERR_INVALID_ARG_TYPE'));
+                return Promise.reject(new EventsTypeError(`Pick one option: signal or abortControllers`, 'ERR_INVALID_OPTION_TYPE'));
             }
 
             abortControllersGroup = new AbortControllersGroup(abortControllers);
@@ -731,7 +742,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         if (signal) {
             if (!isAbortSignal(signal)) {
-                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_ARG_TYPE'));
+                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
             }
 
             // Return early if already aborted, thus avoiding making an HTTP request
@@ -814,6 +825,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
                     }
+                    else if (prependListeners) {
+                        _emitter.prependListener(type as string|symbol, eventListener);
+                    }
                     else {
                         _emitter.on(type as string|symbol, eventListener);
                     }
@@ -839,6 +853,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (isEventTarget) {
                     // EventTarget does not have `error` event semantics like Node
                     (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                }
+                else if (prependListeners) {
+                    _emitter.prependListener(errorEventName, errorListener);
                 }
                 else {
                     _emitter.on(errorEventName, errorListener);
@@ -909,6 +926,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
                     // EventTarget does not have `error` event semantics like Node
                     (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                }
+                else if (prependListeners) {
+                    _emitter.prependListener(type as string|symbol, eventListener);
+                    _emitter.prependListener(errorEventName, errorListener);
                 }
                 else {
                     _emitter.on(type as string|symbol, eventListener);
@@ -1118,6 +1139,7 @@ export function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitte
         && typeof (emitter as NodeEventEmitter).once === 'function'
         && typeof (emitter as NodeEventEmitter).removeListener === 'function'
         && typeof (emitter as NodeEventEmitter).emit === 'function'
+        && typeof (emitter as NodeEventEmitter).prependListener === 'function'
     ;
 }
 

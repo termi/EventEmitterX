@@ -152,3 +152,27 @@ module.exports.compatibleOnce_for_EventTarget = function(once) {
         });
     };
 };
+
+module.exports.createDomEventLike = function(type = 'unknown', props = void 0) {
+    return {
+        type,
+        cancelable: true,
+        defaultPrevented: false,
+        cancelBubble: false,
+        preventDefault() {
+            this.defaultPrevented = true;
+        },
+        canceled: false,
+        canceledImmediate: false,
+        stopImmediatePropagation() {
+            this.cancelBubble = true;
+            this.canceled = true;
+            this.canceledImmediate = true;
+        },
+        stopPropagation() {
+            this.cancelBubble = true;
+            this.canceled = true;
+        },
+        ...props,
+    };
+};

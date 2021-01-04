@@ -23,8 +23,9 @@ const {
     compatibleEventEmitter_from_EventTarget,
     compatibleOnce_for_EventTarget,
     getEventListeners,
+    createDomEventLike,
 } = require('../../spec_utils/EventTarget_helpers');
-import events, {EventEmitterEx} from '../../modules/events';
+import events, {EventEmitterEx, isEventTargetCompatible} from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import {AbortControllersGroup} from 'termi@abortable';
 
@@ -469,44 +470,169 @@ describe('events', function() {
             expect(ee.listenerCount('test2')).toBe(0);
         });
 
-        it(`should reject with error on 'error' event`, function (done) {
-            const expectedError = new Error('REJECT PROMISE');
-            let error = void 0;
+        describe(`'error' handling`, function() {
+            it(`should reject with error on 'error' event`, function (done) {
+                const expectedError = new Error('REJECT PROMISE');
+                let error = void 0;
 
-            once(ee, 'test3')
-                .catch(err => {
-                    error = err;
-                })
-                .then(() => {
-                    expect(error).toBeDefined();
-                    expect(error).toBe(expectedError);
-                    expect(ee.listenerCount('test3')).toBe(0);
+                once(ee, 'test3')
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error).toBe(expectedError);
+                        expect(ee.listenerCount('test3')).toBe(0);
+                        expect(ee.listenerCount('error')).toBe(0);
 
-                    done();
-                })
-            ;
+                        done();
+                    })
+                ;
 
-            ee.emit('error', expectedError);
-        });
-
-        it(`should reject with error on 'error' event (async/await)`, async function () {
-            const expectedError = new Error('REJECT PROMISE');
-            let error = null;
-
-            process.nextTick(() => {
                 ee.emit('error', expectedError);
             });
 
-            try {
-                await once(ee, 'test4');
+            it(`should reject with error on 'error' event (async/await)`, async function () {
+                const expectedError = new Error('REJECT PROMISE');
+                let error = null;
+
+                process.nextTick(() => {
+                    ee.emit('error', expectedError);
+                });
+
+                try {
+                    await once(ee, 'test4');
+                }
+                catch(err) {
+                    error = err;
+                }
+
+                expect(error).toBe(expectedError);
+                expect(ee.listenerCount('test4')).toBe(0);
+                expect(ee.listenerCount('error')).toBe(0);
+            });
+
+            it(`should reject with error on custom error event`, function (done) {
+                const expectedError = new Error('REJECT PROMISE');
+                const customErrorEventName = 'custom_error1';
+                let error = void 0;
+
+                once(ee, 'test3', {
+                    errorEventName: customErrorEventName,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error).toBe(expectedError);
+                        expect(ee.listenerCount('test3')).toBe(0);
+                        expect(ee.listenerCount(customErrorEventName)).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                ee.emit(customErrorEventName, expectedError);
+            });
+
+            it(`should reject with error on custom error event (async/await)`, async function () {
+                const expectedError = new Error('REJECT PROMISE');
+                const customErrorEventName = 'custom_error2';
+                let error = null;
+
+                process.nextTick(() => {
+                    ee.emit(customErrorEventName, expectedError);
+                });
+
+                try {
+                    await once(ee, 'test4', {
+                        errorEventName: customErrorEventName,
+                    });
+                }
+                catch(err) {
+                    error = err;
+                }
+
+                expect(error).toBe(expectedError);
+                expect(ee.listenerCount('test4')).toBe(0);
+                expect(ee.listenerCount(customErrorEventName)).toBe(0);
+            });
+        });
+
+        describe(`- EventTarget incompatible -`, function() {
+            // https://github.com/facebook/jest/issues/7245#issuecomment-640262989
+            const itSkip = it.skip;
+
+            if (!isEventTargetCompatible(ee)) {
+                // Для EventTarget - пропускаем, для EventEmitter - запускаем
+                it.skip = it;
             }
-            catch(err) {
-                error = err;
+            else {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                it.skip = function(){};
             }
 
-            expect(error).toBe(expectedError);
-            expect(ee.listenerCount('test4')).toBe(0);
+            it.skip('with options.prepend', function (done) {
+                const isEvent = Symbol('isEvent');
+                const defaultListener = function(event) {
+                    event.stopImmediatePropagation();
+
+                    if (event.position === 4) {
+                        event.position = 5;
+                    }
+                };
+
+                ee.addListener('test5-1', defaultListener);
+
+                // Если prepend работает правильно и обработчик события внутри once ставиться в начало всех обработчиков
+                //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в checkFn.
+                once(ee, 'test5-1', {
+                    prepend: true,
+                    checkFn(_1, _2, [event]) {
+                        return !event.cancelBubble;
+                    },
+                })
+                    .then(args => {
+                        const event = args[0];
+
+                        expect(event[isEvent]).toBe(true);
+                        expect(event.position).toBe(1);
+                        expect(ee.listenerCount('test5-1')).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                // Если prepend не указан, то сначала выполниться defaultListener, который создаст событие с position = 5.
+                once(ee, 'test5-1', {
+                    checkFn(_1, _2, [event]) {
+                        return event.position === 5;
+                    },
+                })
+                    .then(args => {
+                        const event = args[0];
+
+                        expect(event[isEvent]).toBe(true);
+                        expect(event.position).toBe(5);
+                        expect(ee.listenerCount('test5-1')).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                ee.emit('test5-1', createDomEventLike('test5-1', {position: 1, [isEvent]: true}));
+                ee.emit('test5-1', createDomEventLike('test5-1', {position: 2, [isEvent]: true}));
+                ee.emit('test5-1', createDomEventLike('test5-1', {position: 3, [isEvent]: true}));
+                ee.emit('test5-1', createDomEventLike('test5-1', {position: 4, [isEvent]: true}));
+
+                ee.removeListener('test5-1', defaultListener);
+            });
+
+            it.skip = itSkip;
         });
+
 
         it('with options.checkFn', function (done) {
             const expectedError = null;
