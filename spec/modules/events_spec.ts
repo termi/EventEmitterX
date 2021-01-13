@@ -19,15 +19,16 @@ const NativeAbortController = AbortController;
 import {
     EventEmitter as NodeEventEmitter,
 } from 'events';
+import events, {EventEmitterEx, isEventTargetCompatible} from '../../modules/events';
+import ServerTiming from 'termi@ServerTiming';
+import {AbortControllersGroup} from 'termi@abortable';
+
 const {
     compatibleEventEmitter_from_EventTarget,
     compatibleOnce_for_EventTarget,
     getEventListeners,
     createDomEventLike,
 } = require('../../spec_utils/EventTarget_helpers');
-import events, {EventEmitterEx, isEventTargetCompatible} from '../../modules/events';
-import ServerTiming from 'termi@ServerTiming';
-import {AbortControllersGroup} from 'termi@abortable';
 
 // The EventTarget comes from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
 const NodeEventTarget = EventTarget;
@@ -466,6 +467,8 @@ describe('events', function() {
                 })
             ;
 
+            expect(ee.listenerCount('test1')).toBe(1);
+
             ee.emit('test1', ...expectedArgs);
         });
 
@@ -474,6 +477,8 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             process.nextTick(() => {
+                expect(ee.listenerCount('test2')).toBe(1);
+
                 ee.emit('test2', ...expectedArgs);
             });
 
@@ -508,6 +513,9 @@ describe('events', function() {
                     })
                 ;
 
+                expect(ee.listenerCount('test3')).toBe(1);
+                expect(ee.listenerCount('error')).toBe(1);
+
                 ee.emit('error', expectedError);
             });
 
@@ -516,6 +524,8 @@ describe('events', function() {
                 let error = null;
 
                 process.nextTick(() => {
+                    expect(ee.listenerCount('test4')).toBe(1);
+
                     ee.emit('error', expectedError);
                 });
 
@@ -554,6 +564,8 @@ describe('events', function() {
                     })
                 ;
 
+                expect(ee.listenerCount('test3')).toBe(1);
+
                 ee.emit(customErrorEventName, expectedError);
             });
 
@@ -581,7 +593,9 @@ describe('events', function() {
             });
         });
 
-        describe(`- EventTarget incompatible -`, function() {
+        describe(`(only for EventEmitter's) - EventTarget incompatible -`, function() {
+            // The tests in this group is not compatible for EventTarget, so it will no be called then emitter is EventTarget.
+
             // https://github.com/facebook/jest/issues/7245#issuecomment-640262989
             const itSkip = it.skip;
 
@@ -596,6 +610,7 @@ describe('events', function() {
             }
 
             it.skip('with options.prepend', function (done) {
+                let counter = 0;
                 const isEvent = Symbol('isEvent');
                 const defaultListener = function(event) {
                     event.stopImmediatePropagation();
@@ -609,7 +624,7 @@ describe('events', function() {
 
                 // Если prepend работает правильно и обработчик события внутри once ставиться в начало всех обработчиков
                 //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в checkFn.
-                once(ee, 'test5-1', {
+                const promise1 = once(ee, 'test5-1', {
                     prepend: true,
                     checkFn(_1, _2, [event]) {
                         return !event.cancelBubble;
@@ -620,14 +635,13 @@ describe('events', function() {
 
                         expect(event[isEvent]).toBe(true);
                         expect(event.position).toBe(1);
-                        expect(ee.listenerCount('test5-1')).toBe(0);
 
-                        done();
+                        counter++;
                     })
                 ;
 
                 // Если prepend не указан, то сначала выполниться defaultListener, который создаст событие с position = 5.
-                once(ee, 'test5-1', {
+                const promise2 = once(ee, 'test5-1', {
                     checkFn(_1, _2, [event]) {
                         return event.position === 5;
                     },
@@ -637,11 +651,19 @@ describe('events', function() {
 
                         expect(event[isEvent]).toBe(true);
                         expect(event.position).toBe(5);
-                        expect(ee.listenerCount('test5-1')).toBe(0);
 
-                        done();
+                        counter++;
                     })
                 ;
+
+                expect(getEventListeners(ee, 'test5-1').length).toBe(3);
+
+                Promise.all([ promise1, promise2 ]).then(() => {
+                    expect(counter).toBe(2);
+                    expect(ee.listenerCount('test5-1')).toBe(0);
+
+                    done();
+                });
 
                 ee.emit('test5-1', createDomEventLike('test5-1', {position: 1, [isEvent]: true}));
                 ee.emit('test5-1', createDomEventLike('test5-1', {position: 2, [isEvent]: true}));
@@ -681,6 +703,7 @@ describe('events', function() {
 
                 done();
             });
+            expect(getEventListeners(ee, 'test5').length).toBe(3);
 
             ee.emit('test5', ...[ 'test', 0, {} ]);
             ee.emit('test5', ...[ 'test', 1, {} ]);
@@ -713,10 +736,14 @@ describe('events', function() {
             ]).then(() => {
                 expect(error).toBe(expectedError);
                 expect(argsArray).toEqual(expectedArgs);
-                expect(ee.listenerCount('test5-1') + ee.listenerCount('test5-2')).toBe(0);
+                expect(ee.listenerCount('test5-1')).toBe(0);
+                expect(ee.listenerCount('test5-2')).toBe(0);
 
                 done();
             });
+
+            expect(getEventListeners(ee, 'test5-1').length).toBe(3);
+            expect(getEventListeners(ee, 'test5-2').length).toBe(3);
 
             ee.emit('test5-1', ...[ 'test', 0, {} ]);
             ee.emit('test5-2', ...[ 'test', 0, {} ]);
@@ -778,14 +805,18 @@ describe('events', function() {
                 });
 
                 try {
-                    await once(ee, 'test6', { signal: ac1.signal });
+                    const promise = once(ee, 'test6', { signal: ac1.signal });
+
+                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
+
+                    await promise;
 
                     counter++;
                 }
                 catch(err) {
                     error1 = err;
                 }
-                // on this line ac1 and ac2 already Aborted
+                // at this line ac1 and ac2 already Aborted
                 try {
                     await once(ee, 'test6', { signal: ac2.signal });
 
@@ -810,9 +841,10 @@ describe('events', function() {
             it(`with AbortController's`, function (done) {
                 let error: DOMException|void = void 0;
                 let counter = 0;
-                const ac = new AbortController();
+                const ac1 = new AbortController();
+                const ac2 = new NativeAbortController();
 
-                once(ee, 'test6', { abortControllers: [ ac ] })
+                once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
                     .then(() => {
                         counter++;
                     })
@@ -825,15 +857,47 @@ describe('events', function() {
                         expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
-                        expect(getEventListeners(ac.signal, 'abort').length).toBe(0);
+                        expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
+                        expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac.signal, 'abort').length).toBe(1);
+                expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
+                expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
 
-                ac.abort();
+                ac1.abort();
+                ee.emit('test6', ...[1, 2, 3]);
+            });
+
+            it(`with AbortController's - without abort()`, function (done) {
+                let error: DOMException|void = void 0;
+                let counter = 0;
+                const ac1 = new AbortController();
+                const ac2 = new NativeAbortController();
+
+                once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
+                    .then(() => {
+                        counter++;
+                    })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(counter).toBe(1);
+                        expect(error).not.toBeDefined();
+                        expect(ee.listenerCount('test6')).toBe(0);
+                        expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
+                        expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
+                expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
+
                 ee.emit('test6', ...[1, 2, 3]);
             });
 
@@ -853,14 +917,20 @@ describe('events', function() {
                 });
 
                 try {
-                    await once(ee, 'test6', { abortControllers: [ acg ] });
+                    const promise = once(ee, 'test6', { abortControllers: [ acg ] });
+
+                    expect(getEventListeners(acg.signal, 'abort').length).toBe(1);
+                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
+                    expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
+
+                    await promise;
 
                     counter++;
                 }
                 catch(err) {
                     error1 = err;
                 }
-                // on this line ac1 and ac2 already Aborted
+                // at this line ac1 and ac2 already Aborted
                 try {
                     await once(ee, 'test6', { abortControllers: [ ac1, ac2 ] });
 
@@ -879,6 +949,45 @@ describe('events', function() {
                 expect(error1 && error1.name).toBe('AbortError');
                 expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
                 expect(error2 && error2.name).toBe('AbortError');
+                expect(ee.listenerCount('test6')).toBe(0);
+                expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
+                expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
+                expect(getEventListeners(acg.signal, 'abort').length).toBe(0);
+            });
+
+            it(`with AbortController's (async/await) - without abort()`, async function () {
+                let error: DOMException|void = void 0;
+                let counter = 0;
+                const ac1 = new AbortController();
+                const ac2 = new NativeAbortController();
+                const acg = new AbortControllersGroup([ ac1, ac2 ]);
+
+                process.nextTick(() => {
+                    ee.emit('test6', ...[1, 2, 3]);
+                });
+
+                try {
+                    const promise = Promise.all([
+                        once(ee, 'test6', { abortControllers: [ acg ] }),
+                        once(ee, 'test6', { abortControllers: [ ac1, ac2 ] }),
+                    ]);
+
+                    expect(getEventListeners(acg.signal, 'abort').length).toBe(1);
+                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(2);
+                    expect(getEventListeners(ac2.signal, 'abort').length).toBe(2);
+
+                    await promise;
+
+                    counter++;
+                }
+                catch(err) {
+                    error = err;
+                }
+
+                acg.close();
+
+                expect(counter).toBe(1);
+                expect(error).not.toBeDefined();
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
                 expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);

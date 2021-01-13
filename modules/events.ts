@@ -89,8 +89,8 @@ interface StaticOnceOptionsDefault {
     /** Add listener in the beginning of listeners list */
     prepend?: boolean;
     /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal)
-     * If option "signal" is defined, {@link abortControllers} option is not available
-     * */
+     * If option "signal" is defined, {@link abortControllers} option is not available.
+     */
     signal?: AbortSignal;
     /** A list of AbortController's to subscribe to it's signal's 'abort' event.
      * If option "abortControllers" is defined, {@link signal} option is not available.
@@ -99,8 +99,9 @@ interface StaticOnceOptionsDefault {
     timing?: ServerTiming;
     /** timeout in ms */
     timeout?: number;
-    /** Custom error event name. Default is 'error'. */
+    /** Custom error event name. Default error event name is 'error'. */
     errorEventName?: EventName;
+    /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: Function;
     // [key: string]: any;
 }
@@ -115,6 +116,9 @@ interface StaticOnceOptions_AC<EE, E> extends StaticOnceOptionsDefault {
     signal?: never;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
+    // todo: add:
+    //  capture?: boolean;
+    //  passive?: boolean;
     /** prepend option is not supported for EventTarget emitter */
     prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
@@ -122,6 +126,9 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     abortControllers?: never;
 }
 interface StaticOnceOptionsEventTarget_AC extends StaticOnceOptionsDefault {
+    // todo: add:
+    //  capture?: boolean;
+    //  passive?: boolean;
     /** prepend option is not supported for EventTarget emitter */
     prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
@@ -873,7 +880,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
         const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
-        const prependListeners = !!staticOnceOptions.prepend;
+        const usePrependListener = !!staticOnceOptions.prepend;
         const errorEventNameIsDefined = staticOnceOptions.errorEventName !== void 0;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         let signal = staticOnceOptions.signal || void 0;
@@ -889,14 +896,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let hasTiming = !!timing;
         let abortControllersGroup: TAbortControllersGroup|void;
 
-        if (prependListeners && isEventTarget) {
+        if (usePrependListener && isEventTarget) {
             return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
         }
 
         if (abortControllers && isValidAbortControllers) {
             if (signal) {
                 // Можно использовать либо signal, либо abortController, но не обоих одновременно
-                return Promise.reject(new EventsTypeError(`Pick one option: signal or abortControllers`, 'ERR_INVALID_OPTION_TYPE'));
+                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: Pick one option: signal or abortControllers`, 'ERR_INVALID_OPTION_TYPE'));
             }
 
             abortControllersGroup = new AbortControllersGroup(abortControllers);
@@ -908,7 +915,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
             }
 
-            // Return early if already aborted, thus avoiding making an HTTP request
+            // Return early if already aborted.
             if (signal.aborted) {
                 return Promise.reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
             }
@@ -991,7 +998,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
                     }
-                    else if (prependListeners) {
+                    else if (usePrependListener) {
                         _emitter.prependListener(type as string|symbol, eventListener);
                     }
                     else {
@@ -1022,7 +1029,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
                     }
                 }
-                else if (prependListeners) {
+                else if (usePrependListener) {
                     _emitter.prependListener(errorEventName, errorListener);
                 }
                 else {
@@ -1100,7 +1107,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
                     }
                 }
-                else if (prependListeners) {
+                else if (usePrependListener) {
                     _emitter.prependListener(type as string|symbol, eventListener);
                     _emitter.prependListener(errorEventName, errorListener);
                 }
@@ -1124,7 +1131,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                     if (clearPromiseSymbol === sCleanAbortPromise) {
                         // Call resolve only in cleanup purpose. It should be called when it cannot affect Promise.race!
-                        // Очищаем Promise, чтобы он не висел нереализованным
+                        // Очищаем Promise, чтобы он не висел нереализованным. resolve должен вызываться когда уже не может повлиять на Promise.race!
                         resolve();
                     }
                     else {
@@ -1168,8 +1175,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     // Call resolve only in cleanup purpose. It should be called when it cannot affect Promise.race!
-                    // Очищаем Promise, чтобы он не висел нереализованным
+                    // Очищаем Promise, чтобы он не висел нереализованным. resolve должен вызываться когда уже не может повлиять на Promise.race!
                     resolve();
+
+                    cleanTimeoutCallback = void 0;
                 };
             }) : void 0;
 
