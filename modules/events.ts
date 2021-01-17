@@ -8,7 +8,7 @@
 //  - тесты:
 //    - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget.js
 
-// import type {EventEmitter} from "events";
+import type EventEmitter from "events";
 import type ServerTiming from 'termi@ServerTiming';
 import type {
     // default as TAbortController,
@@ -139,8 +139,57 @@ interface StaticOnceOptionsEventTarget_AC extends StaticOnceOptionsDefault {
 let _onceListenerIdCounter = 0;
 // This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
-const errorMonitor = Symbol('events.errorMonitor');
-// const captureRejectionSymbol = Symbol('nodejs.rejection');
+
+const isNodeJS = (function() {
+    if (typeof process === 'object' && process) {
+        if (typeof window !== 'undefined') {
+            // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
+            // workaround for jest+JSDOM
+            return !!window["__fake__"];
+        }
+        else {
+            return !process["browser"];
+        }
+    }
+
+    return false;
+})();
+
+const {
+    errorMonitor,
+    // captureRejectionSymbol,
+}: {
+    readonly errorMonitor: typeof EventEmitter.errorMonitor,
+    // readonly captureRejectionSymbol: unique symbol,
+} = (function() {
+    let errorMonitor;
+    // let captureRejectionSymbol;
+
+    if (isNodeJS) {
+        // this is nodejs
+        try {
+            const events = globalThis["require"]('events');
+
+            errorMonitor = events.errorMonitor;
+            // captureRejectionSymbol = events.captureRejectionSymbol;
+        }
+        catch(e) {
+            // ignore
+        }
+    }
+
+    if (!errorMonitor) {
+        errorMonitor = Symbol('events.errorMonitor');
+    }
+    // if (!captureRejectionSymbol) {
+    //     captureRejectionSymbol = Symbol('nodejs.rejection');
+    // }
+
+    return {
+        errorMonitor,
+        // captureRejectionSymbol,
+    };
+})()
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
 
@@ -198,10 +247,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         if (handler) {
             const {_f} = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
-            const has_errorMonitor_listener = _checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
 
             if (isErrorEvent) {
-                if (has_errorMonitor_listener) {
+                if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
                     this.emit(errorMonitor, ...args);
