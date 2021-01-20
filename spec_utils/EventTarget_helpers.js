@@ -78,7 +78,7 @@ function handlersFromListenersObject(listenersObject, type) {
  * @param {number|string|symbol} type
  * @returns {[]}
  */
-module.exports.getEventListeners = function(emitter, type) {
+function getEventListeners(emitter, type) {
     if (typeof emitter.listeners === 'function') {
         return emitter.listeners(type);
     }
@@ -116,6 +116,16 @@ module.exports.getEventListeners = function(emitter, type) {
     }
 
     throw new Error('Unknown emitter implementation');
+}
+
+module.exports.getEventListeners = getEventListeners;
+
+module.exports.listenerCount = function listenerCount(emitter, type) {
+    if (typeof emitter.listenerCount === 'function') {
+        return emitter.listenerCount(type);
+    }
+
+    return getEventListeners(emitter, type).length;
 }
 
 module.exports.compatibleOnce_for_EventTarget = function(once) {

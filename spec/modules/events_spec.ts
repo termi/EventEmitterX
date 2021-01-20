@@ -26,13 +26,19 @@ import {AbortControllersGroup} from 'termi@abortable';
 const {
     compatibleEventEmitter_from_EventTarget,
     compatibleOnce_for_EventTarget,
-    getEventListeners,
+    listenerCount,
     createDomEventLike,
 } = require('../../spec_utils/EventTarget_helpers');
 
 // The EventTarget comes from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
 const NodeEventTarget = EventTarget;
 const {EventEmitter} = events;
+
+function isTestError(error: Error) {
+    const errorString = String(error);
+
+    return errorString.includes('Expected') && errorString.includes('Received');
+}
 
 // todo: тесты можно взять тут:
 //  EventEmitter:
@@ -656,7 +662,7 @@ describe('events', function() {
                     })
                 ;
 
-                expect(getEventListeners(ee, 'test5-1').length).toBe(3);
+                expect(listenerCount(ee, 'test5-1')).toBe(3);
 
                 Promise.all([ promise1, promise2 ]).then(() => {
                     expect(counter).toBe(2);
@@ -703,7 +709,7 @@ describe('events', function() {
 
                 done();
             });
-            expect(getEventListeners(ee, 'test5').length).toBe(3);
+            expect(listenerCount(ee, 'test5')).toBe(3);
 
             ee.emit('test5', ...[ 'test', 0, {} ]);
             ee.emit('test5', ...[ 'test', 1, {} ]);
@@ -742,8 +748,8 @@ describe('events', function() {
                 done();
             });
 
-            expect(getEventListeners(ee, 'test5-1').length).toBe(3);
-            expect(getEventListeners(ee, 'test5-2').length).toBe(3);
+            expect(listenerCount(ee, 'test5-1')).toBe(3);
+            expect(listenerCount(ee, 'test5-2')).toBe(3);
 
             ee.emit('test5-1', ...[ 'test', 0, {} ]);
             ee.emit('test5-2', ...[ 'test', 0, {} ]);
@@ -778,13 +784,13 @@ describe('events', function() {
                         expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
-                        expect(getEventListeners(ac.signal, 'abort').length).toBe(0);
+                        expect(listenerCount(ac.signal, 'abort')).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac.signal, 'abort').length).toBe(1);
+                expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
                 ee.emit('test6', ...[1, 2, 3]);
@@ -807,13 +813,17 @@ describe('events', function() {
                 try {
                     const promise = once(ee, 'test6', { signal: ac1.signal });
 
-                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
+                    expect(listenerCount(ac1.signal, 'abort')).toBe(1);
 
                     await promise;
 
                     counter++;
                 }
                 catch(err) {
+                    if (isTestError(err)) {
+                        throw err;
+                    }
+
                     error1 = err;
                 }
                 // at this line ac1 and ac2 already Aborted
@@ -834,8 +844,8 @@ describe('events', function() {
                 expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
                 expect(error2 && error2.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
-                expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
-                expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
+                expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                expect(listenerCount(ac2.signal, 'abort')).toBe(0);
             });
 
             it(`with AbortController's`, function (done) {
@@ -857,15 +867,15 @@ describe('events', function() {
                         expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
-                        expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
-                        expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
+                        expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                        expect(listenerCount(ac2.signal, 'abort')).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
-                expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
+                expect(listenerCount(ac1.signal, 'abort')).toBe(1);
+                expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
                 ac1.abort();
                 ee.emit('test6', ...[1, 2, 3]);
@@ -888,15 +898,15 @@ describe('events', function() {
                         expect(counter).toBe(1);
                         expect(error).not.toBeDefined();
                         expect(ee.listenerCount('test6')).toBe(0);
-                        expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
-                        expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
+                        expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                        expect(listenerCount(ac2.signal, 'abort')).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
-                expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
+                expect(listenerCount(ac1.signal, 'abort')).toBe(1);
+                expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
                 ee.emit('test6', ...[1, 2, 3]);
             });
@@ -919,15 +929,19 @@ describe('events', function() {
                 try {
                     const promise = once(ee, 'test6', { abortControllers: [ acg ] });
 
-                    expect(getEventListeners(acg.signal, 'abort').length).toBe(1);
-                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(1);
-                    expect(getEventListeners(ac2.signal, 'abort').length).toBe(1);
+                    expect(listenerCount(acg.signal, 'abort')).not.toBe(0);
+                    expect(listenerCount(ac1.signal, 'abort')).toBe(1);
+                    expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
                     await promise;
 
                     counter++;
                 }
                 catch(err) {
+                    if (isTestError(err)) {
+                        throw err;
+                    }
+
                     error1 = err;
                 }
                 // at this line ac1 and ac2 already Aborted
@@ -937,6 +951,10 @@ describe('events', function() {
                     counter++;
                 }
                 catch(err) {
+                    if (isTestError(err)) {
+                        throw err;
+                    }
+
                     error2 = err;
                 }
 
@@ -950,9 +968,9 @@ describe('events', function() {
                 expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
                 expect(error2 && error2.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
-                expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
-                expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
-                expect(getEventListeners(acg.signal, 'abort').length).toBe(0);
+                expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                expect(listenerCount(ac2.signal, 'abort')).toBe(0);
+                expect(listenerCount(acg.signal, 'abort')).toBe(0);
             });
 
             it(`with AbortController's (async/await) - without abort()`, async function () {
@@ -972,15 +990,19 @@ describe('events', function() {
                         once(ee, 'test6', { abortControllers: [ ac1, ac2 ] }),
                     ]);
 
-                    expect(getEventListeners(acg.signal, 'abort').length).toBe(1);
-                    expect(getEventListeners(ac1.signal, 'abort').length).toBe(2);
-                    expect(getEventListeners(ac2.signal, 'abort').length).toBe(2);
+                    expect(listenerCount(acg.signal, 'abort')).not.toBe(0);
+                    expect(listenerCount(ac1.signal, 'abort')).toBe(2);
+                    expect(listenerCount(ac2.signal, 'abort')).toBe(2);
 
                     await promise;
 
                     counter++;
                 }
                 catch(err) {
+                    if (isTestError(err)) {
+                        throw err;
+                    }
+
                     error = err;
                 }
 
@@ -989,9 +1011,70 @@ describe('events', function() {
                 expect(counter).toBe(1);
                 expect(error).not.toBeDefined();
                 expect(ee.listenerCount('test6')).toBe(0);
-                expect(getEventListeners(ac1.signal, 'abort').length).toBe(0);
-                expect(getEventListeners(ac2.signal, 'abort').length).toBe(0);
-                expect(getEventListeners(acg.signal, 'abort').length).toBe(0);
+                expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                expect(listenerCount(ac2.signal, 'abort')).toBe(0);
+                expect(listenerCount(acg.signal, 'abort')).toBe(0);
+            });
+
+            it(`with AbortSignal and AbortController's`, function (done) {
+                {
+                    let error: DOMException|void = void 0;
+                    const ac1 = new AbortController();
+                    const ac2 = new AbortController();
+                    const ac3 = new AbortController();
+
+                    once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
+                        .catch(err => {
+                            error = err;
+                        })
+                        .then(() => {
+                            expect(error).toBeDefined();
+                            expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                            expect(error && error.name).toBe('AbortError');
+                            expect(ee.listenerCount('test6')).toBe(0);
+                            expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                            expect(listenerCount(ac2.signal, 'abort')).toBe(0);
+                            expect(listenerCount(ac3.signal, 'abort')).toBe(0);
+
+                            done();
+                        })
+                    ;
+
+                    expect(listenerCount(ac1.signal, 'abort')).toBe(1);
+                    expect(listenerCount(ac2.signal, 'abort')).toBe(1);
+                    expect(listenerCount(ac3.signal, 'abort')).toBe(1);
+
+                    ac3.abort();
+                }
+                {
+                    let error: DOMException|void = void 0;
+                    const ac1 = new AbortController();
+                    const ac2 = new AbortController();
+                    const ac3 = new AbortController();
+
+                    once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
+                        .catch(err => {
+                            error = err;
+                        })
+                        .then(() => {
+                            expect(error).toBeDefined();
+                            expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                            expect(error && error.name).toBe('AbortError');
+                            expect(ee.listenerCount('test6')).toBe(0);
+                            expect(listenerCount(ac1.signal, 'abort')).toBe(0);
+                            expect(listenerCount(ac2.signal, 'abort')).toBe(0);
+                            expect(listenerCount(ac3.signal, 'abort')).toBe(0);
+
+                            done();
+                        })
+                    ;
+
+                    expect(listenerCount(ac1.signal, 'abort')).toBe(1);
+                    expect(listenerCount(ac2.signal, 'abort')).toBe(1);
+                    expect(listenerCount(ac3.signal, 'abort')).toBe(1);
+
+                    ac1.abort();
+                }
             });
 
             it('with AbortSignal and ServerTiming', function (done) {
@@ -1014,13 +1097,13 @@ describe('events', function() {
                         expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test10')).toBe(0);
-                        expect(getEventListeners(ac.signal, 'abort').length).toBe(0);
+                        expect(listenerCount(ac.signal, 'abort')).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac.signal, 'abort').length).toBe(1);
+                expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
                 ee.emit('test10', ...[1, 2, 3]);
@@ -1046,13 +1129,13 @@ describe('events', function() {
                         expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test10') + ee.listenerCount('test11') + ee.listenerCount('test12')).toBe(0);
-                        expect(getEventListeners(ac.signal, 'abort').length).toBe(0);
+                        expect(listenerCount(ac.signal, 'abort')).toBe(0);
 
                         done();
                     })
                 ;
 
-                expect(getEventListeners(ac.signal, 'abort').length).toBe(1);
+                expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
                 ee.emit('test11', ...[1, 2, 3]);

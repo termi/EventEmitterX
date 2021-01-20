@@ -108,12 +108,6 @@ interface StaticOnceOptionsDefault {
 interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
     /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
-    abortControllers?: never;
-}
-interface StaticOnceOptions_AC<EE, E> extends StaticOnceOptionsDefault {
-    /** You can throw a Error inside checkFn to reject once() with your error */
-    checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
-    signal?: never;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     // todo: add:
@@ -123,17 +117,6 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
-    abortControllers?: never;
-}
-interface StaticOnceOptionsEventTarget_AC extends StaticOnceOptionsDefault {
-    // todo: add:
-    //  capture?: boolean;
-    //  passive?: boolean;
-    /** prepend option is not supported for EventTarget emitter */
-    prepend?: never;
-    /** You can throw a Error inside checkFn to reject once() with your error */
-    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
-    signal?: never;
 }
 
 let _onceListenerIdCounter = 0;
@@ -889,11 +872,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
     static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
-    static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions_AC<EventEmitterEx, EventName>): Promise<any[]>;
     static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
-    static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions_AC<NodeEventEmitter, string|symbol>): Promise<any[]>;
     static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<Event>;
-    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget_AC): Promise<Event>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
@@ -948,24 +928,23 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
         }
 
-        if (abortControllers && isValidAbortControllers) {
+        {
             if (signal) {
-                // Можно использовать либо signal, либо abortController, но не обоих одновременно
-                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: Pick one option: signal or abortControllers`, 'ERR_INVALID_OPTION_TYPE'));
+                if (!isAbortSignal(signal)) {
+                    return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+                }
             }
 
-            abortControllersGroup = new AbortControllersGroup(abortControllers);
-            signal = abortControllersGroup.signal;
-        }
-
-        if (signal) {
-            if (!isAbortSignal(signal)) {
-                return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+            if (abortControllers && isValidAbortControllers) {
+                abortControllersGroup = new AbortControllersGroup(abortControllers, signal ? [ signal ] : []);
+                signal = abortControllersGroup.signal;
             }
 
-            // Return early if already aborted.
-            if (signal.aborted) {
-                return Promise.reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+            if (signal) {
+                // Return early if already aborted.
+                if (signal.aborted) {
+                    return Promise.reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+                }
             }
         }
 
