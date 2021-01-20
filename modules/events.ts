@@ -223,9 +223,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]>) {
-        const {_events} = this;
         const isErrorEvent = event === 'error';
-        const handler = _events[event];
+        const handler = this._events[event];
 
         if (handler) {
             const {_f} = this;
@@ -429,6 +428,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const {
             _events,
             _f,
+            _onceIds,
         } = this;
         // const listenerOncePerEventType = _checkBit(_flgs, EventEmitterEx_Flags_listenerOncePerEventType);
         const handler = _events[event];
@@ -442,7 +442,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
-        const hasAnyOnceListener = this._onceIds.length > 0;
+        const hasAnyOnceListener = _onceIds.length > 0;
         let newListenersCount: void|number = void 0;
         // let originalListener: void|Function = void 0;
 
@@ -458,10 +458,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 && handler.listener === listener
             ) {
                 const onceWrapperId = handler[sOnceListenerWrapperId];
-                const idIndex = this._onceIds.indexOf(onceWrapperId);
+                const idIndex = _onceIds.indexOf(onceWrapperId);
 
                 if (idIndex !== -1) {
-                    this._onceIds.splice(idIndex, 1);
+                    _onceIds.splice(idIndex, 1);
                 }
 
                 delete _events[event];
@@ -489,10 +489,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     && handler.listener === listener
                 ) {
                     const onceWrapperId = handler[sOnceListenerWrapperId];
-                    const idIndex = this._onceIds.indexOf(onceWrapperId);
+                    const idIndex = _onceIds.indexOf(onceWrapperId);
 
                     if (idIndex !== -1) {
-                        this._onceIds.splice(idIndex, 1);
+                        _onceIds.splice(idIndex, 1);
                     }
 
                     // originalListener = listeners[i].listener;
@@ -591,8 +591,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     hasListeners<EventKey extends keyof EventMap = EventName>(event: EventKey) {
-        const {_events} = this;
-        const handlers = _events[event];
+        const handlers = this._events[event];
 
         if (!handlers) {
             return false;
@@ -618,14 +617,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     removeAllListeners<EventKey extends keyof EventMap = EventName>(event?: EventKey): this {
-        const {_f} = this;
+        const {
+            _f,
+            _events,
+            _onceIds,
+        } = this;
         const has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
         if (has_removeListener_listener && event !== 'removeListener') {
             if (!event) {
                 // Emit removeListener for all listeners on all events
-                const {_events} = this;
-
                 for (const key of Object.keys(_events)) {
                     if (key === 'removeListener') {
                         continue;
@@ -636,7 +637,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 this.removeAllListeners('removeListener');
 
-                this._onceIds.length = 0;
+                _onceIds.length = 0;
                 this._events = Object.create(null);
                 this._f = _unsetBit(_f,
                     EventEmitterEx_Flags_has_error_listener
@@ -646,17 +647,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 );
             }
             else {
-                if (this._onceIds.length > 0) {
-                    const handler = this._events[event];
+                if (_onceIds.length > 0) {
+                    const handler = _events[event];
 
                     if (typeof handler === 'function') {
                         const onceWrapperId = handler[sOnceListenerWrapperId];
 
                         if (onceWrapperId !== void 0) {
-                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+                            const idIndex = _onceIds.indexOf(onceWrapperId);
 
                             if (idIndex !== -1) {
-                                this._onceIds.splice(idIndex, 1);
+                                _onceIds.splice(idIndex, 1);
                             }
 
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -676,10 +677,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             const handler = listeners[i];
 
                             const onceWrapperId = handler[sOnceListenerWrapperId];
-                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+                            const idIndex = _onceIds.indexOf(onceWrapperId);
 
                             if (idIndex !== -1) {
-                                this._onceIds.splice(idIndex, 1);
+                                _onceIds.splice(idIndex, 1);
                             }
 
                             if (onceWrapperId !== void 0) {
@@ -696,7 +697,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
 
-                delete this._events[event];
+                delete _events[event];
 
                 if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
@@ -715,7 +716,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         else {
             // Not listening for removeListener, no need to emit
             if (!event) {
-                this._onceIds.length = 0;
+                _onceIds.length = 0;
                 this._events = Object.create(null);
                 this._f = _unsetBit(_f,
                     EventEmitterEx_Flags_has_error_listener
@@ -725,17 +726,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 );
             }
             else {
-                if (this._onceIds.length > 0) {
-                    const handler = this._events[event];
+                if (_onceIds.length > 0) {
+                    const handler = _events[event];
 
                     if (typeof handler === 'function') {
                         const onceWrapperId = handler[sOnceListenerWrapperId];
 
                         if (onceWrapperId !== void 0) {
-                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+                            const idIndex = _onceIds.indexOf(onceWrapperId);
 
                             if (idIndex !== -1) {
-                                this._onceIds.splice(idIndex, 1);
+                                _onceIds.splice(idIndex, 1);
                             }
                         }
                     }
@@ -746,16 +747,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             const handler = listeners[i];
 
                             const onceWrapperId = handler[sOnceListenerWrapperId];
-                            const idIndex = this._onceIds.indexOf(onceWrapperId);
+                            const idIndex = _onceIds.indexOf(onceWrapperId);
 
                             if (idIndex !== -1) {
-                                this._onceIds.splice(idIndex, 1);
+                                _onceIds.splice(idIndex, 1);
                             }
                         }
                     }
                 }
 
-                delete this._events[event];
+                delete _events[event];
 
                 if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
@@ -788,8 +789,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * Returns a copy of the array of listeners for the event named eventName.
      */
     listeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][] {
-        const {_events} = this;
-        const handler = _events[event];
+        const handler = this._events[event];
 
         if (!handler) {
             return [];
@@ -826,8 +826,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * Returns a copy of the array of listeners for the event named eventName, including any wrappers (such as those created by .once()).
      */
     rawListeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][] {
-        const {_events} = this;
-        const handler = _events[event];
+        const handler = this._events[event];
 
         if (!handler) {
             return [];
@@ -846,8 +845,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     listenerCount<EventKey extends keyof EventMap = EventName>(event: EventKey): number {
-        const {_events} = this;
-        const handler = _events[event];
+        const handler = this._events[event];
 
         if (!handler) {
             return 0;
