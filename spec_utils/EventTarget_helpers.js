@@ -21,6 +21,12 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
 
             this["dispatchEvent"](event);
         };
+        maybeEventTarget.on = function on(type, listener) {
+            this.addEventListener(type, listener);
+        };
+        maybeEventTarget.off = function on(type, listener) {
+            this.removeEventListener(type, listener);
+        };
 
         if (maybeEventTarget[event_target]) {
             // nodejs native EventTarget

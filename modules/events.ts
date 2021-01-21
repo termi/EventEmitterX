@@ -165,7 +165,7 @@ const {
         errorMonitor = Symbol('events.errorMonitor');
     }
     // if (!captureRejectionSymbol) {
-    //     captureRejectionSymbol = Symbol('nodejs.rejection');
+    //     captureRejectionSymbol = Symbol.for('nodejs.rejection');
     // }
 
     return {
@@ -957,6 +957,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
             promise = new Promise<any[]>((resolve, reject) => {
                 const eventListenersByType: [ type: typeof types extends Array<infer T> ? T : never, listener: Listener ][] = [];
+                let needErrorListener = true;
 
                 listenersCleanUp = function() {
                     for (const [ type, listener ] of eventListenersByType) {
@@ -972,14 +973,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         }
                     }
 
-                    if (isEventTarget) {
-                        if (errorEventNameIsDefined) {
-                            // EventTarget does not have `error` event semantics like Node
-                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                    if (needErrorListener) {
+                        if (isEventTarget) {
+                            if (errorEventNameIsDefined) {
+                                // EventTarget does not have `error` event semantics like Node
+                                (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                            }
                         }
-                    }
-                    else {
-                        _emitter.removeListener(errorEventName, errorListener);
+                        else {
+                            _emitter.removeListener(errorEventName, errorListener);
+                        }
                     }
 
                     eventListenersByType.length = 0;
@@ -993,6 +996,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
 
                 for (const type of types) {
+                    if (type === errorEventName) {
+                        // https://nodejs.org/api/events.html#events_events_once_emitter_name_options
+                        // ...
+                        // The special handling of the 'error' event is only used when events.once() is used to wait for another event.
+                        // If events.once() is used to wait for the 'error' event itself, then it is treated as any other kind of event without special handling.
+                        needErrorListener = false;
+                    }
+
                     const eventListener = (...args) => {
                         if (checkFn) {
                             try {
@@ -1048,6 +1059,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     reject(error);
                 };
 
+                if (!needErrorListener) {
+                    // No need to add errorEventName('error') handler due it already added by one of `types`;
+                    return;
+                }
+
                 if (isEventTarget) {
                     if (errorEventNameIsDefined) {
                         // EventTarget does not have `error` event semantics like Node
@@ -1064,6 +1080,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
         else {
             const type = types;
+            // https://nodejs.org/api/events.html#events_events_once_emitter_name_options
+            // ...
+            // The special handling of the 'error' event is only used when events.once() is used to wait for another event.
+            // If events.once() is used to wait for the 'error' event itself, then it is treated as any other kind of event without special handling.
+            const needErrorListener = type !== errorEventName;
 
             promise = new Promise<any[]>((resolve, reject) => {
                 const eventListener = (...args) => {
@@ -1112,14 +1133,16 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 listenersCleanUp = function() {
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).removeEventListener(type as string, eventListener);
-                        if (errorEventNameIsDefined) {
+                        if (errorEventNameIsDefined && needErrorListener) {
                             // EventTarget does not have `error` event semantics like Node
                             (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
                         }
                     }
                     else {
                         _emitter.removeListener(type as string|symbol, eventListener);
-                        _emitter.removeListener(errorEventName, errorListener);
+                        if (needErrorListener) {
+                            _emitter.removeListener(errorEventName, errorListener);
+                        }
                     }
 
                     listenersCleanUp = void 0;
@@ -1127,18 +1150,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 if (isEventTarget) {
                     (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
-                    if (errorEventNameIsDefined) {
+                    if (errorEventNameIsDefined && needErrorListener) {
                         // EventTarget does not have `error` event semantics like Node
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
                     }
                 }
                 else if (usePrependListener) {
                     _emitter.prependListener(type as string|symbol, eventListener);
-                    _emitter.prependListener(errorEventName, errorListener);
+                    if (needErrorListener) {
+                        _emitter.prependListener(errorEventName, errorListener);
+                    }
                 }
                 else {
                     _emitter.on(type as string|symbol, eventListener);
-                    _emitter.on(errorEventName, errorListener);
+                    if (needErrorListener) {
+                        _emitter.on(errorEventName, errorListener);
+                    }
                 }
             });
         }

@@ -617,6 +617,73 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
+            it(`should not reject if 'error' event is main listener type`, function (done) {
+                once(ee, 'error', {
+                    // EventTarget does not have `error` event semantics like Node
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                })
+                    .then(args => {
+                        expect(args).toEqual([1, 2, 3]);
+
+                        done();
+                    })
+                ;
+
+                expect(ee.listenerCount('error')).toBe(1);
+
+                ee.emit('error', 1, 2, 3);
+            });
+
+            it(`should not reject if 'error' event is main listener type (async/await)`, async function () {
+                setImmediate(() => {
+                    ee.emit('error', 1, 2, 3);
+                });
+
+                const args = await once(ee, 'error', {
+                    // EventTarget does not have `error` event semantics like Node
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                });
+
+                expect(args).toEqual([1, 2, 3]);
+                expect(ee.listenerCount('error')).toBe(0);
+            });
+
+            it(`should not reject if 'error' event is in main listeners types`, function (done) {
+                once(ee, ['test1', 'test2', 'error'], {
+                    // EventTarget does not have `error` event semantics like Node
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                })
+                    .then(args => {
+                        expect(args).toEqual([1, 2, 3]);
+                        expect(ee.listenerCount('test1')).toBe(0);
+                        expect(ee.listenerCount('test2')).toBe(0);
+                        expect(ee.listenerCount('error')).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                expect(ee.listenerCount('test1')).toBe(1);
+                expect(ee.listenerCount('test2')).toBe(1);
+                expect(ee.listenerCount('error')).toBe(1);
+
+                ee.emit('error', 1, 2, 3);
+            });
+
+            it(`should not reject if 'error' event is in main listeners types (async/await)`, async function () {
+                setImmediate(() => {
+                    ee.emit('error', 1, 2, 3);
+                });
+
+                const args = await once(ee, ['test1', 'test2', 'error'], {
+                    // EventTarget does not have `error` event semantics like Node
+                    errorEventName: isEventTarget ? 'error' : void 0,
+                });
+
+                expect(args).toEqual([1, 2, 3]);
+                expect(ee.listenerCount('error')).toBe(0);
+            });
+
             it(`should reject with error on custom error event`, function (done) {
                 const expectedError = new Error('REJECT PROMISE');
                 const customErrorEventName = 'custom_error1';
@@ -670,6 +737,134 @@ describe('events', function() {
                 expect(error).toBe(expectedError);
                 expect(ee.listenerCount('test4')).toBe(0);
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
+            });
+
+            it(`should not reject if custom error event is main listener type`, function (done) {
+                const customErrorEventName = 'custom_error1-1';
+
+                once(ee, customErrorEventName, {
+                    errorEventName: customErrorEventName,
+                })
+                    .then(args => {
+                        expect(args).toEqual([1, 2, 3]);
+                        expect(ee.listenerCount(customErrorEventName)).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                expect(ee.listenerCount(customErrorEventName)).toBe(1);
+
+                ee.emit(customErrorEventName, 1, 2, 3);
+            });
+
+            it(`should not reject if custom error event is main listener type (async/await)`, async function () {
+                const customErrorEventName = 'custom_error1-2';
+
+                setImmediate(() => {
+                    ee.emit(customErrorEventName, 1, 2, 3);
+                });
+
+                const args = await once(ee, customErrorEventName, {
+                    errorEventName: customErrorEventName,
+                });
+
+                expect(args).toEqual([1, 2, 3]);
+                expect(ee.listenerCount(customErrorEventName)).toBe(0);
+            });
+
+            it(`should not reject if custom error event is in main listeners types`, function (done) {
+                const customErrorEventName = 'custom_error1-1';
+
+                once(ee, ['test1', 'test2', customErrorEventName], {
+                    errorEventName: customErrorEventName,
+                })
+                    .then(args => {
+                        expect(args).toEqual([1, 2, 3]);
+                        expect(ee.listenerCount('test1')).toBe(0);
+                        expect(ee.listenerCount('test2')).toBe(0);
+                        expect(ee.listenerCount(customErrorEventName)).toBe(0);
+
+                        done();
+                    })
+                ;
+
+                expect(ee.listenerCount('test1')).toBe(1);
+                expect(ee.listenerCount('test2')).toBe(1);
+                expect(ee.listenerCount(customErrorEventName)).toBe(1);
+
+                ee.emit(customErrorEventName, 1, 2, 3);
+            });
+
+            it(`should not reject if custom error event is in main listeners types (async/await)`, async function () {
+                const customErrorEventName = 'custom_error1-2';
+
+                setImmediate(() => {
+                    ee.emit(customErrorEventName, 1, 2, 3);
+                });
+
+                const args = await once(ee, ['test1', 'test2', customErrorEventName], {
+                    errorEventName: customErrorEventName,
+                });
+
+                expect(args).toEqual([1, 2, 3]);
+                expect(ee.listenerCount(customErrorEventName)).toBe(0);
+            });
+
+            it(`should not reject if custom error event is main listener and 'error' event emitted`, async function () {
+                const customErrorEventName = 'custom_error1-3';
+
+                setImmediate(() => {
+                    const noop = () => {};
+
+                    ee.on('error', noop);
+
+                    ee.emit('error', 1);
+                    ee.emit(customErrorEventName, 1);
+
+                    ee.off('error', noop);
+                });
+
+                await Promise.all([
+                    once(ee, customErrorEventName, {
+                        errorEventName: customErrorEventName,
+                    }),
+                    once(ee, [ 'test1', 'test2', customErrorEventName ], {
+                        errorEventName: customErrorEventName,
+                    }),
+                ]);
+
+                expect(ee.listenerCount('error')).toBe(0);
+                expect(ee.listenerCount(customErrorEventName)).toBe(0);
+            });
+
+            it(`should reject if 'error' event is main listener and custom error event emitted`, async function () {
+                const customErrorEventName = 'custom_error1-3';
+                const error = new Error('custom');
+
+                setImmediate(() => {
+                    ee.emit(customErrorEventName, error);
+                });
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                const [ r1, r2 ] = await Promise.allSettled([
+                    once(ee, 'error', {
+                        errorEventName: customErrorEventName,
+                    }),
+                    once(ee, [ 'test1', 'test2', 'error' ], {
+                        errorEventName: customErrorEventName,
+                    }),
+                ]);
+
+                expect(r1.status).toBe('rejected');
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                expect(r1.reason).toBe(error);
+                expect(r2.status).toBe('rejected');
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                expect(r2.reason).toBe(error);
             });
         });
 
