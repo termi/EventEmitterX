@@ -107,7 +107,7 @@ describe('events', function() {
         describe('#on/#removeListener', function () {
             it('should call listener multiple times', function () {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.emit('test');
@@ -123,9 +123,9 @@ describe('events', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test2', listener2);
@@ -166,9 +166,9 @@ describe('events', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test2', listener2);
@@ -445,6 +445,152 @@ describe('events', function() {
                 expect(ee.listenerCount('test1')).toBe(0);
                 expect(ee.listenerCount('test2')).toBe(0);
                 expect(ee.listenerCount('test3')).toBe(0);
+            });
+        });
+
+        describe('#emit', function () {
+            describe('simple case', function () {
+                it('single listener', function () {
+                    let counter = 0;
+                    const listener = () => { counter++; };
+
+                    ee.on('test', listener);
+                    ee.emit('test');
+                    ee.emit('test');
+
+                    expect(counter).toBe(2);
+
+                    ee.removeListener('test', listener);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('multiply listeners', function () {
+                    let counter = 0;
+                    const listener = () => { counter++; };
+
+                    ee.on('test', listener);
+                    ee.on('test', listener);
+                    ee.on('test', listener);
+                    ee.emit('test');
+                    ee.emit('test');
+
+                    expect(counter).toBe(6);
+
+                    ee.removeAllListeners('test');
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+            });
+
+            describe('should not call handler added in current called handler', function () {
+                it('single listener', function () {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.on('test', listener2);
+                        ee.once('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.emit('test');
+
+                    expect(counter1).toBe(1);
+                    expect(counter2).toBe(0);
+                    expect(counter3).toBe(0);
+
+                    ee.removeListener('test', listener1);
+                    ee.removeListener('test', listener2);
+                    ee.removeListener('test', listener3);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('multiply listeners', function () {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.on('test', listener2);
+                        ee.once('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.emit('test');
+
+                    expect(counter1).toBe(3);
+                    expect(counter2).toBe(0);
+                    expect(counter3).toBe(0);
+
+                    ee.removeAllListeners('test');
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+            });
+
+            describe('should call handler removed in current called handler', function () {
+                it('single listener', function () {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.removeListener('test', listener2);
+                        ee.removeListener('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.on('test', listener2);
+                    ee.once('test', listener3);
+                    ee.emit('test');
+
+                    expect(counter1).toBe(1);
+                    expect(counter2).toBe(1);
+                    expect(counter3).toBe(1);
+
+                    ee.removeListener('test', listener1);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('multiply listeners', function () {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.removeListener('test', listener2);
+                        ee.removeListener('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.on('test', listener2);
+                    ee.on('test', listener2);
+                    ee.once('test', listener3);
+                    ee.once('test', listener3);
+                    ee.emit('test');
+
+                    expect(counter1).toBe(3);
+                    expect(counter2).toBe(2);
+                    expect(counter3).toBe(2);
+
+                    ee.removeAllListeners('test');
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
             });
         });
 

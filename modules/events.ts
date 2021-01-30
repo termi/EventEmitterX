@@ -88,13 +88,9 @@ interface Options {
 interface StaticOnceOptionsDefault {
     /** Add listener in the beginning of listeners list */
     prepend?: boolean;
-    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal)
-     * If option "signal" is defined, {@link abortControllers} option is not available.
-     */
+    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
     signal?: AbortSignal;
-    /** A list of AbortController's to subscribe to it's signal's 'abort' event.
-     * If option "abortControllers" is defined, {@link signal} option is not available.
-     */
+    /** A list of AbortController's to subscribe to it's signal's 'abort' event. */
     abortControllers?: (AbortController|void)[];
     timing?: ServerTiming;
     /** timeout in ms */
@@ -222,7 +218,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
     }
 
-    emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]>) {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]>): boolean;
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    emit<EventKey extends keyof EventMap>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const handler = this._events[event];
 
@@ -234,7 +235,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
-                    this.emit(errorMonitor, ...args);
+                    this.emit.apply(errorMonitor, arguments);// eslint-disable-line prefer-rest-params
                 }
             }
 
@@ -243,22 +244,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (isFn) {
                 const func_handler = handler as Function;
 
-                switch (args.length) {
-                    case 0:
+                switch (arguments.length) {
+                    case 1:
                         func_handler.call(this);
                         break;
-                    case 1:
-                        func_handler.call(this, args[0]);
-                        break;
                     case 2:
-                        func_handler.call(this, args[0], args[1]);
+                        func_handler.call(this, a1);
                         break;
                     case 3:
-                        func_handler.call(this, args[0], args[1], args[2]);
+                        func_handler.call(this, a1, a2);
+                        break;
+                    case 4:
+                        func_handler.call(this, a1, a2, a3);
                         break;
                     // slower
                     default:
-                        func_handler.apply(this, args);
+                        func_handler.apply(this, arguments);// eslint-disable-line prefer-rest-params
                 }
 
                 return true;
@@ -267,23 +268,26 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             const array_handler = handler as Function[];
 
             if (array_handler.length) {
-                switch (args.length) {
+                // arrayClone
+                const listeners = array_handler.slice();
+
+                switch (arguments.length) {
                     // fast cases
-                    case 0:
-                        emitNone_array(array_handler, this);
-                        break;
                     case 1:
-                        emitOne_array(array_handler, this, args[0]);
+                        emitNone_array(listeners, this);
                         break;
                     case 2:
-                        emitTwo_array(array_handler, this, args[0], args[1]);
+                        emitOne_array(listeners, this, a1);
                         break;
                     case 3:
-                        emitThree_array(array_handler, this, args[0], args[1], args[2]);
+                        emitTwo_array(listeners, this, a1, a2);
+                        break;
+                    case 4:
+                        emitThree_array(listeners, this, a1, a2, a3);
                         break;
                     // slower
                     default:
-                        emitMany_array(array_handler, this, args);
+                        emitMany_array(listeners, this, [ ...arguments ]);// eslint-disable-line prefer-rest-params
                 }
 
                 return true;
@@ -291,7 +295,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
         else if (isErrorEvent) {
             // If there is no 'error' event listener then throw.
-            const err = args[0];
+            const err = arguments[1];// eslint-disable-line prefer-rest-params
             /*if (domain) {
                 if (!err) { err = new Error('Uncaught, unspecified "error" event'); }
                 er.domainEmitter = this;
@@ -467,6 +471,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 delete _events[event];
                 newListenersCount = 0;
             }
+            else {
+                // Listener is not found, exit function
+                return this;
+            }
         }
         else if (hasAnyOnceListener) {
             // remove only first link to once listener
@@ -526,6 +534,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
             }
+            else {
+                // Listener is not found, exit function
+                return this;
+            }
         }
         else {
             // remove only first link to listener
@@ -554,6 +566,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         _events[event] = listeners[0];
                     }
                 }
+            }
+            else {
+                // Listener is not found, exit function
+                return this;
             }
         }
 
@@ -862,6 +878,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     // todo:
     //   static on(emitter: EventEmitter|DOMEventTarget, event: string): AsyncIterableIterator<any>;
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-event-on-async-iterator.js
+    //     - [Asynchronous Iterators for JavaScript](https://github.com/tc39/proposal-async-iteration)
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
@@ -1433,45 +1450,35 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     return wrapped as EventMap[EventKey];
 }
 
-function emitNone_array(handlers: Function[], self: EventEmitterEx) {
-    // arrayClone
-    const listeners = [ ...handlers ];
+function emitNone_array(listeners: Function[], self: EventEmitterEx) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self);
     }
 }
 
-function emitOne_array(handlers: Function[], self: EventEmitterEx, arg1: any) {
-    // arrayClone
-    const listeners = [ ...handlers ];
+function emitOne_array(listeners: Function[], self: EventEmitterEx, arg1: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1);
     }
 }
 
-function emitTwo_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any) {
-    // arrayClone
-    const listeners = [ ...handlers ];
+function emitTwo_array(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2);
     }
 }
 
-function emitThree_array(handlers: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any) {
-    // arrayClone
-    const listeners = [ ...handlers ];
+function emitThree_array(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2, arg3);
     }
 }
 
-function emitMany_array(handlers: Function[], self: EventEmitterEx, args: any[]) {
-    // arrayClone
-    const listeners = [ ...handlers ];
+function emitMany_array(listeners: Function[], self: EventEmitterEx, args: any[]) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].apply(self, args);
