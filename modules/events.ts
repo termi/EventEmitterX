@@ -106,13 +106,20 @@ interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
     checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
-    // todo: add:
-    //  capture?: boolean;
-    //  passive?: boolean;
+    /** {@link https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters}
+     * A Boolean indicating that events of this type will be dispatched to the registered listener before being dispatched to any `EventTarget` beneath it in the DOM tree.
+     * */
+    capture?: boolean;
+    /** {@link https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters}
+     * A Boolean that, if true, indicates that the function specified by listener will never call {@link https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault|preventDefault()}.
+     * If a passive listener does call preventDefault(), the user agent will do nothing other than generate a console warning.
+     * See {@link https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#improving_scrolling_performance_with_passive_listeners|Improving scrolling performance with passive listeners} to learn more.
+     * */
+    passive?: boolean;
     /** prepend option is not supported for EventTarget emitter */
     prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
-    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, event: Event) => boolean;
+    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, [event]: [Event]) => boolean;
 }
 
 let _onceListenerIdCounter = 0;
@@ -120,7 +127,7 @@ let _onceListenerIdCounter = 0;
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 
 const isNodeJS = (function() {
-    if (typeof process === 'object' && process) {
+    if (typeof globalThis !== 'undefined' && typeof globalThis["require"] === 'function' && typeof process === 'object' && process) {
         if (typeof window !== 'undefined') {
             // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
             // workaround for jest+JSDOM
@@ -888,7 +895,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
     static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
-    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<Event>;
+    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
@@ -923,17 +930,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
         const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
+        const staticOnceEventTargetOptions = isEventTarget && options ? options as StaticOnceOptionsEventTarget : void 0;
+        const eventTargetListenerOptions = isEventTarget && staticOnceEventTargetOptions && (staticOnceEventTargetOptions.passive !== void 0 || staticOnceEventTargetOptions.capture !== void 0)
+            ? { passive: staticOnceEventTargetOptions.passive, capture: staticOnceEventTargetOptions.capture }
+            : void 0
+        ;
         const usePrependListener = !!staticOnceOptions.prepend;
         const errorEventNameIsDefined = staticOnceOptions.errorEventName !== void 0;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
-        let signal = staticOnceOptions.signal || void 0;
-        const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
-        const isValidAbortControllers = Array.isArray(abortControllers) && abortControllers.length > 0;
         const timeout = staticOnceOptions.timeout || void 0;
         // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
         //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
         //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
         const checkFn = staticOnceOptions.checkFn && typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0;
+        const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
+        const isValidAbortControllers = Array.isArray(abortControllers) && abortControllers.length > 0;
+        let signal = staticOnceOptions.signal || void 0;
         let listenersCleanUp: Function|void = void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
@@ -979,7 +991,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 listenersCleanUp = function() {
                     for (const [ type, listener ] of eventListenersByType) {
                         if (isEventTarget) {
-                            (emitter as DOMEventTarget).removeEventListener(type as string, listener);
+                            (emitter as DOMEventTarget).removeEventListener(type as string, listener, eventTargetListenerOptions);
                         }
                         else {
                             _emitter.removeListener(type as string|symbol, listener);
@@ -994,7 +1006,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         if (isEventTarget) {
                             if (errorEventNameIsDefined) {
                                 // EventTarget does not have `error` event semantics like Node
-                                (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                                (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                             }
                         }
                         else {
@@ -1049,7 +1061,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     eventListenersByType.push([ type, eventListener ]);
 
                     if (isEventTarget) {
-                        (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
+                        (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
                     }
                     else if (usePrependListener) {
                         _emitter.prependListener(type as string|symbol, eventListener);
@@ -1084,7 +1096,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (isEventTarget) {
                     if (errorEventNameIsDefined) {
                         // EventTarget does not have `error` event semantics like Node
-                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                     }
                 }
                 else if (usePrependListener) {
@@ -1149,10 +1161,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 listenersCleanUp = function() {
                     if (isEventTarget) {
-                        (emitter as DOMEventTarget).removeEventListener(type as string, eventListener);
+                        (emitter as DOMEventTarget).removeEventListener(type as string, eventListener, eventTargetListenerOptions);
                         if (errorEventNameIsDefined && needErrorListener) {
                             // EventTarget does not have `error` event semantics like Node
-                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener);
+                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                         }
                     }
                     else {
@@ -1166,10 +1178,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 };
 
                 if (isEventTarget) {
-                    (emitter as DOMEventTarget).addEventListener(type as string, eventListener);
+                    (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
                     if (errorEventNameIsDefined && needErrorListener) {
                         // EventTarget does not have `error` event semantics like Node
-                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener);
+                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                     }
                 }
                 else if (usePrependListener) {
@@ -1375,14 +1387,6 @@ function checkListener(listener: Function, supportHandleEvent = false) {
         }
     }
 }
-
-/*
-function isDOMEventTarget(emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter) {
-    return typeof (emitter as DOMEventTarget).addEventListener === 'function'
-        && typeof (emitter as DOMEventTarget).removeEventListener === 'function'
-    ;
-}
-*/
 
 export function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter|Object) {
     return !!emitter

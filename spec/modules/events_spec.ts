@@ -19,7 +19,7 @@ const NativeAbortController = AbortController;
 import {
     EventEmitter as NodeEventEmitter,
 } from 'events';
-import events, {EventEmitterEx, isEventTargetCompatible} from '../../modules/events';
+import events, {EventEmitterEx, isEventEmitterCompatible, isEventTargetCompatible} from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import {AbortControllersGroup} from 'termi@abortable';
 
@@ -1098,6 +1098,93 @@ describe('events', function() {
             it.skip = itSkip;
         });
 
+        describe(`(only for EventTarget's) - EventEmitter incompatible -`, function() {
+            // The tests in this group is not compatible for EventEmitter, so it will no be called then emitter is EventEmitter.
+
+            // https://github.com/facebook/jest/issues/7245#issuecomment-640262989
+            const itSkip = it.skip;
+            const eventTarget = ee as unknown as EventTarget;
+
+            if (!isEventEmitterCompatible(eventTarget)) {
+                // Для EventEmitter - пропускаем, для EventTarget - запускаем
+                it.skip = it;
+            }
+            else {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                it.skip = function(){};
+            }
+
+            it.skip('with options.capture', async function () {
+                const data = {
+                    test: true,
+                };
+                const event = new CustomEvent<typeof data>('test5-2', { detail: data });
+
+                setImmediate(() => {
+                    eventTarget.dispatchEvent(event);
+                });
+
+                await once(eventTarget, 'test5-2', {
+                    capture: true,
+                }).then(([event]) => {
+                    expect((event as CustomEvent<typeof data>).detail).toBe(data);
+                    expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
+                });
+            });
+
+            it.skip('with options.passive=true', async function () {
+                const data = {
+                    test: true,
+                };
+                const event = new CustomEvent<typeof data>('test5-2', { detail: data, cancelable: true });
+
+                setImmediate(() => {
+                    eventTarget.dispatchEvent(event);
+                });
+
+                await once(eventTarget, 'test5-2', {
+                    passive: true,
+                    checkFn(_, type, [event]) {
+                        event.preventDefault();
+
+                        return true;
+                    },
+                }).then(([event]) => {
+                    expect((event as CustomEvent<typeof data>).detail).toBe(data);
+                    expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
+                    expect(event.defaultPrevented).toBe(false);
+                });
+            });
+
+
+            it.skip('with options.passive=false', async function () {
+                const data = {
+                    test: true,
+                };
+                const event = new CustomEvent<typeof data>('test5-2', { detail: data, cancelable: true });
+
+                setImmediate(() => {
+                    eventTarget.dispatchEvent(event);
+                });
+
+                await once(eventTarget, 'test5-2', {
+                    passive: false,
+                    checkFn(_, type, [event]) {
+                        event.preventDefault();
+
+                        return true;
+                    },
+                }).then(([event]) => {
+                    expect((event as CustomEvent<typeof data>).detail).toBe(data);
+                    expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
+                    expect(event.defaultPrevented).toBe(true);
+                });
+            });
+
+            it.skip = itSkip;
+        });
+
         it('with options.checkFn', function (done) {
             const expectedError = null;
             let error = null;
@@ -1590,11 +1677,13 @@ describe('events', function() {
                     expect(error && error.name).toBe('Error');
                     expect(ee.listenerCount('test7')).toBe(0);
 
+                    clearTimeout(timeout);
+
                     done();
                 })
             ;
 
-            setTimeout(() => {
+            const timeout = setTimeout(() => {
                 ee.emit('test7', ...[1, 2, 3]);
             }, 100);
         });
