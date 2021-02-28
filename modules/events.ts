@@ -346,10 +346,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         checkListener(listener, /*supportHandleEvent*/false);
 
-        if (once) {
-            listener = _onceWrap<EventMap, EventKey>(this, event, listener);
-        }
-
         const {
             _events,
             _maxListeners,
@@ -380,6 +376,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             this.emit('newListener', event, listener);
+        }
+
+        if (once) {
+            listener = _onceWrap<EventMap, EventKey>(this, event, listener);
         }
 
         if (!handler) {
@@ -605,6 +605,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         if (has_removeListener_listener) {
+            if (listener[sOnceListenerWrapperId] !== void 0) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                listener = listener.listener || listener;
+            }
+
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
             this.emit('removeListener', event, listener);
@@ -827,7 +833,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            return handler.listener;
+            return [ handler.listener as EventMap[EventKey] ];
         }
 
         if (!hasAnyOnceListener) {
@@ -907,7 +913,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {StaticOnceOptions=} options
      * @param {AbortSignal=} options.signal - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
      * @param {(AbortController|void)[]=} options.abortControllers
-     * @param {ServerTiming=} options.timing
+     * @param {ServerTiming=} options.timing - todo: Принимать в качестве timing, в том числе, ConsoleLike-объекты и оборачивать их в совместимый с ServerTiming враппер.
      * @param {number=} options.timeout
      * @param {Function=} options.checkFn
      */
@@ -925,7 +931,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (!isEventTarget) {
                 return Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
             }
-            // throw new EventsTypeError('DOMEventTarget compatible mode not implemented yet', 'ERR_INVALID_ARG_TYPE');
         }
 
         const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
@@ -936,20 +941,19 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             : void 0
         ;
         const usePrependListener = !!staticOnceOptions.prepend;
-        const errorEventNameIsDefined = staticOnceOptions.errorEventName !== void 0;
+        const errorEventNameIsDefined = !!staticOnceOptions.errorEventName;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         const timeout = staticOnceOptions.timeout || void 0;
         // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
         //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
         //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
-        const checkFn = staticOnceOptions.checkFn && typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0;
+        const checkFn = typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0;
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
-        const isValidAbortControllers = Array.isArray(abortControllers) && abortControllers.length > 0;
         let signal = staticOnceOptions.signal || void 0;
-        let listenersCleanUp: Function|void = void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
         let abortControllersGroup: TAbortControllersGroup|void;
+        let listenersCleanUp: Function|void = void 0;
 
         if (usePrependListener && isEventTarget) {
             return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
@@ -962,7 +966,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
             }
 
-            if (abortControllers && isValidAbortControllers) {
+            if (abortControllers && Array.isArray(abortControllers) && abortControllers.length > 0) {
                 abortControllersGroup = new AbortControllersGroup(abortControllers, signal ? [ signal ] : []);
                 signal = abortControllersGroup.signal;
             }
@@ -998,7 +1002,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         }
 
                         if (hasTiming && type !== winnerEventType) {
-                            timing!.timeClear(type as string, true);
+                            if (typeof timing!.timeClear === 'function') {
+                                timing!.timeClear(type as string, true);
+                            }
+                            else {
+                                timing!.timeEnd(type as string, true);
+                            }
                         }
                     }
 
@@ -1075,7 +1084,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     if (hasTiming) {
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
-                        timing!.timeClear(types as string[], true);
+                        if (typeof timing!.timeClear === 'function') {
+                            timing!.timeClear(types as string[], true);
+                        }
+                        else {
+                            timing!.timeEnd(types as string[], true);
+                        }
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1145,7 +1159,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     if (hasTiming) {
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
-                        //  timing!.timeClear(type as string, true);
+                        //   if (typeof timing!.timeClear === 'function') {
+                        //       timing!.timeClear(type as string, true);
+                        //   } else { timing!.timeEnd(type as string, true); }
                         timing!.timeEnd(type as string, true);
                         // cleanup
                         timing = void 0;
@@ -1234,7 +1250,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                     if (hasTiming) {
                         // todo: Создавать метку времени для 'timeout' и закрывать её в случае таймаута. Если ошибки не было - удалять метку времени для 'timeout' из timing.
-                        //  timing!.timeClear(type as string, true);
+                        //   if (typeof timing!.timeClear === 'function') {
+                        //       timing!.timeClear(type as string, true);
+                        //   } else { timing!.timeEnd(type as string, true); }
                         timing!.timeEnd(types as string[], true);
                         // cleanup
                         timing = void 0;
@@ -1286,6 +1304,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
                 if (abortControllersGroup) {
                     abortControllersGroup.close();
+                    abortControllersGroup = void 0;
                 }
 
                 if (hasTiming) {
@@ -1309,6 +1328,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
                 if (abortControllersGroup) {
                     abortControllersGroup.close();
+                    abortControllersGroup = void 0;
                 }
 
                 if (hasTiming) {
