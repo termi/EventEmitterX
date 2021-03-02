@@ -918,10 +918,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {Function=} options.checkFn
      */
     static once(
-            emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter,
-            types: EventName|EventName[],
-            // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
-            options?: StaticOnceOptionsDefault,
+        emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter,
+        types: EventName|EventName[],
+        // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
+        options?: StaticOnceOptionsDefault,
     ): Promise<any[]|Event> {
         let isEventTarget = false;
 
