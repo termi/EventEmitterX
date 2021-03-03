@@ -233,16 +233,43 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     emit<EventKey extends keyof EventMap>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const handler = this._events[event];
+        const argumentsLength = arguments.length;
 
+        // todo: Вопрос: Если (isErrorEvent == true) нужно ли вызывать событие errorMonitor, если НЕТ подписок на событие 'error'.
+        //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
         if (handler) {
             const {_f} = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
 
             if (isErrorEvent) {
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
-                    this.emit.apply(errorMonitor, arguments);// eslint-disable-line prefer-rest-params
+                    switch (argumentsLength) {
+                        case 1:
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit(errorMonitor);
+                            break;
+                        case 2:
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit(errorMonitor, a1);
+                            break;
+                        case 3:
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit(errorMonitor, a1, a2);
+                            break;
+                        case 4:
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit(errorMonitor, a1, a2, a3);
+                            break;
+                        // slower
+                        default:
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                            // @ts-ignore
+                            this.emit.apply(this, [ errorMonitor, ...arguments ]);// eslint-disable-line prefer-rest-params
+                    }
                 }
             }
 
@@ -251,7 +278,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (isFn) {
                 const func_handler = handler as Function;
 
-                switch (arguments.length) {
+                switch (argumentsLength) {
                     case 1:
                         func_handler.call(this);
                         break;
@@ -278,7 +305,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 // arrayClone
                 const listeners = array_handler.slice();
 
-                switch (arguments.length) {
+                switch (argumentsLength) {
                     // fast cases
                     case 1:
                         emitNone_array(listeners, this);

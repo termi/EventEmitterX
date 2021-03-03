@@ -33,7 +33,9 @@ const {
 
 // The EventTarget comes from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
 const NodeEventTarget = EventTarget;
+
 let {EventEmitter} = events;
+const {errorMonitor} = events;
 
 function isTestError(error: Error) {
     const errorString = String(error);
@@ -44,7 +46,6 @@ function isTestError(error: Error) {
 // todo: тесты можно взять тут:
 //  EventEmitter:
 //  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-check-listener-leaks.js
-//  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-error-monitor.js
 //  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-errors.js
 //  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-get-max-listeners.js
 //  - https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-invalid-listener.js
@@ -976,6 +977,202 @@ describe('events', function() {
 
                     ee.removeAllListeners('test');
                     expect(ee.listenerCount('test')).toBe(0);
+                });
+            });
+        });
+
+        describe('events.errorMonitor', function () {
+            // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-error-monitor.js
+
+            it(`events.errorMonitor is a Symbol`, function () {
+                expect(typeof errorMonitor).toBe('symbol');
+            });
+
+            describe(`without 'error' listener`, function () {
+                // todo: На данный момент НЕ вызываем событие errorMonitor, если НЕТ подписок на событие 'error'.
+                //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
+
+                it(`single listener`, function () {
+                    const theErr = new Error('MyError');
+                    const monitorListener1 = jest.fn((/*err*/) => {
+                        // {// main tests #1
+                        //     expect(err).toBe(theErr);
+                        // }
+                    });
+                    let err;
+
+                    ee.on(errorMonitor, monitorListener1);
+
+                    try {
+                        ee.emit('error', theErr);
+                    }
+                    catch(e) {
+                        err = e;
+                    }
+
+                    {// additional tests
+                        expect(ee.listenerCount(errorMonitor)).toBe(1);
+                    }
+
+                    {// main tests
+                        expect(err).toBe(theErr);
+
+                        expect(monitorListener1).not.toHaveBeenCalled();
+                        // expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                    }
+
+                    {// cleanup
+                        ee.removeListener(errorMonitor, monitorListener1);
+                        expect(ee.listenerCount(errorMonitor)).toBe(0);
+                    }
+                });
+
+                it(`multiply listeners`, function () {
+                    const theErr = new Error('MyError');
+                    const monitorListener1 = jest.fn(() => {});
+                    const monitorListener2 = jest.fn((/*err*/) => {
+                        // {// main tests #1
+                        //     expect(err).toBe(theErr);
+                        // }
+                    });
+                    let err;
+
+                    ee.on(errorMonitor, monitorListener1);
+                    ee.on(errorMonitor, monitorListener2);
+
+                    try {
+                        ee.emit('error', theErr);
+                    }
+                    catch(e) {
+                        err = e;
+                    }
+
+                    {// additional tests
+                        expect(ee.listenerCount(errorMonitor)).toBe(2);
+                    }
+
+                    {// main tests
+                        expect(err).toBe(theErr);
+
+                        expect(monitorListener1).not.toHaveBeenCalled();
+                        // expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+
+                        expect(monitorListener2).not.toHaveBeenCalled();
+                        // expect(monitorListener2.mock.calls).toEqual([[theErr]]);
+                    }
+
+                    {// cleanup
+                        ee.removeListener(errorMonitor, monitorListener1);
+                        ee.removeListener(errorMonitor, monitorListener2);
+                        expect(ee.listenerCount(errorMonitor)).toBe(0);
+                    }
+                });
+            });
+
+            describe(`with 'error' listener`, function () {
+
+                it(`single listener`, function () {
+                    const theErr = new Error('MyError');
+                    const monitorListener1 = jest.fn((err) => {
+                        {// main tests 1
+                            expect(err).toBe(theErr);
+                        }
+                    });
+                    const errorListener1 = jest.fn((err) => {
+                        {// main tests #1
+                            expect(err).toBe(theErr);
+                        }
+                    });
+
+                    ee.on(errorMonitor, monitorListener1);
+                    ee.on('error', errorListener1);
+
+                    try {
+                        ee.emit('error', theErr);
+                    }
+                    catch(e) {
+                        // This code should be unreachable
+                        {// main tests #2
+                            expect(false).toBe(true);
+                        }
+                    }
+
+                    {// additional tests
+                        expect(ee.listenerCount(errorMonitor)).toBe(1);
+                        expect(ee.listenerCount('error')).toBe(1);
+                    }
+
+                    {// main tests #3
+                        expect(monitorListener1).toHaveBeenCalled();
+                        expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+
+                        expect(errorListener1).toHaveBeenCalled();
+                        expect(errorListener1.mock.calls).toEqual([[theErr]]);
+                    }
+
+                    {// cleanup
+                        ee.removeListener(errorMonitor, monitorListener1);
+                        ee.removeListener('error', errorListener1);
+                        expect(ee.listenerCount(errorMonitor)).toBe(0);
+                        expect(ee.listenerCount('error')).toBe(0);
+                    }
+                });
+
+                it(`multiply listeners`, function () {
+                    const theErr = new Error('MyError');
+                    const monitorListener1 = jest.fn(() => {});
+                    const monitorListener2 = jest.fn((err) => {
+                        {// main tests #1
+                            expect(err).toBe(theErr);
+                        }
+                    });
+                    const errorListener1 = jest.fn(() => {});
+                    const errorListener2 = jest.fn((err) => {
+                        {// main tests #1
+                            expect(err).toBe(theErr);
+                        }
+                    });
+
+                    ee.on(errorMonitor, monitorListener1);
+                    ee.on(errorMonitor, monitorListener2);
+                    ee.on('error', errorListener1);
+                    ee.on('error', errorListener2);
+
+                    try {
+                        ee.emit('error', theErr);
+                    }
+                    catch(e) {
+                        // This code should be unreachable
+                        {// main tests #2
+                            expect(false).toBe(true);
+                        }
+                    }
+
+                    {// additional tests
+                        expect(ee.listenerCount(errorMonitor)).toBe(2);
+                        expect(ee.listenerCount('error')).toBe(2);
+                    }
+
+                    {// main tests #3
+                        expect(monitorListener1).toHaveBeenCalled();
+                        expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(monitorListener2).toHaveBeenCalled();
+                        expect(monitorListener2.mock.calls).toEqual([[theErr]]);
+
+                        expect(errorListener1).toHaveBeenCalled();
+                        expect(errorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(errorListener2).toHaveBeenCalled();
+                        expect(errorListener2.mock.calls).toEqual([[theErr]]);
+                    }
+
+                    {// cleanup
+                        ee.removeListener(errorMonitor, monitorListener1);
+                        ee.removeListener(errorMonitor, monitorListener2);
+                        ee.removeListener('error', errorListener1);
+                        ee.removeListener('error', errorListener2);
+                        expect(ee.listenerCount(errorMonitor)).toBe(0);
+                        expect(ee.listenerCount('error')).toBe(0);
+                    }
                 });
             });
         });
