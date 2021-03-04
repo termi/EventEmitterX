@@ -39,40 +39,6 @@ export declare type DefaultEventMap = {
     [event in EventName]: Listener;
 };
 
-/* todo: как-то нужно добавить эти типы в EventMap передаваемый в EventEmitterEx
-type InnerListeners = {
-    'newListener': (eventName: EventName, listener: Listener) => void|((eventName: EventName, listener: Listener) => void)[];
-    'removeListener': (eventName: EventName, listener: Listener) => void|((eventName: EventName, listener: Listener) => void)[];
-    'error': ((error: Error) => void)|((error: Error) => void)[]|((error: any) => void)|((error: any) => void)[];
-};
-*/
-
-// todo: add handleEvent support
-// interface EventListenerObject {
-//     handleEvent(evt: Event): void;
-// }
-// declare type EventListenerOrEventListenerObject = Listener | EventListenerObject;
-
-export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMap> {
-    emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]> | any[]): boolean;
-    on<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    once<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    removeListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    prependListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    prependOnceListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    off<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this;
-    removeAllListeners<EventKey extends keyof EventMap = EventName>(event?: EventKey): this;
-    setMaxListeners(n: number): this;
-    getMaxListeners(): number;
-    listeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][];
-    rawListeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][];
-    eventNames(): Array<string | symbol>;
-    listenerCount<EventKey extends keyof EventMap = EventName>(type: EventKey): number;
-}
-/** cast type of any event emitter to typed event emitter */
-export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends NodeEventEmitter>(x: X): IEventEmitter<EventMap>;
-
 interface Options {
     maxListeners?: number;
     // listener can be registered at most once per event type
@@ -122,6 +88,10 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, [event]: [Event]) => boolean;
 }
 
+// type EventMapFrom<T> = T extends EventEmitterEx<infer X> ? X : never;
+type EventNamesFrom<T> = T extends EventEmitterEx<infer X> ? keyof X : never;
+type EventNamesFrom2<T> = EventNamesFrom<T>|EventNamesFrom<T>[];
+
 let _onceListenerIdCounter = 0;
 // This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
@@ -145,9 +115,12 @@ const {
     errorMonitor,
     // captureRejectionSymbol,
 }: {
-    readonly errorMonitor: typeof EventEmitter.errorMonitor,
+    readonly errorMonitor: typeof import("events").errorMonitor,
     // readonly captureRejectionSymbol: unique symbol,
-} = (function() {
+} = (function(): {
+    readonly errorMonitor: typeof import("events").errorMonitor,
+    // readonly captureRejectionSymbol: unique symbol,
+} {
     let errorMonitor;
     // let captureRejectionSymbol;
 
@@ -165,17 +138,55 @@ const {
     }
 
     if (!errorMonitor) {
-        errorMonitor = Symbol('events.errorMonitor');
+        errorMonitor = Symbol('events.errorMonitor') as typeof import("events").errorMonitor;
     }
     // if (!captureRejectionSymbol) {
     //     captureRejectionSymbol = Symbol.for('nodejs.rejection');
     // }
 
     return {
-        errorMonitor,
+        errorMonitor: errorMonitor as typeof import("events").errorMonitor,
         // captureRejectionSymbol,
     };
-})()
+})();
+
+type InnerListeners = {
+    'newListener': (eventName: EventName, listener: Listener) => void;
+    'removeListener': (eventName: EventName, listener: Listener) => void;
+    'error': (error: Error, ...args: any[]) => void;
+};
+
+// todo: add handleEvent support
+// interface EventListenerObject {
+//     handleEvent(evt: Event): void;
+// }
+// declare type EventListenerOrEventListenerObject = Listener | EventListenerObject;
+
+/** EventMap with default listeners */
+type EMD<EventMap extends DefaultEventMap=DefaultEventMap> = EventMap & InnerListeners;
+// /** EventMap any key */
+// type EMK<EventMap extends DefaultEventMap=DefaultEventMap, _T= EMD<EventMap>> = _T[keyof _T];
+
+export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMap> {
+    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]> | any[]): boolean;
+    on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    once<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    removeListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    prependListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    prependOnceListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    off<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
+    removeAllListeners<EventKey extends keyof EMD<EventMap> = EventName>(event?: EventKey): this;
+    setMaxListeners(n: number): this;
+    getMaxListeners(): number;
+    listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
+    rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
+    eventNames(): Array<string | symbol>;
+    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
+}
+/** cast type of any event emitter to typed event emitter */
+export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends NodeEventEmitter>(x: X): IEventEmitter<EventMap>;
+
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
 
@@ -189,7 +200,7 @@ const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     private _events: {
-        [eventName in keyof EventMap]?: Function|Function[]
+        [eventName in keyof EMD<EventMap>]?: Function|Function[]
     } = Object.create(null);
 
     _maxListeners = Infinity;
@@ -227,10 +238,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    emit<EventKey extends keyof EventMap>(event: EventKey, ...args: Parameters<EventMap[EventKey]>): boolean;
+    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>): boolean;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    emit<EventKey extends keyof EventMap>(event: EventKey, a1, a2, a3) {
+    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const handler = this._events[event];
         const argumentsLength = arguments.length;
@@ -265,10 +276,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             this.emit(errorMonitor, a1, a2, a3);
                             break;
                         // slower
-                        default:
+                        default: {
+                            const args = [ ...arguments ];// eslint-disable-line prefer-rest-params
+
+                            args[0] = errorMonitor;
+
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
-                            this.emit.apply(this, [ errorMonitor, ...arguments ]);// eslint-disable-line prefer-rest-params
+                            this.emit.apply(this, args);// eslint-disable-line prefer-spread
+                        }
                     }
                 }
             }
@@ -292,8 +308,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         func_handler.call(this, a1, a2, a3);
                         break;
                     // slower
-                    default:
-                        func_handler.apply(this, arguments);// eslint-disable-line prefer-rest-params
+                    default: {
+                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+
+                        func_handler.apply(this, args);
+                    }
                 }
 
                 return true;
@@ -320,8 +339,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         emitThree_array(listeners, this, a1, a2, a3);
                         break;
                     // slower
-                    default:
-                        emitMany_array(listeners, this, [ ...arguments ]);// eslint-disable-line prefer-rest-params
+                    default: {
+                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+
+                        emitMany_array(listeners, this, args);
+                    }
                 }
 
                 return true;
@@ -355,17 +377,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return false;
     }
 
-    // on<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject): this;
-    on<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    // on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject): this;
+    on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this._addListener(event, listener, false, false);
     }
 
-    once<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    once<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this._addListener(event, listener, false, true);
     }
 
-    // private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
-    private _addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey], prepend: boolean, once: boolean): this {
+    // private _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
+    private _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean): this {
         // const {_she: supportHandleEvent} = this;
         // if (typeof listener === 'object') {
         //     console.log(listener);
@@ -406,7 +428,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         if (once) {
-            listener = _onceWrap<EventMap, EventKey>(this, event, listener);
+            listener = _onceWrap<EMD<EventMap>, EventKey>(this, event, listener);
         }
 
         if (!handler) {
@@ -456,11 +478,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return this;
     }
 
-    addListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this._addListener(event, listener, false, false);
     }
 
-    removeListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    removeListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         checkListener(listener);
 
         const {
@@ -646,7 +668,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return this;
     }
 
-    hasListeners<EventKey extends keyof EventMap = EventName>(event: EventKey) {
+    hasListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
         const handlers = this._events[event];
 
         if (!handlers) {
@@ -660,19 +682,19 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return (handlers as Function[]).length > 0;
     }
 
-    prependListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    prependListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this._addListener(event, listener, true, false);
     }
 
-    prependOnceListener<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    prependOnceListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this._addListener(event, listener, true, true);
     }
 
-    off<EventKey extends keyof EventMap = EventName>(event: EventKey, listener: EventMap[EventKey]): this {
+    off<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
         return this.removeListener(event, listener);
     }
 
-    removeAllListeners<EventKey extends keyof EventMap = EventName>(event?: EventKey): this {
+    removeAllListeners<EventKey extends keyof EMD<EventMap> = EventName>(event?: EventKey): this {
         const {
             _f,
             _events,
@@ -707,7 +729,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     const handler = _events[event];
 
                     if (typeof handler === 'function') {
-                        const onceWrapperId = handler[sOnceListenerWrapperId];
+                        const listener = handler as Listener;
+                        const onceWrapperId = listener[sOnceListenerWrapperId];
 
                         if (onceWrapperId !== void 0) {
                             const idIndex = _onceIds.indexOf(onceWrapperId);
@@ -716,23 +739,24 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                                 _onceIds.splice(idIndex, 1);
                             }
 
+                            const onceListener = listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>;
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
-                            this.emit('removeListener', event, handler["listener"]);
+                            this.emit('removeListener', event, onceListener.listener);
                         }
                         else {
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
-                            this.emit('removeListener', event, handler);
+                            this.emit('removeListener', event, listener);
                         }
                     }
                     else {
-                        const listeners = (handler as Function[]);
+                        const listeners = (handler as Listener[]);
 
                         for (let i = listeners.length ; i-- > 0 ; ) {
-                            const handler = listeners[i];
+                            const listener = listeners[i];
 
-                            const onceWrapperId = handler[sOnceListenerWrapperId];
+                            const onceWrapperId = listener[sOnceListenerWrapperId];
                             const idIndex = _onceIds.indexOf(onceWrapperId);
 
                             if (idIndex !== -1) {
@@ -742,12 +766,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             if (onceWrapperId !== void 0) {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                                 // @ts-ignore
-                                this.emit('removeListener', event, handler["listener"]);
+                                this.emit('removeListener', event, (listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener);
                             }
                             else {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                                 // @ts-ignore
-                                this.emit('removeListener', event, handler);
+                                this.emit('removeListener', event, listener);
                             }
                         }
                     }
@@ -844,7 +868,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     /**
      * Returns a copy of the array of listeners for the event named eventName.
      */
-    listeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][] {
+    listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
+        type _TEventMap = EMD<EventMap>;
         const handler = this._events[event];
 
         if (!handler) {
@@ -855,33 +880,30 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         if (typeof handler === 'function') {
             if (!hasAnyOnceListener || !handler[sOnceListenerWrapperId]) {
-                return [ handler as EventMap[EventKey] ];
+                return [ handler as _TEventMap[EventKey] ];
             }
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            return [ handler.listener as EventMap[EventKey] ];
+            return [ (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey] ];
         }
 
         if (!hasAnyOnceListener) {
-            return [ ...(handler as EventMap[EventKey][]) ];
+            return [ ...(handler as _TEventMap[EventKey][]) ];
         }
 
-        return handler.map<EventMap[EventKey]>(handler => {
+        return handler.map<_TEventMap[EventKey]>(handler => {
             if (handler[sOnceListenerWrapperId]) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                return handler.listener;
+                return (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey];
             }
 
-            return handler;
+            return handler as _TEventMap[EventKey];
         });
     }
 
     /**
      * Returns a copy of the array of listeners for the event named eventName, including any wrappers (such as those created by .once()).
      */
-    rawListeners<EventKey extends keyof EventMap = EventName>(event: EventKey): EventMap[EventKey][] {
+    rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
+        type _TEventMap = EMD<EventMap>;
         const handler = this._events[event];
 
         if (!handler) {
@@ -889,10 +911,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         if (typeof handler === 'function') {
-            return [ handler as EventMap[EventKey] ];
+            return [ handler as _TEventMap[EventKey] ];
         }
 
-        return [ ...(handler as EventMap[EventKey][]) ];
+        return [ ...(handler as _TEventMap[EventKey][]) ];
     }
 
     eventNames(): Array<string | symbol> {
@@ -900,7 +922,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return Object.keys(this._events);
     }
 
-    listenerCount<EventKey extends keyof EventMap = EventName>(event: EventKey): number {
+    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): number {
         const handler = this._events[event];
 
         if (!handler) {
@@ -911,7 +933,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             return 1;
         }
 
-        return (handler as EventMap[EventKey][]).length;
+        return (handler as EMD<EventMap>[EventKey][]).length;
     }
 
 
@@ -926,7 +948,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     //   static getEventListeners(emitter: EventEmitter|DOMEventTarget, type: string)
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
-    static once(emitter: EventEmitterEx, types: EventName|EventName[], options?: StaticOnceOptions<EventEmitterEx, EventName>): Promise<any[]>;
+    static once<EE extends EventEmitterEx=EventEmitterEx>(emitter: EventEmitterEx, types: EventNamesFrom2<EE>, options?: StaticOnceOptions<EE, EventNamesFrom<EE>>): Promise<any[]>;
     static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
     static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
@@ -1372,12 +1394,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return promise;
     }
 
-    static errorMonitor = errorMonitor;
+    static readonly errorMonitor = errorMonitor as typeof EventEmitter.errorMonitor;
     // domain is not supported
-    static usingDomains = false;
+    static readonly usingDomains = false;
 
     static EventEmitter = EventEmitterEx;
     static EventEmitterEx = EventEmitterEx;
+
     /** alias for global AbortController */
     static AbortController = AbortController;
 }
@@ -1453,12 +1476,12 @@ export function isEventTargetCompatible(emitter: DOMEventTarget|Object) {
     ;
 }
 
-type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> = {
+type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EMD<EventMap> = EventName> = {
     id: number;
     type: EventKey;
     fired: boolean;
-    wrapFn: EventMap[EventKey];
-    listener: Function;
+    wrapFn: EMD<EventMap>[EventKey];
+    listener: Listener;
     target: EventEmitterEx;
 }
 const sOnceListenerWrapperId = Symbol('');
@@ -1478,17 +1501,17 @@ function onceWrapper(this: OnceListenerState, ...args) {
     }
 }
 
-function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName>(target: EventEmitterEx, type: EventKey, listener: EventMap[EventKey]) {
+function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName>(target: EventEmitterEx, type: EventKey, listener: EMD<EventMap>[EventKey]) {
     const id = ++_onceListenerIdCounter;
-    const state: OnceListenerState<EventMap, EventKey> = {
+    const state: OnceListenerState<EMD<EventMap>, EventKey> = {
         id,
         type,
         fired: false,
-        wrapFn: void 0 as any as EventMap[EventKey],
+        wrapFn: void 0 as any as EMD<EventMap>[EventKey],
         listener,
         target,
     };
-    const wrapped = onceWrapper.bind(state) as EventMap[EventKey];
+    const wrapped = onceWrapper.bind(state) as EMD<EventMap>[EventKey];
 
     target._onceIds.push(state.id);
 
@@ -1498,7 +1521,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     wrapped.listener = listener;
     state.wrapFn = wrapped;
 
-    return wrapped as EventMap[EventKey];
+    return wrapped as EMD<EventMap>[EventKey];
 }
 
 function emitNone_array(listeners: Function[], self: EventEmitterEx) {
