@@ -8,7 +8,6 @@
 //  - тесты:
 //    - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget.js
 
-import type EventEmitter from "events";
 import type ServerTiming from 'termi@ServerTiming';
 import type {
     // default as TAbortController,
@@ -25,7 +24,7 @@ const {
 
 type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
-type NodeEventEmitter = NodeJS.EventEmitter;
+type INodeEventEmitter = NodeJS.EventEmitter;
 // type NodeEventEmitter = EventEmitter;
 export declare type Listener = (...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
@@ -185,7 +184,7 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
 }
 /** cast type of any event emitter to typed event emitter */
-export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends NodeEventEmitter>(x: X): IEventEmitter<EventMap>;
+export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends INodeEventEmitter>(x: X): IEventEmitter<EventMap>;
 
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
@@ -949,7 +948,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
     static once<EE extends EventEmitterEx=EventEmitterEx>(emitter: EventEmitterEx, types: EventNamesFrom2<EE>, options?: StaticOnceOptions<EE, EventNamesFrom<EE>>): Promise<any[]>;
-    static once(emitter: NodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<NodeEventEmitter, string|symbol>): Promise<any[]>;
+    static once(emitter: INodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<INodeEventEmitter, string|symbol>): Promise<any[]>;
     static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
@@ -967,14 +966,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {Function=} options.checkFn
      */
     static once(
-        emitter: DOMEventTarget|EventEmitterEx|NodeEventEmitter,
+        emitter: DOMEventTarget|EventEmitterEx|INodeEventEmitter,
         types: EventName|EventName[],
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
         options?: StaticOnceOptionsDefault,
     ): Promise<any[]|Event> {
         let isEventTarget = false;
 
-        if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|NodeEventEmitter)) {
+        if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|INodeEventEmitter)) {
             isEventTarget = isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
@@ -982,8 +981,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
 
-        const _emitter = (emitter as NodeEventEmitter|EventEmitterEx);
-        const staticOnceOptions = (options || {}) as StaticOnceOptions<NodeEventEmitter|EventEmitterEx, EventName>;
+        const _emitter = (emitter as INodeEventEmitter|EventEmitterEx);
+        const staticOnceOptions = (options || {}) as StaticOnceOptions<INodeEventEmitter|EventEmitterEx, EventName>;
         const staticOnceEventTargetOptions = isEventTarget && options ? options as StaticOnceOptionsEventTarget : void 0;
         const eventTargetListenerOptions = isEventTarget && staticOnceEventTargetOptions && (staticOnceEventTargetOptions.passive !== void 0 || staticOnceEventTargetOptions.capture !== void 0)
             ? { passive: staticOnceEventTargetOptions.passive, capture: staticOnceEventTargetOptions.capture }
@@ -1394,7 +1393,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return promise;
     }
 
-    static readonly errorMonitor = errorMonitor as typeof EventEmitter.errorMonitor;
+    static readonly errorMonitor = errorMonitor as typeof import("events").errorMonitor;
     // domain is not supported
     static readonly usingDomains = false;
 
@@ -1404,6 +1403,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     /** alias for global AbortController */
     static AbortController = AbortController;
 }
+
+export type NodeEventEmitter = INodeEventEmitter;
+
+export {errorMonitor};
+export const once = EventEmitterEx.once;
 
 export default EventEmitterEx;
 
@@ -1458,13 +1462,13 @@ function checkListener(listener: Function, supportHandleEvent = false) {
     }
 }
 
-export function isEventEmitterCompatible(emitter: EventEmitterEx|NodeEventEmitter|Object) {
+export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
     return !!emitter
-        && typeof (emitter as NodeEventEmitter).on === 'function'
-        && typeof (emitter as NodeEventEmitter).once === 'function'
-        && typeof (emitter as NodeEventEmitter).removeListener === 'function'
-        && typeof (emitter as NodeEventEmitter).emit === 'function'
-        && typeof (emitter as NodeEventEmitter).prependListener === 'function'
+        && typeof (emitter as INodeEventEmitter).on === 'function'
+        && typeof (emitter as INodeEventEmitter).once === 'function'
+        && typeof (emitter as INodeEventEmitter).removeListener === 'function'
+        && typeof (emitter as INodeEventEmitter).emit === 'function'
+        && typeof (emitter as INodeEventEmitter).prependListener === 'function'
     ;
 }
 
