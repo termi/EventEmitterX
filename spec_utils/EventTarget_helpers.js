@@ -139,11 +139,11 @@ module.exports.compatibleOnce_for_EventTarget = function(once) {
         if (options && options.checkFn) {
             const {checkFn} = options;
 
-            options.checkFn = function(emitter, type, args) {
+            options.checkFn = function(type, ...args) {
                 if (args[0] instanceof Event && args[0]["args"]) {
-                    return checkFn(emitter, type, args[0]["args"]);
+                    return checkFn.apply(this, [type, ...args[0]["args"]]);
                 }
-                return checkFn(emitter, type, args);
+                return checkFn.apply(this, [type, ...args]);
             }
         }
 

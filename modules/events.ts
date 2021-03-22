@@ -65,10 +65,11 @@ interface StaticOnceOptionsDefault {
     /** You can throw a Error inside checkFn to reject once() with your error */
     checkFn?: Function;
     // [key: string]: any;
+    debugInfo?: Object;
 }
 interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
     /** You can throw a Error inside checkFn to reject once() with your error */
-    checkFn?: (eventEmitter: EE, emitEventName: E, amitArgs: any[]) => boolean;
+    checkFn?: (this: EE, emitEventName: E, ...amitArgs: any[]) => boolean;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     /** {@link https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters}
@@ -84,7 +85,7 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     /** prepend option is not supported for EventTarget emitter */
     prepend?: never;
     /** You can throw a Error inside checkFn to reject once() with your error */
-    checkFn?: (eventEmitter: DOMEventTarget, emitEventName: string, [event]: [Event]) => boolean;
+    checkFn?: (this: DOMEventTarget, emitEventName: string, event: Event) => boolean;
 }
 
 // type EventMapFrom<T> = T extends EventEmitterEx<infer X> ? X : never;
@@ -1000,6 +1001,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let signal = staticOnceOptions.signal || void 0;
         let timing = staticOnceOptions.timing || void 0;
         let hasTiming = !!timing;
+        const debugInfo = staticOnceOptions.debugInfo || void 0;
+        const hasDebugInfo = !!debugInfo;
         let abortControllersGroup: TAbortControllersGroup|void;
         let listenersCleanUp: Function|void = void 0;
 
@@ -1093,7 +1096,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     const eventListener = (...args) => {
                         if (checkFn) {
                             try {
-                                if (!checkFn(_emitter, type, args)) {
+                                if (!checkFn.apply(_emitter, [type, ...args])) {
                                     return;
                                 }
                             }
@@ -1181,7 +1184,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 const eventListener = (...args) => {
                     if (checkFn) {
                         try {
-                            if (!checkFn(_emitter, type, args)) {
+                            if (!checkFn.apply(_emitter, [type, ...args])) {
                                 return;
                             }
                         }
@@ -1294,8 +1297,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }) : void 0;
             const timeoutPromise = timeout ? new Promise<void>((resolve, reject) => {
                 let timeoutId: Timeout|void = setTimeout(() => {
-                    timeoutId = void 0;
-
                     if (hasTiming) {
                         // todo: Создавать метку времени для 'timeout' и закрывать её в случае таймаута. Если ошибки не было - удалять метку времени для 'timeout' из timing.
                         //   if (typeof timing!.timeClear === 'function') {
@@ -1311,10 +1312,20 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         listenersCleanUp();
                     }
 
+                    if (hasDebugInfo) {
+                        console.error('once#TIMEOUT:', debugInfo, { timeoutId });
+                    }
+
+                    timeoutId = void 0;
+
                     reject(new Error(`TIMEOUT`));
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
+                    if (hasDebugInfo) {
+                        console.info('once#cleanTimeout:', debugInfo, { timeoutId });
+                    }
+
                     if (timeoutId) {
                         clearTimeout(timeoutId);
 

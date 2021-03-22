@@ -1895,7 +1895,7 @@ describe('events', function() {
                 //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в checkFn.
                 const promise1 = once(ee, 'test5-1', {
                     prepend: true,
-                    checkFn(_1, _2, [event]) {
+                    checkFn(type, event) {
                         return !event.cancelBubble;
                     },
                 })
@@ -1911,7 +1911,7 @@ describe('events', function() {
 
                 // Если prepend не указан, то сначала выполниться defaultListener, который создаст событие с position = 5.
                 const promise2 = once(ee, 'test5-1', {
-                    checkFn(_1, _2, [event]) {
+                    checkFn(type, event) {
                         return event.position === 5;
                     },
                 })
@@ -1993,7 +1993,7 @@ describe('events', function() {
 
                 await once(eventTarget, 'test5-2', {
                     passive: true,
-                    checkFn(_, type, [event]) {
+                    checkFn(type, event) {
                         event.preventDefault();
 
                         return true;
@@ -2018,7 +2018,7 @@ describe('events', function() {
 
                 await once(eventTarget, 'test5-2', {
                     passive: false,
-                    checkFn(_, type, [event]) {
+                    checkFn(type, event) {
                         event.preventDefault();
 
                         return true;
@@ -2044,13 +2044,13 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, 'test5', {checkFn: (ee, type, args) => args[1] === 9})
+                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 9})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, 'test5', {checkFn: (ee, type, args) => args[1] === 5})
+                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 5})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, 'test5', {checkFn: (ee, type, args) => args[1] === 1})
+                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 1})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
             ]).then(() => {
@@ -2071,6 +2071,27 @@ describe('events', function() {
             ee.emit('test5', ...[ 'test', 9, {} ]);
         });
 
+        it('with options.checkFn - this should be EventEmitter', async function () {
+            let passedEventEmitter: typeof ee | null = null;
+
+            setImmediate(() => {
+                ee.emit('test-ee-this', 1, 2, 3);
+            });
+
+            const actualArgs = await once(ee, 'test-ee-this', {
+                checkFn() {
+                    passedEventEmitter = this;
+
+                    return true;
+                },
+            })
+
+            expect(passedEventEmitter).toBe(ee);
+            expect(actualArgs).toEqual([1, 2, 3]);
+            expect(ee.listenerCount('test-ee-this')).toBe(0);
+            expect(ee.listenerCount('error')).toBe(0);
+        });
+
         it('with options.checkFn and multi-names', function (done) {
             const expectedError = null;
             let error = null;
@@ -2082,13 +2103,13 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, ['test5-1', 'test5-2'], {checkFn: (ee, type, args) => args[1] === 9})
+                once(ee, ['test5-1', 'test5-2'], {checkFn: (type, ...args) => args[1] === 9})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, ['test5-2', 'test5-1'], {checkFn: (ee, type, args) => args[1] === 5})
+                once(ee, ['test5-2', 'test5-1'], {checkFn: (type, ...args) => args[1] === 5})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, ['test5-1', 'test5-2'], {checkFn: (ee, type, args) => args[1] === 1})
+                once(ee, ['test5-1', 'test5-2'], {checkFn: (type, ...args) => args[1] === 1})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
             ]).then(() => {
