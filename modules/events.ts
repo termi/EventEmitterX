@@ -97,7 +97,7 @@ let _onceListenerIdCounter = 0;
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 
 const isNodeJS = (function() {
-    if (typeof globalThis !== 'undefined' && typeof globalThis["require"] === 'function' && typeof process === 'object' && process) {
+    if (typeof process === 'object' && typeof require === 'function' && process) {
         if (typeof window !== 'undefined') {
             // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
             // workaround for jest+JSDOM
@@ -127,9 +127,15 @@ const {
     if (isNodeJS) {
         // this is nodejs
         try {
-            const events = globalThis["require"]('events');
+            const conditionalNodeRequire = (moduleName: string) => {
+                return require(moduleName);
+            };
+            // conditionalNodeRequire, в основном, используется для того, чтобы rollup проигнорировал этот require.
+            //  Если удастся настроить rollup так, чтобы он игнорировал пакет 'events' присборке для WEB, то тут
+            //  можно вернуть назад `const events = require('events');`.
+            const events = conditionalNodeRequire('events');
 
-            errorMonitor = events.errorMonitor;
+            errorMonitor = events.errorMonitor as typeof import("events").errorMonitor;
             // captureRejectionSymbol = events.captureRejectionSymbol;
         }
         catch(e) {
