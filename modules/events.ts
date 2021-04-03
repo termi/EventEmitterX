@@ -127,13 +127,7 @@ const {
     if (isNodeJS) {
         // this is nodejs
         try {
-            const conditionalNodeRequire = (moduleName: string) => {
-                return require(moduleName);
-            };
-            // conditionalNodeRequire, в основном, используется для того, чтобы rollup проигнорировал этот require.
-            //  Если удастся настроить rollup так, чтобы он игнорировал пакет 'events' присборке для WEB, то тут
-            //  можно вернуть назад `const events = require('events');`.
-            const events = conditionalNodeRequire('events');
+            const events = require('events');
 
             errorMonitor = events.errorMonitor as typeof import("events").errorMonitor;
             // captureRejectionSymbol = events.captureRejectionSymbol;
