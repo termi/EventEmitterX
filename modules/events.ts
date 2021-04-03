@@ -143,7 +143,9 @@ const {
         }
     }
 
-    if (!errorMonitor) {
+    if (!errorMonitor || errorMonitor === 'error') {
+        // Проверка на errorMonitor === 'error' добавлена для того, чтобы на 100% исключить возможность зацикливания
+        //  EventEmitterEx#emit при отправки 'error'.
         errorMonitor = Symbol('events.errorMonitor') as typeof import("events").errorMonitor;
     }
     // if (!captureRejectionSymbol) {
@@ -333,21 +335,26 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 switch (argumentsLength) {
                     // fast cases
                     case 1:
+                        /*@__NOINLINE__*/
                         emitNone_array(listeners, this);
                         break;
                     case 2:
+                        /*@__NOINLINE__*/
                         emitOne_array(listeners, this, a1);
                         break;
                     case 3:
+                        /*@__NOINLINE__*/
                         emitTwo_array(listeners, this, a1, a2);
                         break;
                     case 4:
+                        /*@__NOINLINE__*/
                         emitThree_array(listeners, this, a1, a2, a3);
                         break;
                     // slower
                     default: {
                         const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
 
+                        /*@__NOINLINE__*/
                         emitMany_array(listeners, this, args);
                     }
                 }
@@ -587,7 +594,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         listeners.shift();
                     }
                     else {
-                        // spliceOne(listeners, position);
                         listeners.splice(index, 1);
                     }
 
@@ -620,7 +626,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         listeners.shift();
                     }
                     else {
-                        // spliceOne(listeners, index);
                         listeners.splice(index, 1);
                     }
 
@@ -980,8 +985,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     ): Promise<any[]|Event> {
         let isEventTarget = false;
 
-        if (!(emitter instanceof EventEmitterEx) && !isEventEmitterCompatible(emitter as EventEmitterEx|INodeEventEmitter)) {
-            isEventTarget = isEventTargetCompatible(emitter as DOMEventTarget);
+        if (!(emitter instanceof EventEmitterEx) && !_isEventEmitterCompatible(emitter as EventEmitterEx|INodeEventEmitter)) {
+            isEventTarget = _isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
                 return Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
@@ -1479,21 +1484,43 @@ function checkListener(listener: Function, supportHandleEvent = false) {
     }
 }
 
-export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
+
+/**
+ * Check only 'on', 'once', 'prependListener' and 'removeListener', but not 'emit'.
+ * Reason: we dont use 'emit' method in {@link EventEmitterEx.once}
+ * @param emitter
+ * @private
+ */
+function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).once === 'function'
-        && typeof (emitter as INodeEventEmitter).removeListener === 'function'
-        && typeof (emitter as INodeEventEmitter).emit === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
+        && typeof (emitter as INodeEventEmitter).removeListener === 'function'
     ;
 }
 
-export function isEventTargetCompatible(emitter: DOMEventTarget|Object) {
-    return !!emitter
-        && typeof (emitter as DOMEventTarget).addEventListener === 'function'
-        && typeof (emitter as DOMEventTarget).removeEventListener === 'function'
-        && typeof (emitter as DOMEventTarget).dispatchEvent === 'function'
+export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
+    return _isEventEmitterCompatible(emitter)
+        && typeof (emitter as INodeEventEmitter).emit === 'function'
+    ;
+}
+
+/**
+ * Check only 'addEventListener' and 'removeEventListener', but not 'dispatchEvent'.
+ * Reason: in 'ws' nodule, in file `node_modules/ws/lib/websocket.js` class WebSocket implements only 'addEventListener' and 'removeEventListener'.
+ * @param maybeDOMEventTarget
+ */
+function _isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object) {
+    return !!maybeDOMEventTarget
+        && typeof (maybeDOMEventTarget as DOMEventTarget).addEventListener === 'function'
+        && typeof (maybeDOMEventTarget as DOMEventTarget).removeEventListener === 'function'
+    ;
+}
+
+export function isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object) {
+    return _isEventTargetCompatible(maybeDOMEventTarget)
+        && typeof (maybeDOMEventTarget as DOMEventTarget).dispatchEvent === 'function'
     ;
 }
 
@@ -1586,15 +1613,3 @@ function _checkBit(mask: number, bit: number): boolean {
 function _unsetBit(mask: number, bit: number): number {
     return mask & ~bit;
 }
-
-/*
-// TESTED: in 2021, spliceOne is much slower
-// About 1.5x faster than the two-arg version of Array#splice().
-function spliceOne(list, index) {
-    for (let i = index, k = i + 1, n = list.length; k < n; i += 1, k += 1) {
-        list[i] = list[k];
-    }
-
-    list.pop();
-}
-*/
