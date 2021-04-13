@@ -13,14 +13,11 @@ import type {
     // default as TAbortController,
     AbortControllersGroup as TAbortControllersGroup,
 } from 'termi@abortable';
-import * as AbortController_Module from '../common/AbortController';
-
-const {
-    default: AbortController,
+import AbortController, {
     errorFabric,
     isAbortSignal,
     AbortControllersGroup,
-} = AbortController_Module;
+} from 'termi@abortable';
 
 type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
