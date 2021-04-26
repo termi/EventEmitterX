@@ -1289,6 +1289,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             listenersCleanUp();
                         }
 
+                        if (hasDebugInfo) {
+                            console.error('once#Aborted:', debugInfo, { types, errorEventName });
+                        }
+
                         reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
                     }
 
@@ -1315,7 +1319,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     if (hasDebugInfo) {
-                        console.error('once#TIMEOUT:', debugInfo, { timeoutId });
+                        console.error('once#TIMEOUT:', debugInfo, { types, errorEventName });
                     }
 
                     timeoutId = void 0;
@@ -1324,9 +1328,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
+                    /*
                     if (hasDebugInfo) {
                         console.info('once#cleanTimeout:', debugInfo, { timeoutId });
                     }
+                    */
 
                     if (timeoutId) {
                         clearTimeout(timeoutId);
