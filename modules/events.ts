@@ -14,7 +14,7 @@ import type {
     AbortControllersGroup as TAbortControllersGroup,
 } from 'termi@abortable';
 import AbortController, {
-    errorFabric,
+    createAbortError,
     isAbortSignal,
     AbortControllersGroup,
 } from 'termi@abortable';
@@ -1027,7 +1027,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (signal) {
                 // Return early if already aborted.
                 if (signal.aborted) {
-                    return Promise.reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+                    return Promise.reject(createAbortError());
                 }
             }
         }
@@ -1293,7 +1293,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             console.error('once#Aborted:', debugInfo, { types, errorEventName });
                         }
 
-                        reject(errorFabric('Aborted', 'AbortError', /*DOMException.ABORT_ERR*/20));
+                        reject(createAbortError());
                     }
 
                     abortCallback = void 0;
@@ -1324,7 +1324,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                     timeoutId = void 0;
 
-                    reject(new Error(`TIMEOUT`));
+                    reject(createTimeoutError('TIMEOUT'));
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
@@ -1463,6 +1463,18 @@ class EventsTypeError extends TypeError {
             return new EventsTypeError(message, code);
         }
     }
+}
+
+export class TimeoutError extends Error {
+    constructor(...args) {
+        super(...args);
+
+        this.name = 'TimeoutError';
+    }
+}
+
+export function createTimeoutError(message: string) {
+    return new TimeoutError(message);
 }
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
