@@ -2543,7 +2543,7 @@ describe('events', function() {
                 .then(() => {
                     expect(counter).toBe(0);
                     expect(error).toBeDefined();
-                    expect(error && error.name).toBe('Error');
+                    expect(error && error.name).toBe('TimeoutError');
                     expect(ee.listenerCount('test7')).toBe(0);
 
                     clearTimeout(timeout);
