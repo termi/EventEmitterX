@@ -22,6 +22,27 @@ import AbortController, {
 type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
 type INodeEventEmitter = NodeJS.EventEmitter;
+
+// https://stackoverflow.com/a/50014868
+type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
+
+/**
+ * Это минимально совместимый с кодом {@link EventEmitterEx.once} emitter, отличающийся от EventEmitter:
+ * * для ICompatibleEmitter нужны только некоторые методы из всех методов EventEmitter
+ * * методы ICompatibleEmitter **могут** не возвращать this
+ */
+interface ICompatibleEmitter {
+    on: ReplaceReturnType<INodeEventEmitter["on"], any>;
+    // on: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    once: ReplaceReturnType<INodeEventEmitter["once"], any>;
+    // once: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
+    // removeListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
+    // prependListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
+    // prependOnceListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
+}
 // type NodeEventEmitter = EventEmitter;
 export declare type Listener = (...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
@@ -87,7 +108,8 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
 
 // type EventMapFrom<T> = T extends EventEmitterEx<infer X> ? X : never;
 type EventNamesFrom<T> = T extends EventEmitterEx<infer X> ? keyof X : never;
-type EventNamesFrom2<T> = EventNamesFrom<T>|EventNamesFrom<T>[];
+// type EventNamesFrom2<T> = EventNamesFrom<T>|EventNamesFrom<T>[];
+type EventNamesFrom3<T> = EventNamesFrom<T>|EventNamesFrom<T>[]|EventName|EventName[];
 
 let _onceListenerIdCounter = 0;
 // This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
@@ -950,9 +972,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     //   static getEventListeners(emitter: EventEmitter|DOMEventTarget, type: string)
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
-    static once<EE extends EventEmitterEx=EventEmitterEx>(emitter: EventEmitterEx, types: EventNamesFrom2<EE>, options?: StaticOnceOptions<EE, EventNamesFrom<EE>>): Promise<any[]>;
-    static once(emitter: INodeEventEmitter, types: string|symbol|(string|symbol)[], options?: StaticOnceOptions<INodeEventEmitter, string|symbol>): Promise<any[]>;
-    static once(emitter: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
+    static once<EE extends EventEmitterEx=EventEmitterEx>(emitter: EventEmitterEx, types: EventNamesFrom3<EE>, options?: StaticOnceOptions<EE, EventNamesFrom<EE>>): Promise<any[]>;
+    static once(nodeEmitter: INodeEventEmitter, events: string|symbol|(string|symbol)[], options?: StaticOnceOptions<INodeEventEmitter, string|symbol>): Promise<any[]>;
+    static once(eventTarget: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
+    static once(compatibleEmitter: ICompatibleEmitter, events: string|symbol|(string|symbol)[], options?: StaticOnceOptions<ICompatibleEmitter, string|symbol>): Promise<any[]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
@@ -969,7 +992,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {Function=} options.checkFn
      */
     static once(
-        emitter: DOMEventTarget|EventEmitterEx|INodeEventEmitter,
+        emitter: DOMEventTarget|EventEmitterEx|INodeEventEmitter|ICompatibleEmitter,
         types: EventName|EventName[],
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
         options?: StaticOnceOptionsDefault,
@@ -1493,14 +1516,13 @@ function checkListener(listener: Function, supportHandleEvent = false) {
     }
 }
 
-
 /**
  * Check only 'on', 'once', 'prependListener' and 'removeListener', but not 'emit'.
  * Reason: we dont use 'emit' method in {@link EventEmitterEx.once}
  * @param emitter
  * @private
  */
-function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
+function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICompatibleEmitter|Object) {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).once === 'function'
