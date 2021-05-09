@@ -31,7 +31,7 @@ type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parame
  * * для ICompatibleEmitter нужны только некоторые методы из всех методов EventEmitter
  * * методы ICompatibleEmitter **могут** не возвращать this
  */
-interface ICompatibleEmitter {
+export interface ICompatibleEmitter {
     on: ReplaceReturnType<INodeEventEmitter["on"], any>;
     // on: (event: string | symbol, listener: (...args: any[]) => void) => any;
     once: ReplaceReturnType<INodeEventEmitter["once"], any>;
