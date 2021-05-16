@@ -264,6 +264,55 @@ describe('events', function() {
                     expect(ee.listenerCount(eventName)).toBe(0);
                 }
             });
+
+            it('should not add duplicated listeners if options.listenerOncePerEventType = true', function () {
+                let counter1 = 0;
+                let counter2 = 0;
+                const listener1 = () => { counter1++; };
+                const listener2_1 = () => { counter2++; };
+                const listener2_2 = () => { counter2++; };
+                const ee = new EventEmitter({ listenerOncePerEventType: true });
+
+                // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
+                //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
+                //  что это новый listener
+                //  Поэтому, в тестах ниже, только on и addListener должны рассматриваться как добавляющие один и тот же
+                //   listener, а все остальные - добавляют свои новые обработчики.
+
+                ee.on('test_duplicates', listener1);
+                ee.addListener('test_duplicates', listener1);
+                ee.once('test_duplicates', listener1);
+                ee.prependListener('test_duplicates', listener1);
+                ee.prependOnceListener('test_duplicates', listener1);
+
+                ee.once('test_duplicates_2', listener2_1);
+                ee.once('test_duplicates_2', listener2_2);
+                ee.prependListener('test_duplicates_2', listener2_1);
+                ee.prependListener('test_duplicates_2', listener2_2);
+                ee.prependOnceListener('test_duplicates_2', listener2_1);
+                ee.prependOnceListener('test_duplicates_2', listener2_2);
+                ee.on('test_duplicates_2', listener2_1);
+                ee.on('test_duplicates_2', listener2_2);
+                ee.addListener('test_duplicates_2', listener2_1);
+                ee.addListener('test_duplicates_2', listener2_2);
+
+                ee.emit('test_duplicates', 123);
+                ee.emit('test_duplicates_2', 123);
+
+                {// main tests
+                    expect(counter1).toBe(1);
+                    expect(counter2).toBe(2);
+                }
+
+                {// cleanup
+                    ee.removeListener('test_duplicates', listener1);
+                    expect(ee.listenerCount('test_duplicates')).toBe(0);
+
+                    ee.removeListener('test_duplicates_2', listener2_1);
+                    ee.removeListener('test_duplicates_2', listener2_2);
+                    expect(ee.listenerCount('test_duplicates_2')).toBe(0);
+                }
+            });
         });
 
         describe('#removeListener/#off', function () {

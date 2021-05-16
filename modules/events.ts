@@ -425,12 +425,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             _events,
             _maxListeners,
             _f,
+            _onceIds,
         } = this;
-        const listenerOncePerEventType = _checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType);
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+        const hasAnyOnceListener = _onceIds.length > 0;
         // todo: add handleEvent support
         const listenerAs_objectWith_handleEvent = false;//supportHandleEvent && typeof listener === 'object';
         const handler = _events[event];
+        const existedHandlerIsFunction = typeof handler === 'function';
         let newLen: number;
 
         if (event === 'error') {
@@ -453,6 +455,44 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             this.emit('newListener', event, listener);
         }
 
+        if (_checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType) && handler) {
+            // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
+            //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
+            //  что это новый listener
+            if (existedHandlerIsFunction) {
+                if (handler === listener) {
+                    return this;
+                }
+                else if (hasAnyOnceListener
+                    && (handler[sOnceListenerWrapperId] !== void 0)
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    && handler.listener === listener
+                ) {
+                    return this;
+                }
+            }
+            else {
+                const listeners = (handler as Function[]);
+
+                for (let i = listeners.length ; i-- > 0 ; ) {
+                    const handler = listeners[i];
+
+                    if (handler === listener) {
+                        return this;
+                    }
+                    else if (
+                        (handler[sOnceListenerWrapperId] !== void 0)
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        && handler.listener === listener
+                    ) {
+                        return this;
+                    }
+                }
+            }
+        }
+
         if (once) {
             listener = _onceWrap<EMD<EventMap>, EventKey>(this, event, listener);
         }
@@ -468,25 +508,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 newLen = 1;
             }
         }
-        else if (typeof handler === 'function') {
-            if (listenerOncePerEventType && handler === listener) {
-                return this;
-            }
-
+        else if (existedHandlerIsFunction) {
             if (prepend) {
-                _events[event] = [ listener, handler ];
+                _events[event] = [ listener, handler as Function ];
             }
             else {
-                _events[event] = [ handler, listener ];
+                _events[event] = [ handler as Function, listener ];
             }
 
             newLen = 2;
         }
         else {
-            if (listenerOncePerEventType && (handler as Function[]).includes(listener)) {
-                return this;
-            }
-
             if (prepend) {
                 newLen = (handler as Function[]).unshift(listener);
             }
