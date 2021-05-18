@@ -1494,6 +1494,47 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
         });
+
+        describe('non-standard #hasListener', function () {
+            it('should detect without handler', function () {
+                const ee = new EventEmitterEx();
+
+                const handler1 = () => {};
+
+                ee.on('test_1', handler1);
+                ee.once('test_2', handler1);
+                ee.once('test_2', handler1);
+                ee.prependListener('test_3', handler1);
+                ee.prependListener('test_3', handler1);
+                ee.prependOnceListener('test_4', handler1);
+
+                expect(ee.hasListener('test_1')).toBe(true);
+                expect(ee.hasListener('test_2')).toBe(true);
+                expect(ee.hasListener('test_3')).toBe(true);
+                expect(ee.hasListener('test_4')).toBe(true);
+            });
+
+            it('should detect with handler', function () {
+                const ee = new EventEmitterEx();
+
+                const handler1 = () => {};
+                const handler2 = () => {};
+                const handler3 = () => {};
+                const handler4 = () => {};
+
+                ee.on('test_1', handler1);
+                ee.once('test_2', handler2);
+                ee.once('test_2', handler2);
+                ee.prependListener('test_3', handler3);
+                ee.prependListener('test_3', handler3);
+                ee.prependOnceListener('test_4', handler4);
+
+                expect(ee.hasListener('test_1', handler1)).toBe(true);
+                expect(ee.hasListener('test_2', handler2)).toBe(true);
+                expect(ee.hasListener('test_3', handler3)).toBe(true);
+                expect(ee.hasListener('test_4', handler4)).toBe(true);
+            });
+        });
     }) as EmptyFunction);
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js

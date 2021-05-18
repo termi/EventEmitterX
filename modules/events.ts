@@ -937,6 +937,57 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     /**
+     * Non-standard EventEmitter method!
+     *
+     * Check if has any listener for given `event` name and optional `listenerToCheck` handler function.
+     */
+    hasListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listenerToCheck?: EMD<EventMap>[EventKey]) {
+        type _TEventMap = EMD<EventMap>;
+        const handler = this._events[event];
+
+        if (!handler) {
+            return false;
+        }
+        if (!listenerToCheck) {
+            return true;
+        }
+
+        const hasAnyOnceListener = this._onceIds.length > 0;
+
+        if (typeof handler === 'function') {
+            if (!hasAnyOnceListener || !handler[sOnceListenerWrapperId]) {
+                return listenerToCheck === handler;
+            }
+
+            return listenerToCheck === (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey];
+        }
+
+        if (!hasAnyOnceListener) {
+            for (const _handler of (handler as Function[])) {
+                if (listenerToCheck === _handler) {
+                    return true;
+                }
+            }
+        }
+        else {
+            for (const _handler of (handler as Function[])) {
+                if (_handler[sOnceListenerWrapperId]) {
+                    if (listenerToCheck === (_handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey]) {
+                        return true;
+                    }
+                }
+                else {
+                    if (listenerToCheck === _handler) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Returns a copy of the array of listeners for the event named eventName.
      */
     listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
