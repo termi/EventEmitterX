@@ -50,6 +50,7 @@ export interface EventListenerObject<EventMap, EventKey> {
     handleEvent(...args: Parameters<EventMap[EventKey]>): Promise<any> | void;
 }
 */
+export declare type NodeEventName = string | symbol;
 export declare type EventName = number | string | symbol;
 export declare type DefaultEventMap = {
     // [event in EventName]: Listener|EventListenerObject;
@@ -116,7 +117,7 @@ let _onceListenerIdCounter = 0;
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 
 const isNodeJS = (function() {
-    if (typeof process === 'object' && typeof require === 'function' && process) {
+    if (typeof process === 'object' && typeof require === 'function' && {}.toString.call(process) === "[object process]") {
         if (typeof window !== 'undefined') {
             // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
             // workaround for jest+JSDOM
@@ -202,7 +203,7 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     getMaxListeners(): number;
     listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
     rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
-    eventNames(): Array<string | symbol>;
+    eventNames(): Array<NodeEventName>;
     listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
 }
 /** cast type of any event emitter to typed event emitter */
@@ -413,7 +414,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     // private _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
-    private _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean): this {
+    protected _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean): this {
         // const {_she: supportHandleEvent} = this;
         // if (typeof listener === 'object') {
         //     console.log(listener);
@@ -459,6 +460,20 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
             //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
             //  что это новый listener
+
+            /* todo: send 'duplicatedListener'
+            const sendDuplicatedListener = () => {
+                const event = {
+                    type: 'duplicatedListener',
+                    listenerType: 'duplicatedListener',
+                    listener,
+                };
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                this.emit(event.type, event);
+            };
+            */
+
             if (existedHandlerIsFunction) {
                 if (handler === listener) {
                     return this;
@@ -973,7 +988,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return [ ...(handler as _TEventMap[EventKey][]) ];
     }
 
-    eventNames(): Array<string | symbol> {
+    eventNames(): Array<NodeEventName> {
         // todo: return number key as number
         return Object.keys(this._events);
     }
@@ -1476,6 +1491,220 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     /** alias for global AbortController */
     static AbortController = AbortController;
+}
+
+type EventEmitterProxy_ProxyHook = (type, eventEmitter) => NodeEventEmitter|EventEmitterEx;
+interface EventEmitterProxy_Options extends Options {
+    /** Функция, которая вычисляет нужный экземпляр eventEmitter, который относиться к конкретному событию */
+    proxyHook?: EventEmitterProxy_ProxyHook;
+}
+
+export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
+    private _proxyHook: EventEmitterProxy_ProxyHook|void;
+    private _eventEmitter: INodeEventEmitter|EventEmitterEx|void;
+    private _proxyHandlers: Record<EventName, (...args: any[]) => void> = {};
+
+    /**
+     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запонимать все подписки нп него
+     *  а при вызове removeAllListeners, удалять все подписки, которые прошли через экземпляр этого класса
+     *
+     * Например, мы можем создать экземпляр этого класса передав в конструктор userActionMonitor (которы эмитит события 'mouse_click').
+     *  Передаём этот экземпляр на стороннюю страницу, там подписываются на соыбтия 'mouse_click', а когда страница выгружается, при
+     *  вызове removeAllListeners, мы удалим все подписки, которые были сделаны на этой странице, не затрагивая подписки с других страниц
+     *
+     * @param emitter
+     * @param options
+     * @param options.proxyHook -
+     */
+    constructor(emitter?: INodeEventEmitter|EventEmitterEx, options?: EventEmitterProxy_Options) {
+        super(options);
+
+        const {
+            proxyHook,
+        } = options || {};
+
+        if (typeof proxyHook === 'function') {
+            this._proxyHook = proxyHook;
+        }
+        else {
+            this._proxyHook = void 0;
+        }
+
+        this._eventEmitter = emitter || void 0;
+    }
+
+    setProxyHook(proxyHook: EventEmitterProxy_ProxyHook) {
+        if (typeof proxyHook === 'function') {
+            this._proxyHook = proxyHook;
+        }
+        else {
+            this._proxyHook = void 0;
+        }
+    }
+
+    handleEvent(event: EventName, ...args) {
+        switch (args.length) {
+            case 0:
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                super.emit(event);
+                break;
+            case 1:
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                super.emit(event, args[0]);
+                break;
+            case 2:
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                super.emit(event, args[0], args[1]);
+                break;
+            case 3:
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                super.emit(event, args[0], args[1], args[2]);
+                break;
+            default:
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                super.emit(event, ...args);
+        }
+    }
+
+    emit(event, ...args) {
+        const {
+            _proxyHook,
+            _eventEmitter,
+        } = this;
+        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+
+        if (!eventEmitter) {
+            return false;
+        }
+
+        return eventEmitter.emit(event, ...args);
+    }
+
+    emitSelf<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) {
+        return super.emit(event, ...args);
+    }
+
+    protected _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean) {
+        const result = super._addListener(event, listener, prepend, once);
+        const {
+            _proxyHook,
+            _eventEmitter,
+            _proxyHandlers,
+        } = this;
+        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+
+        if (!eventEmitter) {
+            return result;
+        }
+
+        let eventProxy = _proxyHandlers[event];
+
+        if (eventProxy) {
+            // Нам нужно быть уверенным, что обработчик будет подписан на этот type, но только один раз
+            // Если он ещё не был подписан, то removeListener ничего не сделает
+            eventEmitter.removeListener(event as NodeEventName, eventProxy);
+        }
+        else {
+            eventProxy = this.handleEvent.bind(this, event);
+            _proxyHandlers[event] = eventProxy;
+        }
+
+        if (prepend) {
+            if (once) {
+                eventEmitter.prependOnceListener(event as NodeEventName, eventProxy);
+            }
+            else {
+                eventEmitter.prependListener(event as NodeEventName, eventProxy);
+            }
+        }
+        else {
+            if (once) {
+                eventEmitter.once(event as NodeEventName, eventProxy);
+            }
+            else {
+                eventEmitter.on(event as NodeEventName, eventProxy);
+            }
+        }
+
+        return result;
+    }
+
+    removeListener(event, listener) {
+        const result = super.removeListener(event, listener);
+
+        if (this.listenerCount(event) === 0) {
+            const {
+                _proxyHook,
+                _eventEmitter,
+                _proxyHandlers,
+            } = this;
+            const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+            const proxyHandler = _proxyHandlers[event];
+
+            delete _proxyHandlers[event];
+
+            if (eventEmitter && proxyHandler) {
+                if (proxyHandler) {
+                    try {
+                        eventEmitter.removeListener(event, proxyHandler);
+                    }
+                    catch {
+                        // ignore
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    removeAllListeners(event?) {
+        const {
+            _proxyHook,
+            _eventEmitter,
+            _proxyHandlers,
+        } = this;
+
+        for (const type of Object.keys(_proxyHandlers)) {
+            if (event && event !== type) {
+                continue;
+            }
+
+            const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+            const proxyHandler = _proxyHandlers[type];
+
+            delete _proxyHandlers[type];
+
+            if (eventEmitter && proxyHandler) {
+                if (proxyHandler) {
+                    try {
+                        eventEmitter.removeListener(type, proxyHandler);
+                    }
+                    catch {
+                        // ignore
+                    }
+                }
+            }
+        }
+
+        if (!event) {
+            this._proxyHandlers = {};
+        }
+
+        return super.removeAllListeners(event);
+    }
+
+    destructor() {
+        this.removeAllListeners();
+
+        this._eventEmitter = void 0;
+        this._proxyHook = void 0;
+    }
 }
 
 export type NodeEventEmitter = INodeEventEmitter;
