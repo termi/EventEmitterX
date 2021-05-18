@@ -61,6 +61,7 @@ interface Options {
     maxListeners?: number;
     // listener can be registered at most once per event type
     listenerOncePerEventType?: boolean;
+    captureRejections?: boolean;
     /* todo: add handleEvent support
     // support DOMEventTarget.handleEvent
     supportHandleEvent?: boolean;
@@ -133,42 +134,42 @@ const isNodeJS = (function() {
 
 const {
     errorMonitor,
-    // captureRejectionSymbol,
+    captureRejectionSymbol,
 }: {
     readonly errorMonitor: typeof import("events").errorMonitor,
-    // readonly captureRejectionSymbol: unique symbol,
+    readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
 } = (function(): {
     readonly errorMonitor: typeof import("events").errorMonitor,
-    // readonly captureRejectionSymbol: unique symbol,
+    readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
 } {
-    let errorMonitor;
-    // let captureRejectionSymbol;
+    let errorMonitor: typeof import("events").errorMonitor | void;
+    let captureRejectionSymbol: typeof import("events").captureRejectionSymbol | void;
 
     if (isNodeJS) {
         // this is nodejs
         try {
             const events = require('events');
 
-            errorMonitor = events.errorMonitor as typeof import("events").errorMonitor;
-            // captureRejectionSymbol = events.captureRejectionSymbol;
+            errorMonitor = events.errorMonitor;
+            captureRejectionSymbol = events.captureRejectionSymbol;
         }
         catch(e) {
             // ignore
         }
     }
 
-    if (!errorMonitor || errorMonitor === 'error') {
+    if (!errorMonitor || (errorMonitor as unknown as string) === 'error') {
         // Проверка на errorMonitor === 'error' добавлена для того, чтобы на 100% исключить возможность зацикливания
         //  EventEmitterEx#emit при отправки 'error'.
         errorMonitor = Symbol('events.errorMonitor') as typeof import("events").errorMonitor;
     }
-    // if (!captureRejectionSymbol) {
-    //     captureRejectionSymbol = Symbol.for('nodejs.rejection');
-    // }
+    if (!captureRejectionSymbol) {
+        captureRejectionSymbol = Symbol.for('nodejs.rejection') as typeof import("events").captureRejectionSymbol;
+    }
 
     return {
-        errorMonitor: errorMonitor as typeof import("events").errorMonitor,
-        // captureRejectionSymbol,
+        errorMonitor,
+        captureRejectionSymbol,
     };
 })();
 
@@ -211,9 +212,15 @@ export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X 
 
 // Symbol for EventEmitterEx.once
 const sCleanAbortPromise = Symbol();
+/**
+ * This symbol should not be exportable
+ * @private
+ */
+const kCapture = Symbol('kCapture');
 
 // listenerOncePerEventType, listener can be registered at most once per event type
 const EventEmitterEx_Flags_listenerOncePerEventType = 1 << 1;
+const EventEmitterEx_Flags_captureRejections = 1 << 2;
 const EventEmitterEx_Flags_has_error_listener = 1 << 10;
 const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
 const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
@@ -242,6 +249,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 maxListeners,
                 listenerOncePerEventType,
                 // supportHandleEvent,
+                captureRejections,
             } = options;
 
             if (maxListeners !== void 0) {
@@ -250,11 +258,31 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (listenerOncePerEventType !== void 0) {
                 this._f |= EventEmitterEx_Flags_listenerOncePerEventType;
             }
+            if (captureRejections) {
+                if (typeof (captureRejections as any) !== 'boolean') {
+                    // throw new ERR_INVALID_ARG_TYPE()
+                    throw new Error(`options.captureRejections should be of type "boolean" but has "${typeof captureRejections}" type`);
+                }
+                this._f |= EventEmitterEx_Flags_captureRejections;
+            }
             /*
             if (supportHandleEvent !== void 0) {
                 this._she = supportHandleEvent;
             }
             */
+        }
+    }
+
+    get [kCapture]() {
+        return _checkBit(this._f, EventEmitterEx_Flags_captureRejections);
+    }
+
+    set [kCapture](value: boolean) {
+        if (value) {
+            this._f |= EventEmitterEx_Flags_captureRejections;
+        }
+        else {
+            this._f = _unsetBit(this._f, EventEmitterEx_Flags_captureRejections);
         }
     }
 
@@ -273,6 +301,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         if (handler) {
             const {_f} = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
+            const captureRejections = _checkBit(_f, EventEmitterEx_Flags_captureRejections);
 
             if (isErrorEvent) {
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
@@ -315,25 +344,37 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
             if (isFn) {
                 const func_handler = handler as Function;
+                let result;
 
                 switch (argumentsLength) {
                     case 1:
-                        func_handler.call(this);
+                        result = func_handler.call(this);
                         break;
                     case 2:
-                        func_handler.call(this, a1);
+                        result = func_handler.call(this, a1);
                         break;
                     case 3:
-                        func_handler.call(this, a1, a2);
+                        result = func_handler.call(this, a1, a2);
                         break;
                     case 4:
-                        func_handler.call(this, a1, a2, a3);
+                        result = func_handler.call(this, a1, a2, a3);
                         break;
                     // slower
                     default: {
                         const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
 
-                        func_handler.apply(this, args);
+                        result = func_handler.apply(this, args);
+                    }
+                }
+
+                if (captureRejections) {
+                    // We check if result is undefined first because that
+                    // is the most common case so we do not pay any perf
+                    // penalty
+                    if (result !== undefined && result !== null) {
+                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+
+                        _addCatch(this, result, event, args);
                     }
                 }
 
@@ -349,27 +390,57 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 switch (argumentsLength) {
                     // fast cases
                     case 1:
-                        /*@__NOINLINE__*/
-                        emitNone_array(listeners, this);
+                        if (captureRejections) {
+                            /*@__NOINLINE__*/
+                            emitNone_array_catch(listeners, this, event);
+                        }
+                        else {
+                            /*@__NOINLINE__*/
+                            emitNone_array(listeners, this);
+                        }
                         break;
                     case 2:
-                        /*@__NOINLINE__*/
-                        emitOne_array(listeners, this, a1);
+                        if (captureRejections) {
+                            /*@__NOINLINE__*/
+                            emitOne_array_catch(listeners, this, a1, event);
+                        }
+                        else {
+                            /*@__NOINLINE__*/
+                            emitOne_array(listeners, this, a1);
+                        }
                         break;
                     case 3:
-                        /*@__NOINLINE__*/
-                        emitTwo_array(listeners, this, a1, a2);
+                        if (captureRejections) {
+                            /*@__NOINLINE__*/
+                            emitTwo_array_catch(listeners, this, a1, a2, event);
+                        }
+                        else {
+                            /*@__NOINLINE__*/
+                            emitTwo_array(listeners, this, a1, a2);
+                        }
                         break;
                     case 4:
-                        /*@__NOINLINE__*/
-                        emitThree_array(listeners, this, a1, a2, a3);
+                        if (captureRejections) {
+                            /*@__NOINLINE__*/
+                            emitThree_array_catch(listeners, this, a1, a2, a3, event);
+                        }
+                        else {
+                            /*@__NOINLINE__*/
+                            emitThree_array(listeners, this, a1, a2, a3);
+                        }
                         break;
                     // slower
                     default: {
                         const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
 
-                        /*@__NOINLINE__*/
-                        emitMany_array(listeners, this, args);
+                        if (captureRejections) {
+                            /*@__NOINLINE__*/
+                            emitMany_array_catch(listeners, this, args, event);
+                        }
+                        else {
+                            /*@__NOINLINE__*/
+                            emitMany_array(listeners, this, args);
+                        }
                     }
                 }
 
@@ -1534,6 +1605,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     static readonly errorMonitor = errorMonitor as typeof import("events").errorMonitor;
+    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("events").captureRejectionSymbol;
     // domain is not supported
     static readonly usingDomains = false;
 
@@ -1760,7 +1832,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
 export type NodeEventEmitter = INodeEventEmitter;
 
-export {errorMonitor};
+export {errorMonitor, captureRejectionSymbol};
 export const once = EventEmitterEx.once;
 
 export default EventEmitterEx;
@@ -1922,10 +1994,32 @@ function emitNone_array(listeners: Function[], self: EventEmitterEx) {
     }
 }
 
+function emitNone_array_catch(listeners: Function[], self: EventEmitterEx, event: EventName) {
+    const len = listeners.length;
+    for (let i = 0 ; i < len ; ++i) {
+        const result = listeners[i].call(self);
+
+        if (result !== undefined && result !== null) {
+            _addCatch(this, result, event, []);
+        }
+    }
+}
+
 function emitOne_array(listeners: Function[], self: EventEmitterEx, arg1: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1);
+    }
+}
+
+function emitOne_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, event: EventName) {
+    const len = listeners.length;
+    for (let i = 0 ; i < len ; ++i) {
+        const result = listeners[i].call(self, arg1);
+
+        if (result !== undefined && result !== null) {
+            _addCatch(this, result, event, [ arg1 ]);
+        }
     }
 }
 
@@ -1936,6 +2030,17 @@ function emitTwo_array(listeners: Function[], self: EventEmitterEx, arg1: any, a
     }
 }
 
+function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, event: EventName) {
+    const len = listeners.length;
+    for (let i = 0 ; i < len ; ++i) {
+        const result = listeners[i].call(self, arg1, arg2);
+
+        if (result !== undefined && result !== null) {
+            _addCatch(this, result, event, [ arg1, arg2 ]);
+        }
+    }
+}
+
 function emitThree_array(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -1943,10 +2048,76 @@ function emitThree_array(listeners: Function[], self: EventEmitterEx, arg1: any,
     }
 }
 
+function emitThree_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any, event: EventName) {
+    const len = listeners.length;
+    for (let i = 0 ; i < len ; ++i) {
+        const result = listeners[i].call(self, arg1, arg2, arg3);
+
+        if (result !== undefined && result !== null) {
+            _addCatch(this, result, event, [ arg1, arg2, arg3 ]);
+        }
+    }
+}
+
 function emitMany_array(listeners: Function[], self: EventEmitterEx, args: any[]) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].apply(self, args);
+    }
+}
+
+function emitMany_array_catch(listeners: Function[], self: EventEmitterEx, args: any[], event: EventName) {
+    const len = listeners.length;
+    for (let i = 0 ; i < len ; ++i) {
+        const result = listeners[i].apply(self, args);
+
+        if (result !== undefined && result !== null) {
+            _addCatch(this, result, event, args);
+        }
+    }
+}
+
+function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventName, args: any[]) {
+    // Handle Promises/A+ spec, then could be a getter
+    // that throws on second use.
+    try {
+        const then = promise.then;
+
+        if (typeof then === 'function') {
+            then.call(promise, undefined, function(err) {
+                // The callback is called with nextTick to avoid a follow-up
+                // rejection from this promise.
+                setImmediate(_emitUnhandledRejectionOrErr, that, err, type, args);
+            });
+        }
+    }
+    catch (err) {
+        that.emit('error', err);
+    }
+}
+
+function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventName, args: any[]) {
+    const captureRejectionHandler = ee[captureRejectionSymbol];
+
+    if (typeof captureRejectionHandler === 'function') {
+        captureRejectionHandler(err, type, ...args);
+    }
+    else {
+        // We have to disable the capture rejections mechanism, otherwise
+        // we might end up in an infinite loop.
+        const prev = ee[kCapture];
+
+        // If the error handler throws, it is not catcheable and it
+        // will end up in 'uncaughtException'. We restore the previous
+        // value of kCapture in case the uncaughtException is present
+        // and the exception is handled.
+        try {
+            ee[kCapture] = false;
+            ee.emit('error', err);
+        }
+        finally {
+            ee[kCapture] = prev;
+        }
     }
 }
 
