@@ -660,7 +660,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             _f,
             _onceIds,
         } = this;
-        // const listenerOncePerEventType = _checkBit(_flgs, EventEmitterEx_Flags_listenerOncePerEventType);
+        // const listenerOncePerEventType = _checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType);
         const handler = _events[event];
 
         if (handler === void 0) {
@@ -1201,7 +1201,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             isEventTarget = _isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
-                return _Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
+                return _Promise.reject(new _EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
             }
         }
 
@@ -1232,13 +1232,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let listenersCleanUp: Function|void = void 0;
 
         if (usePrependListener && isEventTarget) {
-            return _Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
+            return _Promise.reject(new _EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
         }
 
         {
             if (signal) {
                 if (!isAbortSignal(signal)) {
-                    return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+                    return _Promise.reject(new _EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
                 }
             }
 
@@ -1659,11 +1659,11 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     private _proxyHandlers: Record<EventName, (...args: any[]) => void> = {};
 
     /**
-     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запонимать все подписки нп него
+     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запоминать все подписки нп него
      *  а при вызове removeAllListeners, удалять все подписки, которые прошли через экземпляр этого класса
      *
-     * Например, мы можем создать экземпляр этого класса передав в конструктор userActionMonitor (которы эмитит события 'mouse_click').
-     *  Передаём этот экземпляр на стороннюю страницу, там подписываются на соыбтия 'mouse_click', а когда страница выгружается, при
+     * Например, мы можем создать экземпляр этого класса передав в конструктор userActionMonitor (который кидает события 'mouse_click').
+     *  Передаём этот экземпляр на стороннюю страницу, там подписываются на события 'mouse_click', а когда страница выгружается, при
      *  вызове removeAllListeners, мы удалим все подписки, которые были сделаны на этой странице, не затрагивая подписки с других страниц
      *
      * @param emitter
@@ -1868,7 +1868,10 @@ export const once = EventEmitterEx.once;
 
 export default EventEmitterEx;
 
-class EventsTypeError extends TypeError {
+/**
+ * @private
+ */
+class _EventsTypeError extends TypeError {
     code: string|void;
 
     constructor(message = '', code?: string) {
@@ -1892,13 +1895,13 @@ class EventsTypeError extends TypeError {
     }
 
     static fromObject(error) {
-        if (error instanceof EventsTypeError) {
+        if (error instanceof _EventsTypeError) {
             return error;
         }
         else {
             const { code, message } = error;
 
-            return new EventsTypeError(message, code);
+            return new _EventsTypeError(message, code);
         }
     }
 }
@@ -1946,7 +1949,6 @@ function checkListener(listener: Function, supportHandleEvent = false) {
 function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICompatibleEmitter|Object) {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
-        && typeof (emitter as INodeEventEmitter).once === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
         && typeof (emitter as INodeEventEmitter).removeListener === 'function'
     ;
@@ -1954,6 +1956,9 @@ function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICo
 
 export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
     return _isEventEmitterCompatible(emitter)
+        && typeof (emitter as INodeEventEmitter).addListener === 'function'
+        && typeof (emitter as INodeEventEmitter).once === 'function'
+        && typeof (emitter as INodeEventEmitter).prependOnceListener === 'function'
         && typeof (emitter as INodeEventEmitter).emit === 'function'
     ;
 }
