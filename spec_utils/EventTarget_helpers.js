@@ -21,12 +21,27 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
 
             this["dispatchEvent"](event);
         };
-        maybeEventTarget.on = function on(type, listener) {
+
+        const on = function on(type, listener) {
             this.addEventListener(type, listener);
         };
-        maybeEventTarget.off = function on(type, listener) {
+        const off = function off(type, listener) {
             this.removeEventListener(type, listener);
         };
+
+        maybeEventTarget.on = on;
+        maybeEventTarget.addListener = on;
+        maybeEventTarget.once = function(type, listener) {
+            this.addEventListener(type, listener, { once: true });
+        };
+        maybeEventTarget.prependListener = function() {
+            throw new Error('"prependListener" on EventTarget is not supported');
+        };
+        maybeEventTarget.prependOnceListener = function() {
+            throw new Error('"prependOnceListener" on EventTarget is not supported');
+        };
+        maybeEventTarget.off = off;
+        maybeEventTarget.remoteListener = off;
 
         if (maybeEventTarget[event_target]) {
             // nodejs native EventTarget
@@ -136,14 +151,14 @@ module.exports.listenerCount = function listenerCount(emitter, type) {
 
 module.exports.compatibleOnce_for_EventTarget = function(once) {
     return function(emitter, type, options) {
-        if (options && options.checkFn) {
-            const {checkFn} = options;
+        if (options && options.filter) {
+            const {filter} = options;
 
-            options.checkFn = function(type, ...args) {
+            options.filter = function(type, ...args) {
                 if (args[0] instanceof Event && args[0]["args"]) {
-                    return checkFn.apply(this, [type, ...args[0]["args"]]);
+                    return filter.apply(this, [type, ...args[0]["args"]]);
                 }
-                return checkFn.apply(this, [type, ...args]);
+                return filter.apply(this, [type, ...args]);
             }
         }
 

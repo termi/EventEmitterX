@@ -13,7 +13,7 @@ import type {
     // default as TAbortController,
     AbortControllersGroup as TAbortControllersGroup,
 } from 'termi@abortable';
-import AbortController, {
+import {
     createAbortError,
     isAbortSignal,
     AbortControllersGroup,
@@ -73,22 +73,45 @@ interface Options {
 interface StaticOnceOptionsDefault {
     /** Add listener in the beginning of listeners list */
     prepend?: boolean;
-    /** [AbortSignal](https://nodejs.org/api/globals.html#globals_class_abortsignal) */
+    /**
+     * @see [nodejs AbortSignal]{@link https://nodejs.org/api/globals.html#globals_class_abortsignal}
+     * @see [MDN AbortSignal]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal}
+     */
     signal?: AbortSignal;
-    /** A list of AbortController's to subscribe to it's signal's 'abort' event. */
+    /** A list of AbortController's to subscribe to it's signal's 'abort' event.
+     * @see [nodejs AbortController]{@link https://nodejs.org/api/globals.html#globals_class_abortcontroller}
+     * @see [MDN AbortController]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortController}
+     */
     abortControllers?: (AbortController|void)[];
     timing?: ServerTiming;
-    /** timeout in ms */
+    /** the timeout in ms for resolving the promise before it is rejected with an
+     * error [TimeoutError]{@link TimeoutError}: {name: 'TimeoutError', message: 'timeout', code: 'ETIMEDOUT'} */
     timeout?: number;
     /** Custom error event name. Default error event name is 'error'. */
     errorEventName?: EventName;
-    /** You can throw a Error inside checkFn to reject once() with your error */
+    /**
+     * Filter function to determine acceptable values for resolving the promise.
+     *
+     * You can throw a Error inside filter to reject [once()]{@link EventEmitterEx.once} with your error.
+     *
+     * @see {@link https://github.com/EventEmitter2/EventEmitter2#emitterwaitforevent--eventns-filter}
+     */
+    filter?: (this: any, emitEventName: any, event: any) => boolean;
+    /**
+     * @extends filter
+     * @deprecated @use {@link filter}
+     */
     checkFn?: Function;
+    /** Promise constructor to use */
+    Promise?: PromiseConstructor;
     // [key: string]: any;
     debugInfo?: Object;
 }
 interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
-    /** You can throw a Error inside checkFn to reject once() with your error */
+    /** @inheritdoc */
+    filter?: (this: EE, emitEventName: E, ...amitArgs: any[]) => boolean;
+    /** @inheritdoc
+     * @deprecated */
     checkFn?: (this: EE, emitEventName: E, ...amitArgs: any[]) => boolean;
 }
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
@@ -104,7 +127,10 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     passive?: boolean;
     /** prepend option is not supported for EventTarget emitter */
     prepend?: never;
-    /** You can throw a Error inside checkFn to reject once() with your error */
+    /** @inheritdoc */
+    filter?: (this: DOMEventTarget, emitEventName: string, event: Event) => boolean;
+    /** @inheritdoc
+     * @deprecated */
     checkFn?: (this: DOMEventTarget, emitEventName: string, event: Event) => boolean;
 }
 
@@ -153,7 +179,7 @@ const {
             errorMonitor = events.errorMonitor;
             captureRejectionSymbol = events.captureRejectionSymbol;
         }
-        catch(e) {
+        catch {
             // ignore
         }
     }
@@ -1158,7 +1184,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @param {(AbortController|void)[]=} options.abortControllers
      * @param {ServerTiming=} options.timing - todo: Принимать в качестве timing, в том числе, ConsoleLike-объекты и оборачивать их в совместимый с ServerTiming враппер.
      * @param {number=} options.timeout
-     * @param {Function=} options.checkFn
+     * @param {Function=} options.filter
+     * @param {Function=} options.checkFn - deprecated @use {options.filter}
      */
     static once(
         emitter: DOMEventTarget|EventEmitterEx|INodeEventEmitter|ICompatibleEmitter,
@@ -1166,18 +1193,19 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
         options?: StaticOnceOptionsDefault,
     ): Promise<any[]|Event> {
+        const staticOnceOptions = (options || {}) as StaticOnceOptions<INodeEventEmitter|EventEmitterEx, EventName>;
+        const _Promise = staticOnceOptions.Promise || Promise;
         let isEventTarget = false;
 
         if (!(emitter instanceof EventEmitterEx) && !_isEventEmitterCompatible(emitter as EventEmitterEx|INodeEventEmitter)) {
             isEventTarget = _isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
-                return Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
+                return _Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
             }
         }
 
         const _emitter = (emitter as INodeEventEmitter|EventEmitterEx);
-        const staticOnceOptions = (options || {}) as StaticOnceOptions<INodeEventEmitter|EventEmitterEx, EventName>;
         const staticOnceEventTargetOptions = isEventTarget && options ? options as StaticOnceOptionsEventTarget : void 0;
         const eventTargetListenerOptions = isEventTarget && staticOnceEventTargetOptions && (staticOnceEventTargetOptions.passive !== void 0 || staticOnceEventTargetOptions.capture !== void 0)
             ? { passive: staticOnceEventTargetOptions.passive, capture: staticOnceEventTargetOptions.capture }
@@ -1187,10 +1215,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const errorEventNameIsDefined = !!staticOnceOptions.errorEventName;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         const timeout = staticOnceOptions.timeout || void 0;
-        // options с функцией checkFn только для статических методов потому, что тут мы можем гарантировать, что
+        // options с функцией filter только для статических методов потому, что тут мы можем гарантировать, что
         //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
         //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
-        const checkFn = typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0;
+        /** @borrows StaticOnceOptionsDefault.filter */
+        const filter = (typeof staticOnceOptions.filter === 'function' ? staticOnceOptions.filter : void 0)
+            || (typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0)
+        ;
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
         let signal = staticOnceOptions.signal || void 0;
         let timing = staticOnceOptions.timing || void 0;
@@ -1201,13 +1232,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let listenersCleanUp: Function|void = void 0;
 
         if (usePrependListener && isEventTarget) {
-            return Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
+            return _Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
         }
 
         {
             if (signal) {
                 if (!isAbortSignal(signal)) {
-                    return Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+                    return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
                 }
             }
 
@@ -1219,7 +1250,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (signal) {
                 // Return early if already aborted.
                 if (signal.aborted) {
-                    return Promise.reject(createAbortError());
+                    return _Promise.reject(createAbortError());
                 }
             }
         }
@@ -1233,7 +1264,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         if (Array.isArray(types)) {
             let winnerEventType: void|(typeof types extends Array<infer T> ? T : typeof types);
 
-            promise = new Promise<any[]>((resolve, reject) => {
+            promise = new _Promise<any[]>((resolve, reject) => {
                 const eventListenersByType: [ type: typeof types extends Array<infer T> ? T : never, listener: Listener ][] = [];
                 let needErrorListener = true;
 
@@ -1288,13 +1319,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     const eventListener = (...args) => {
-                        if (checkFn) {
+                        if (filter) {
                             try {
-                                if (!checkFn.apply(_emitter, [type, ...args])) {
+                                if (!filter.apply(_emitter, [type, ...args])) {
                                     return;
                                 }
                             }
-                            catch(err) {
+                            catch (err) {
                                 reject(err);
                             }
                         }
@@ -1374,15 +1405,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             // If events.once() is used to wait for the 'error' event itself, then it is treated as any other kind of event without special handling.
             const needErrorListener = type !== errorEventName;
 
-            promise = new Promise<any[]>((resolve, reject) => {
+            promise = new _Promise<any[]>((resolve, reject) => {
                 const eventListener = (...args) => {
-                    if (checkFn) {
+                    if (filter) {
                         try {
-                            if (!checkFn.apply(_emitter, [type, ...args])) {
+                            if (!filter.apply(_emitter, [type, ...args])) {
                                 return;
                             }
                         }
-                        catch(err) {
+                        catch (err) {
                             reject(err);
                         }
                     }
@@ -1465,7 +1496,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             let cleanTimeoutCallback: Function|void;
 
             // Turn an event into a promise, reject it once `abort` is dispatched
-            const cancelPromise = signal ? new Promise<void>((resolve, reject) => {
+            const cancelPromise = signal ? new _Promise<void>((resolve, reject) => {
                 abortCallback = function(clearPromiseSymbol) {
                     if (abortCallback) {
                         signal!.removeEventListener('abort', abortCallback);
@@ -1493,7 +1524,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 signal!.addEventListener('abort', abortCallback);
             }) : void 0;
-            const timeoutPromise = timeout ? new Promise<void>((resolve, reject) => {
+            const timeoutPromise = timeout ? new _Promise<void>((resolve, reject) => {
                 let timeoutId: Timeout|void = setTimeout(() => {
                     if (hasTiming) {
                         // todo: Создавать метку времени для 'timeout' и закрывать её в случае таймаута. Если ошибки не было - удалять метку времени для 'timeout' из timing.
@@ -1511,12 +1542,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
 
                     if (hasDebugInfo) {
-                        console.error('once#TIMEOUT:', debugInfo, { types, errorEventName });
+                        console.error('once#Timeout:', debugInfo, { types, errorEventName });
                     }
 
                     timeoutId = void 0;
 
-                    reject(createTimeoutError('TIMEOUT'));
+                    reject(createTimeoutError('timeout'));
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
@@ -1550,7 +1581,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
 
             // Return the fastest promise (don't need to wait for request to finish)
-            return Promise.race(promises).then(result => {
+            return _Promise.race(promises).then(result => {
                 if (listenersCleanUp) {
                     listenersCleanUp();
                 }
@@ -1873,10 +1904,16 @@ class EventsTypeError extends TypeError {
 }
 
 export class TimeoutError extends Error {
+    name = 'TimeoutError';
+    code = 'ETIMEDOUT';
+
     constructor(...args) {
         super(...args);
 
-        this.name = 'TimeoutError';
+        if (!this.stack) {
+            // es5 environment
+            this.stack = (new Error()).stack;
+        }
     }
 }
 

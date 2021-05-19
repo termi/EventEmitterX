@@ -31,7 +31,7 @@ import events, {
     Listener,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
-import {AbortControllersGroup} from 'termi@abortable';
+import {AbortControllersGroup, AbortSignal} from 'termi@abortable';
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -1572,7 +1572,7 @@ describe('events', function() {
             emitter.on('test', handler1);
             proxy.on('test', handler2);
 
-            // emit on emitter, catch on proxy and emitter
+            // emit on emitter, handle on proxy and emitter
             emitter.emit('test');
 
             // on emitter, it should be proxyHandler and `() => { counter1++; }` handler
@@ -1582,7 +1582,7 @@ describe('events', function() {
             expect(proxy.listenerCount('test')).toEqual(1);
             expect(proxy.hasListener('test', handler2)).toEqual(true);
 
-            // remove all listeners on proxy, but not emitter (remote only proxyHandler from emitter)
+            // remove all listeners on proxy and remove only proxy handlers from emitter
             proxy.removeAllListeners();
 
             expect(emitter.listenerCount('test')).toEqual(1);
@@ -1616,9 +1616,9 @@ describe('events', function() {
             ee.on('test', () => { counter1++; });
             proxy.on('test', () => { counter2++; });
 
-            // emit on emitter, catch on proxy and emitter
+            // emit on emitter, handle on proxy and emitter
             ee.emit('test');
-            // also emit on emitter (not on proxy), catch on proxy and emitter
+            // also emit on emitter (not on proxy), handle on proxy and emitter
             proxy.emit('test');
 
             expect(counter1).toBe(2);
@@ -2054,10 +2054,10 @@ describe('events', function() {
                 ee.addListener('test5-1', defaultListener);
 
                 // Если prepend работает правильно и обработчик события внутри once ставиться в начало всех обработчиков
-                //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в checkFn.
+                //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в filter.
                 const promise1 = once(ee, 'test5-1', {
                     prepend: true,
-                    checkFn(type, event) {
+                    filter(type, event) {
                         return !event.cancelBubble;
                     },
                 })
@@ -2073,7 +2073,7 @@ describe('events', function() {
 
                 // Если prepend не указан, то сначала выполниться defaultListener, который создаст событие с position = 5.
                 const promise2 = once(ee, 'test5-1', {
-                    checkFn(type, event) {
+                    filter(type, event) {
                         return event.position === 5;
                     },
                 })
@@ -2155,7 +2155,7 @@ describe('events', function() {
 
                 await once(eventTarget, 'test5-2', {
                     passive: true,
-                    checkFn(type, event) {
+                    filter(type, event) {
                         event.preventDefault();
 
                         return true;
@@ -2180,7 +2180,7 @@ describe('events', function() {
 
                 await once(eventTarget, 'test5-2', {
                     passive: false,
-                    checkFn(type, event) {
+                    filter(type, event) {
                         event.preventDefault();
 
                         return true;
@@ -2195,7 +2195,7 @@ describe('events', function() {
             it.skip = itSkip;
         });
 
-        it('with options.checkFn', function (done) {
+        it('with options.filter', function (done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [
@@ -2206,13 +2206,13 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 9})
+                once(ee, 'test5', {filter: (type, ...args) => args[1] === 9})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 5})
+                once(ee, 'test5', {filter: (type, ...args) => args[1] === 5})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, 'test5', {checkFn: (type, ...args) => args[1] === 1})
+                once(ee, 'test5', {filter: (type, ...args) => args[1] === 1})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
             ]).then(() => {
@@ -2233,7 +2233,7 @@ describe('events', function() {
             ee.emit('test5', ...[ 'test', 9, {} ]);
         });
 
-        it('with options.checkFn - this should be EventEmitter', async function () {
+        it('with options.filter - this should be EventEmitter', async function () {
             let passedEventEmitter: typeof ee | null = null;
 
             setImmediate(() => {
@@ -2241,7 +2241,7 @@ describe('events', function() {
             });
 
             const actualArgs = await once(ee, 'test-ee-this', {
-                checkFn() {
+                filter() {
                     passedEventEmitter = this;
 
                     return true;
@@ -2254,7 +2254,7 @@ describe('events', function() {
             expect(ee.listenerCount('error')).toBe(0);
         });
 
-        it('with options.checkFn and multi-names', function (done) {
+        it('with options.filter and multi-names', function (done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [
@@ -2265,13 +2265,13 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, ['test5-1', 'test5-2'], {checkFn: (type, ...args) => args[1] === 9})
+                once(ee, ['test5-1', 'test5-2'], {filter: (type, ...args) => args[1] === 9})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, ['test5-2', 'test5-1'], {checkFn: (type, ...args) => args[1] === 5})
+                once(ee, ['test5-2', 'test5-1'], {filter: (type, ...args) => args[1] === 5})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
-                once(ee, ['test5-1', 'test5-2'], {checkFn: (type, ...args) => args[1] === 1})
+                once(ee, ['test5-1', 'test5-2'], {filter: (type, ...args) => args[1] === 1})
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch(err => (error = err)),
             ]).then(() => {
@@ -2300,7 +2300,17 @@ describe('events', function() {
             ee.emit('test5-2', ...[ 'test', 9, {} ]);
         });
 
-        describe('abortable EventEmitter.once', function() {
+        describe('abortable EventEmitterEx.once', function() {
+            it('simple case', async function() {
+                await EventEmitterEx.once(ee, 'myevent', {
+                    signal: AbortSignal.abort(),
+                }).then(() => {
+                    throw new Error('test failed');
+                }).catch(err => {
+                    expect(err.code).toBe(/*DOMException.ABORT_ERR*/20);
+                });
+            });
+
             it('with AbortSignal', function (done) {
                 let error: DOMException|void = void 0;
                 let counter = 0;
@@ -2832,6 +2842,7 @@ describe('events', function() {
                 */
             }
 
+            // TypeScript should emit this type for listener: `(a: string, n1: number, n2: number, n3: number) => void`
             ee.on('test1', (a, n1, n2, n3) => {
                 expect(typeof a).toBe('string');
                 expect(typeof n1).toBe('number');
@@ -2839,12 +2850,15 @@ describe('events', function() {
                 expect(typeof n3).toBe('number');
             });
 
-            ee.on('test2', (eventName, listener, a) => {
+            // TypeScript should emit this type for listener: `(eventName: EventName, listener: Listener, a: string, b: number) => void`
+            ee.on('test2', (eventName, listener, a, b) => {
                 expect(typeof eventName).toBe('string');
                 expect(typeof listener).toBe('function');
                 expect(typeof a).toBe('string');
+                expect(typeof b).toBe('number');
             });
 
+            // TypeScript should emit this names and types for arguments: `name: EventName, listener: Listener, a: string, b: number`
             ee.emit('test2', 'test', () => {}, 'test', 123);
         });
     });
