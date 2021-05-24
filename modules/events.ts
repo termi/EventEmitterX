@@ -57,6 +57,16 @@ export declare type DefaultEventMap = {
     [event in EventName]: Listener;
 };
 
+interface ICounter {
+    /**
+     * Will be called on every [EventEmitterEx#emit]{@link EventEmitterEx.emit} call
+     *
+     * @see {Console.count}
+     * @see [MDN console.count()]{@link https://developer.mozilla.org/en-US/docs/Web/API/Console/count}
+     */
+    count: (eventName: EventName) => void;
+}
+
 interface Options {
     maxListeners?: number;
     // listener can be registered at most once per event type
@@ -66,6 +76,12 @@ interface Options {
     // support DOMEventTarget.handleEvent
     supportHandleEvent?: boolean;
      */
+    /**
+     * If passed, call `counter.count(eventName)` for every [EventEmitterEx#emit]{@link EventEmitterEx.emit} call.
+     *
+     * {@link global.console} is valid value for this option.
+     */
+    emitCounter?: ICounter|Console;
 }
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
@@ -251,6 +267,8 @@ const EventEmitterEx_Flags_has_error_listener = 1 << 10;
 const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
 const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
 const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
+const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 14;
+const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
@@ -261,6 +279,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     _maxListeners = Infinity;
 
     private _f = 0;
+    private _emitCounter: ICounter|Console|void;
 
     /* todo: add handleEvent support
     // supportHandleEvent, support DOMEventTarget.handleEvent
@@ -276,6 +295,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 listenerOncePerEventType,
                 // supportHandleEvent,
                 captureRejections,
+                emitCounter,
             } = options;
 
             if (maxListeners !== void 0) {
@@ -296,7 +316,27 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 this._she = supportHandleEvent;
             }
             */
+            if (emitCounter) {
+                this._emitCounter = emitCounter;
+
+                if (emitCounter === console || emitCounter instanceof Object.getPrototypeOf(console).constructor) {
+                    this._f |= EventEmitterEx_Flags_emitCounter_isConsole;
+                }
+            }
         }
+    }
+
+    destructor() {
+        this._f |= EventEmitterEx_Flags_destroyed;
+        this._emitCounter = void 0;
+
+        this.removeAllListeners();
+
+        this._addListener = function _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean) {
+            console.warn('Attempt to add listener on destroyed emitter', this, { event, once, prepend });
+
+            return this;
+        };
     }
 
     get [kCapture]() {
@@ -319,6 +359,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     // @ts-ignore
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
+        const emitCounter = this._emitCounter;
         const handler = this._events[event];
         const argumentsLength = arguments.length;
 
@@ -404,6 +445,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
 
+                if (emitCounter) {
+                    if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
+                        emitCounter.count(_eventNameToString(event));
+                    }
+                    else {
+                        (emitCounter as ICounter).count(event);
+                    }
+                }
+
                 return true;
             }
 
@@ -470,6 +520,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
 
+                if (emitCounter) {
+                    if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
+                        emitCounter.count(_eventNameToString(event));
+                    }
+                    else {
+                        (emitCounter as ICounter).count(event);
+                    }
+                }
+
                 return true;
             }
         }
@@ -495,6 +554,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 // @ts-ignore
                 error.context = err;
                 throw error;
+            }
+        }
+
+        if (emitCounter) {
+            if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
+                emitCounter.count(_eventNameToString(event));
+            }
+            else {
+                (emitCounter as ICounter).count(event);
             }
         }
 
@@ -1867,6 +1935,20 @@ export {errorMonitor, captureRejectionSymbol};
 export const once = EventEmitterEx.once;
 
 export default EventEmitterEx;
+
+/**
+ * @private
+ * @param eventName
+ */
+function _eventNameToString(eventName: EventName) {
+    if (typeof eventName === 'symbol') {
+        const {description = ''} = eventName;
+
+        return description ? `Symbol(${description})` : `Symbol()`;
+    }
+
+    return String(eventName);
+}
 
 /**
  * @private

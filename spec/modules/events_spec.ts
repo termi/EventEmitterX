@@ -125,6 +125,101 @@ describe('events', function() {
             });
         });
 
+        describe('with options.counter', function () {
+            it('should call `counter.count(eventName)` for every `EventEmitterEx#emit`', function () {
+                const event1 = 'test-event1';
+                const event2 = 'test-event2';
+                const numericEventType = 123;
+                const testSymbol = Symbol('testSymbol');
+                const counters = {
+                    [event1]: 0,
+                    [event2]: 0,
+                    [numericEventType]: 0,
+                    [testSymbol]: 0,
+                };
+
+                {
+                    const ee = new EventEmitter({
+                        emitCounter: {
+                            count(eventName: EventName) {
+                                counters[eventName]++;
+                            },
+                        },
+                    });
+
+                    ee.emit(event1);
+                    ee.emit(event2);
+                    ee.emit(event2);
+                    ee.emit(numericEventType);
+                    ee.emit(testSymbol);
+
+                    expect(counters[event1]).toBe(1);
+                    expect(counters[event2]).toBe(2);
+                    expect(counters[numericEventType]).toBe(1);
+                    expect(counters[testSymbol]).toBe(1);
+                }
+
+                {
+                    const emitCounter = {
+                        count(eventName: EventName) {
+                            counters[eventName]++;
+                        },
+                    };
+                    const emitCounter_count = emitCounter.count = jest.fn(emitCounter.count);
+                    const ee = new EventEmitter({
+                        emitCounter,
+                    });
+
+                    ee.emit(event1);
+                    ee.emit(event2);
+                    ee.emit(event2);
+                    ee.emit(numericEventType);
+                    ee.emit(testSymbol);
+
+                    expect(emitCounter_count).toHaveBeenCalled();
+                    expect(emitCounter_count.mock.calls).toEqual([
+                        [ event1 ],
+                        [ event2 ],
+                        [ event2 ],
+                        [ numericEventType ],
+                        [ testSymbol ],
+                    ]);
+                }
+            });
+
+            it('options.counter as global.console', function () {
+                const eventType = 'test-event1';
+                const numericEventType = 123;
+                const testSymbol = Symbol('testSymbol');
+                const anonymous_testSymbol = Symbol();
+                const console_count = console.count;
+                const console_count_mock = jest.fn(console_count);
+
+                console.count = console_count_mock;
+
+                {
+                    const ee = new EventEmitter({
+                        emitCounter: console,
+                    });
+
+                    ee.emit(eventType);
+                    ee.emit(numericEventType);
+                    ee.emit(testSymbol);
+                    ee.emit(anonymous_testSymbol);
+
+                    expect(console_count_mock).toHaveBeenCalled();
+                    expect(console_count_mock.mock.calls).toEqual([
+                        [ eventType ],
+                        [ String(numericEventType) ],
+                        [ `Symbol(${testSymbol.description})` ],
+                        [ `Symbol()` ],
+                    ]);
+                }
+
+                console.count = console_count;
+            });
+        });
+
         describe('#on/#addListener + #once + #prependListener + #prependOnceListener', function () {
             it('should returns this', function () {
                 const ee = new EventEmitter();
