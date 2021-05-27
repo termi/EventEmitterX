@@ -3,6 +3,7 @@
 // see: https://github.com/nodejs/node/blob/master/lib/events.js
 
 // todo: Изучить [DOM-compatible EventTarget](https://github.com/yiminghe/ts-event-target/blob/main/src/index.ts)
+// todo: Изучить [eventtargeter](https://github.com/brettz9/eventdispatcher.js/blob/master/EventTarget-es6.js)
 // todo: Реализовать EventTarget (для старых версий nodejs):
 //  копировать код из https://github.com/nodejs/node/blob/master/lib/internal/event_target.js
 //  - тесты:

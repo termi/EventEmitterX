@@ -32,6 +32,7 @@ import events, {
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import {AbortControllersGroup, AbortSignal} from 'termi@abortable';
+import LoggerCap from '../../utils/LoggerCap';
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -125,8 +126,8 @@ describe('events', function() {
             });
         });
 
-        describe('with options.counter', function () {
-            it('should call `counter.count(eventName)` for every `EventEmitterEx#emit`', function () {
+        describe('with options.emitCounter', function () {
+            it('should call `emitCounter.count(eventName)` for every `EventEmitterEx#emit`', function () {
                 const event1 = 'test-event1';
                 const event2 = 'test-event2';
                 const numericEventType = 123;
@@ -187,11 +188,12 @@ describe('events', function() {
                 }
             });
 
-            it('options.counter as global.console', function () {
+            it('options.emitCounter as global.console', function () {
                 const eventType = 'test-event1';
                 const numericEventType = 123;
                 const testSymbol = Symbol('testSymbol');
-                const anonymous_testSymbol = Symbol();
+                const anonymous_testSymbol1 = Symbol();
+                const anonymous_testSymbol2 = Symbol();
                 const console_count = console.count;
                 const console_count_mock = jest.fn(console_count);
 
@@ -205,7 +207,11 @@ describe('events', function() {
                     ee.emit(eventType);
                     ee.emit(numericEventType);
                     ee.emit(testSymbol);
-                    ee.emit(anonymous_testSymbol);
+                    // will emit `Symbol(): 1` to console
+                    ee.emit(anonymous_testSymbol1);
+                    // will emit `Symbol(): 2` to console although anonymous_testSymbol1 != anonymous_testSymbol2, cause
+                    //  of `console`.time-methods doesn't have `Symbol()` support.
+                    ee.emit(anonymous_testSymbol2);
 
                     expect(console_count_mock).toHaveBeenCalled();
                     expect(console_count_mock.mock.calls).toEqual([
@@ -213,10 +219,42 @@ describe('events', function() {
                         [ String(numericEventType) ],
                         [ `Symbol(${testSymbol.description})` ],
                         [ `Symbol()` ],
+                        [ `Symbol()` ],
                     ]);
                 }
 
                 console.count = console_count;
+            });
+
+            it('options.emitCounter as LoggerCap', function () {
+                const eventType = 'test-event1';
+                const numericEventType = 123;
+                const testSymbol = Symbol('testSymbol');
+                const anonymous_testSymbol1 = Symbol();
+                const anonymous_testSymbol2 = Symbol();
+
+                {
+                    const logger = new LoggerCap({
+                        addTime: false,
+                    });
+                    const ee = new EventEmitter({
+                        emitCounter: logger,
+                    });
+
+                    ee.emit(eventType);
+                    ee.emit(numericEventType);
+                    ee.emit(testSymbol);
+                    // will emit `Symbol(): 1` to console
+                    ee.emit(anonymous_testSymbol1);
+                    // will emit `Symbol(): 1` to console unlike `console` behaviour
+                    ee.emit(anonymous_testSymbol2);
+
+                    expect(logger.countValue(eventType)).toBe(1);
+                    expect(logger.countValue(numericEventType)).toBe(1);
+                    expect(logger.countValue(testSymbol)).toBe(1);
+                    expect(logger.countValue(anonymous_testSymbol1)).toBe(1);
+                    expect(logger.countValue(anonymous_testSymbol2)).toBe(1);
+                }
             });
         });
 
