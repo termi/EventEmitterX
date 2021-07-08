@@ -8,6 +8,26 @@ require('termi@polyfills');
 
 const NativeAbortController = AbortController;
 
+/*
+{// JSDOM
+    // todo: Начиная с "jest": "^27.0.1" понадобиться вручную инсталировать DOM-классы в globalThis. Примерно вот так:
+    //  (Но код не до конца дописан, может быть ещё что-то нужно инсталировать из jsdom).
+    const detect_browser_env = ["Window", "Worker", "AudioWorklet"];
+
+    const JSDOM_EventTarget_lib = require('jsdom/lib/jsdom/living/generated/EventTarget');
+    // node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js: exports.install
+    JSDOM_EventTarget_lib.install(globalThis, detect_browser_env);
+
+    const JSDOM_Event_lib = require('jsdom/lib/jsdom/living/generated/Event');
+    // node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js: exports.install
+    JSDOM_Event_lib.install(globalThis, detect_browser_env);
+}
+*/
+
+// The EventTarget comes from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
+const NodeEventTarget = EventTarget;
+
+// Удаляем AbortController/AbortSignal после require(jsdom), чтобы не использовались версии из jsdom
 // also check AbortController polyfill
 {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -40,9 +60,6 @@ const {
     listenerCount,
     createDomEventLike,
 } = require('../../spec_utils/EventTarget_helpers');
-
-// The EventTarget comes from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
-const NodeEventTarget = EventTarget;
 
 let {EventEmitter} = events;
 const {errorMonitor} = events;
@@ -255,6 +272,58 @@ describe('events', function() {
                     expect(logger.countValue(anonymous_testSymbol1)).toBe(1);
                     expect(logger.countValue(anonymous_testSymbol2)).toBe(1);
                 }
+            });
+        });
+
+        describe('with options.listenerWithoutThis', function () {
+            it('with options.listenerWithoutThis = true: should not pass emitter instance to listener', function () {
+                const emitter = new EventEmitter({
+                    listenerWithoutThis: true,
+                });
+                let callCounter = 0;
+                const callContexts: undefined[] = [];
+                const onTest = function(this: undefined) {
+                    callCounter++;
+                    callContexts.push(this);
+                };
+
+                emitter.on('test', onTest);
+
+                emitter.emit('test');
+                emitter.emit('test', 1);
+                emitter.emit('test', 1, 2);
+                emitter.emit('test', 1, 2, 3);
+                emitter.emit('test', 1, 2, 3, 4);
+                emitter.emit('test', 1, 2, 3, 4, 5);
+                emitter.emit('test', ...(new Array(25)).fill(1));
+
+                expect(callCounter).toBe(7);
+                expect(callContexts).toEqual((new Array(callCounter)).fill(void 0));
+            });
+
+            it('(default) with options.listenerWithoutThis = false: should pass emitter instance to listener', function () {
+                const emitter = new EventEmitter({
+                    listenerWithoutThis: false,
+                });
+                let callCounter = 0;
+                const callContexts: EventEmitterEx[] = [];
+                const onTest = function(this: EventEmitterEx) {
+                    callCounter++;
+                    callContexts.push(this);
+                };
+
+                emitter.on('test', onTest);
+
+                emitter.emit('test');
+                emitter.emit('test', 1);
+                emitter.emit('test', 1, 2);
+                emitter.emit('test', 1, 2, 3);
+                emitter.emit('test', 1, 2, 3, 4);
+                emitter.emit('test', 1, 2, 3, 4, 5);
+                emitter.emit('test', ...(new Array(25)).fill(1));
+
+                expect(callCounter).toBe(7);
+                expect(callContexts).toEqual((new Array(callCounter)).fill(emitter));
             });
         });
 
@@ -1668,6 +1737,8 @@ describe('events', function() {
                 expect(ee.hasListener('test_4', handler4)).toBe(true);
             });
         });
+
+
     }) as EmptyFunction);
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js

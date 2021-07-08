@@ -83,6 +83,11 @@ interface Options {
      * {@link global.console} is valid value for this option.
      */
     emitCounter?: ICounter|Console;
+    /**
+     * By default, `EventEmitterEx` calls listeners with a `this` value of the emitter instance.
+     * Passing `true` to this parameter will cause to calls listener functions without any `this` value.
+     */
+    listenerWithoutThis?: boolean;
 }
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
@@ -264,6 +269,20 @@ const kCapture = Symbol('kCapture');
 // listenerOncePerEventType, listener can be registered at most once per event type
 const EventEmitterEx_Flags_listenerOncePerEventType = 1 << 1;
 const EventEmitterEx_Flags_captureRejections = 1 << 2;
+/**
+ * By default, `EventEmitterEx` calls listeners with a `this` value of the emitter instance.
+ * This flag will cause to calls listener functions without any `this` value.
+ */
+const EventEmitterEx_Flags_listenerWithoutThis = 1 << 3;
+// TODO:
+// /**
+//  * Disable 'error' event. Any error in listener will break listeners calls and throw error.
+//  */
+// const EventEmitterEx_Flags_noErrorCatch = 1 << 4;
+// /**
+//  * Disable 'newListener' and 'removeListener' events.
+//  */
+// const EventEmitterEx_Flags_noListenersChangeHandling = 1 << 5;
 const EventEmitterEx_Flags_has_error_listener = 1 << 10;
 const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
 const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
@@ -297,6 +316,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 // supportHandleEvent,
                 captureRejections,
                 emitCounter,
+                listenerWithoutThis,
             } = options;
 
             if (maxListeners !== void 0) {
@@ -311,6 +331,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     throw new Error(`options.captureRejections should be of type "boolean" but has "${typeof captureRejections}" type`);
                 }
                 this._f |= EventEmitterEx_Flags_captureRejections;
+            }
+            if (listenerWithoutThis) {
+                this._f |= EventEmitterEx_Flags_listenerWithoutThis;
             }
             /*
             if (supportHandleEvent !== void 0) {
@@ -370,6 +393,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             const {_f} = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
             const captureRejections = _checkBit(_f, EventEmitterEx_Flags_captureRejections);
+            const listenerWithoutThis = _checkBit(_f, EventEmitterEx_Flags_listenerWithoutThis);
 
             if (isErrorEvent) {
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
@@ -409,6 +433,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
 
             const isFn = typeof handler === 'function';
+            const context = listenerWithoutThis ? void 0 : this;
 
             if (isFn) {
                 const func_handler = handler as Function;
@@ -416,22 +441,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 switch (argumentsLength) {
                     case 1:
-                        result = func_handler.call(this);
+                        result = func_handler.call(context);
                         break;
                     case 2:
-                        result = func_handler.call(this, a1);
+                        result = func_handler.call(context, a1);
                         break;
                     case 3:
-                        result = func_handler.call(this, a1, a2);
+                        result = func_handler.call(context, a1, a2);
                         break;
                     case 4:
-                        result = func_handler.call(this, a1, a2, a3);
+                        result = func_handler.call(context, a1, a2, a3);
                         break;
                     // slower
                     default: {
                         const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
 
-                        result = func_handler.apply(this, args);
+                        result = func_handler.apply(context, args);
                     }
                 }
 
@@ -469,41 +494,41 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     case 1:
                         if (captureRejections) {
                             /*@__NOINLINE__*/
-                            emitNone_array_catch(listeners, this, event);
+                            emitNone_array_catch(listeners, context, event);
                         }
                         else {
                             /*@__NOINLINE__*/
-                            emitNone_array(listeners, this);
+                            emitNone_array(listeners, context);
                         }
                         break;
                     case 2:
                         if (captureRejections) {
                             /*@__NOINLINE__*/
-                            emitOne_array_catch(listeners, this, a1, event);
+                            emitOne_array_catch(listeners, context, a1, event);
                         }
                         else {
                             /*@__NOINLINE__*/
-                            emitOne_array(listeners, this, a1);
+                            emitOne_array(listeners, context, a1);
                         }
                         break;
                     case 3:
                         if (captureRejections) {
                             /*@__NOINLINE__*/
-                            emitTwo_array_catch(listeners, this, a1, a2, event);
+                            emitTwo_array_catch(listeners, context, a1, a2, event);
                         }
                         else {
                             /*@__NOINLINE__*/
-                            emitTwo_array(listeners, this, a1, a2);
+                            emitTwo_array(listeners, context, a1, a2);
                         }
                         break;
                     case 4:
                         if (captureRejections) {
                             /*@__NOINLINE__*/
-                            emitThree_array_catch(listeners, this, a1, a2, a3, event);
+                            emitThree_array_catch(listeners, context, a1, a2, a3, event);
                         }
                         else {
                             /*@__NOINLINE__*/
-                            emitThree_array(listeners, this, a1, a2, a3);
+                            emitThree_array(listeners, context, a1, a2, a3);
                         }
                         break;
                     // slower
@@ -512,11 +537,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                         if (captureRejections) {
                             /*@__NOINLINE__*/
-                            emitMany_array_catch(listeners, this, args, event);
+                            emitMany_array_catch(listeners, context, args, event);
                         }
                         else {
                             /*@__NOINLINE__*/
-                            emitMany_array(listeners, this, args);
+                            emitMany_array(listeners, context, args);
                         }
                     }
                 }
@@ -2112,14 +2137,14 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     return wrapped as EMD<EventMap>[EventKey];
 }
 
-function emitNone_array(listeners: Function[], self: EventEmitterEx) {
+function emitNone_array(listeners: Function[], self: EventEmitterEx|undefined) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self);
     }
 }
 
-function emitNone_array_catch(listeners: Function[], self: EventEmitterEx, event: EventName) {
+function emitNone_array_catch(listeners: Function[], self: EventEmitterEx|undefined, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self);
@@ -2130,14 +2155,14 @@ function emitNone_array_catch(listeners: Function[], self: EventEmitterEx, event
     }
 }
 
-function emitOne_array(listeners: Function[], self: EventEmitterEx, arg1: any) {
+function emitOne_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1);
     }
 }
 
-function emitOne_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, event: EventName) {
+function emitOne_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1);
@@ -2148,14 +2173,14 @@ function emitOne_array_catch(listeners: Function[], self: EventEmitterEx, arg1: 
     }
 }
 
-function emitTwo_array(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any) {
+function emitTwo_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2);
     }
 }
 
-function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, event: EventName) {
+function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2);
@@ -2166,14 +2191,14 @@ function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx, arg1: 
     }
 }
 
-function emitThree_array(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any) {
+function emitThree_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2, arg3);
     }
 }
 
-function emitThree_array_catch(listeners: Function[], self: EventEmitterEx, arg1: any, arg2: any, arg3: any, event: EventName) {
+function emitThree_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2, arg3);
@@ -2184,14 +2209,14 @@ function emitThree_array_catch(listeners: Function[], self: EventEmitterEx, arg1
     }
 }
 
-function emitMany_array(listeners: Function[], self: EventEmitterEx, args: any[]) {
+function emitMany_array(listeners: Function[], self: EventEmitterEx|undefined, args: any[]) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].apply(self, args);
     }
 }
 
-function emitMany_array_catch(listeners: Function[], self: EventEmitterEx, args: any[], event: EventName) {
+function emitMany_array_catch(listeners: Function[], self: EventEmitterEx|undefined, args: any[], event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].apply(self, args);
