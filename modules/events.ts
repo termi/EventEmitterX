@@ -18,6 +18,7 @@ import {
     createAbortError,
     isAbortSignal,
     AbortControllersGroup,
+    AbortSignal,
 } from 'termi@abortable';
 
 type Timeout = ReturnType<typeof setTimeout>;
@@ -1302,7 +1303,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const _emitter = (emitter as INodeEventEmitter|EventEmitterEx);
         const staticOnceEventTargetOptions = isEventTarget && options ? options as StaticOnceOptionsEventTarget : void 0;
         const eventTargetListenerOptions = isEventTarget && staticOnceEventTargetOptions && (staticOnceEventTargetOptions.passive !== void 0 || staticOnceEventTargetOptions.capture !== void 0)
-            ? { passive: staticOnceEventTargetOptions.passive, capture: staticOnceEventTargetOptions.capture }
+            ? {
+                passive: staticOnceEventTargetOptions.passive,
+                capture: staticOnceEventTargetOptions.capture,
+            } as (AddEventListenerOptions & { signal?: AbortSignal })
             : void 0
         ;
         const usePrependListener = !!staticOnceOptions.prepend;
@@ -1345,6 +1349,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 // Return early if already aborted.
                 if (signal.aborted) {
                     return _Promise.reject(createAbortError());
+                }
+
+                if (eventTargetListenerOptions && isEventTarget && _eventTargetHasSignalSupport(emitter as DOMEventTarget)) {
+                    eventTargetListenerOptions.signal = signal;
                 }
             }
         }
@@ -2087,6 +2095,58 @@ export function isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Obje
     return _isEventTargetCompatible(maybeDOMEventTarget)
         && typeof (maybeDOMEventTarget as DOMEventTarget).dispatchEvent === 'function'
     ;
+}
+
+const _kEventTargetSignalSupport = Symbol('kEventTargetSignalSupport');
+const _abortedSignal = AbortSignal.abort();
+const _noop = function() {};
+
+/**
+ * // a copy of cftools/web/DOMTools.ts~eventTargetHasSupport rewrite to test only signal
+ * @param eventTarget
+ * @private
+ */
+function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
+    const preValue = eventTarget[_kEventTargetSignalSupport] as boolean|void;
+
+    if (preValue !== void 0) {
+        return preValue;
+    }
+
+    // assume the feature isn't supported
+    let supportsFeature: true|false = false;
+    // create options object with a getter to see if its once property is accessed
+    // see `Let capture, passive, and once be the result of flattening more options.` at [DOM Spec#addEventListener](https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener)
+    const opts = Object.defineProperty({ _v: void 0 }, 'signal', {
+        get() {
+            supportsFeature = true;
+
+            return this._v !== void 0 ? this._v : _abortedSignal;
+        },
+        set(value) {
+            this._v = value;
+        },
+    }) as AddEventListenerOptions;
+
+    const testEventType = `signalTest`;
+
+    // Another option for this code would be adding try/catch around addEventListener/removeEventListener, but
+    //  it will hide the problem with incorrect eventTarget arguments, therefore, you need a good reason to add try/catch.
+
+    // Synchronously test out our options
+    eventTarget.addEventListener(testEventType, _noop, opts);
+    eventTarget.removeEventListener(testEventType, _noop, opts);
+
+    /*
+    // Another variant without any listener
+    // https://github.com/Modernizr/Modernizr/issues/1894#issuecomment-254199728
+    // See `If listener’s callback is null, then return.` at [DOM Spec#add-an-event-listener](https://dom.spec.whatwg.org/#add-an-event-listener)
+    eventTarget.addEventListener(testEventType, null, opts);
+    */
+
+    eventTarget[_kEventTargetSignalSupport] = supportsFeature;
+
+    return supportsFeature;
 }
 
 type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EMD<EventMap> = EventName> = {

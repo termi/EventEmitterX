@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 // eslint-disable-next-line no-unused-vars,@typescript-eslint/no-unused-vars
 /* globals describe, xdescribe, it, xit, expect */
 'use strict';
@@ -6,7 +9,7 @@ import 'jest-extended';
 
 require('termi@polyfills');
 
-const NativeAbortController = AbortController;
+const NativeAbortController = globalThis.AbortController;
 
 /*
 {// JSDOM
@@ -51,8 +54,9 @@ import events, {
     Listener,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
-import {AbortControllersGroup, AbortSignal} from 'termi@abortable';
+import {AbortController, AbortControllersGroup, AbortSignal} from 'termi@abortable';
 import LoggerCap from '../../utils/LoggerCap';
+import {FakeEventTarget} from "../../spec_utils/FakeEventTarget";
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -2347,7 +2351,7 @@ describe('events', function() {
                 });
             });
 
-            it.skip('with options.passive=true', async function () {
+            it.skip('with options.passive=true', async function() {
                 const data = {
                     test: true,
                 };
@@ -2371,8 +2375,7 @@ describe('events', function() {
                 });
             });
 
-
-            it.skip('with options.passive=false', async function () {
+            it.skip('with options.passive=false', async function() {
                 const data = {
                     test: true,
                 };
@@ -2394,6 +2397,77 @@ describe('events', function() {
                     expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
                     expect(event.defaultPrevented).toBe(true);
                 });
+            });
+
+            it.skip('with options.signal should pass signal to compatible addEventListener', async function() {
+                const fakeEventTarget = new FakeEventTarget();
+                const ac = new AbortController();
+                const signal = ac.signal;
+                const type = 'test-options.signal';
+
+                fakeEventTarget.initSupports({ signal: true });
+
+                const promise = once(fakeEventTarget, type, {
+                    passive: false,
+                    signal,
+                });
+
+                expect(listenerCount(fakeEventTarget, type)).toBe(1);
+                expect(listenerCount(signal, 'abort')).toBe(2);
+
+                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal; });
+
+                expect(addEventListenerOptions.signal).toBe(signal);
+
+                ac.abort();
+
+                let wasCatch = false;
+
+                await promise.catch(error => {
+                    wasCatch = true;
+
+                    expect(String(error).includes('Aborted')).toBe(true);
+                    expect(listenerCount(fakeEventTarget, type)).toBe(0);
+                    expect(listenerCount(signal, 'abort')).toBe(0);
+                });
+
+                expect(wasCatch).toBe(true);
+            });
+
+            it.skip('with options.signal should NOT pass signal to incompatible addEventListener', async function() {
+                const fakeEventTarget = new FakeEventTarget();
+                const ac = new AbortController();
+                const signal = ac.signal;
+                const type = 'test-options.signal';
+
+                fakeEventTarget.initSupports({ signal: false });
+
+                const promise = once(fakeEventTarget, type, {
+                    passive: false,
+                    signal,
+                });
+
+                expect(listenerCount(fakeEventTarget, type)).toBe(1);
+                expect(listenerCount(signal, 'abort')).toBe(1);
+
+                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal; });
+
+                expect(addEventListenerOptions.signal).not.toBe(signal);
+                expect(addEventListenerOptions.signal).not.toBeDefined();
+
+                ac.abort();
+
+                let wasCatch = false;
+
+                await promise.catch(error => {
+                    wasCatch = true;
+
+                    expect(String(error).includes('Aborted')).toBe(true);
+                    expect(listenerCount(fakeEventTarget, type)).toBe(0);
+                    expect(listenerCount(signal, 'abort')).toBe(0);
+                });
+
+                expect(wasCatch).toBe(true);
             });
 
             it.skip = itSkip;
@@ -2771,14 +2845,16 @@ describe('events', function() {
                 expect(listenerCount(acg.signal, 'abort')).toBe(0);
             });
 
-            it(`with AbortSignal and AbortController's`, function (done) {
+            it(`with AbortSignal and AbortController's`, async function () {
+                const promises: Promise<any>[] = [];
+
                 {
                     let error: DOMException|void = void 0;
                     const ac1 = new AbortController();
                     const ac2 = new AbortController();
                     const ac3 = new AbortController();
 
-                    once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
+                    const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
                         .catch(err => {
                             error = err;
                         })
@@ -2791,10 +2867,9 @@ describe('events', function() {
                             expect(listenerCount(ac1.signal, 'abort')).toBe(0);
                             expect(listenerCount(ac2.signal, 'abort')).toBe(0);
                             expect(listenerCount(ac3.signal, 'abort')).toBe(0);
-
-                            done();
                         })
                     ;
+                    promises.push(promise);
 
                     expect(listenerCount(ac1.signal, 'abort')).toBe(1);
                     expect(listenerCount(ac2.signal, 'abort')).toBe(1);
@@ -2808,7 +2883,7 @@ describe('events', function() {
                     const ac2 = new AbortController();
                     const ac3 = new AbortController();
 
-                    once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
+                    const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
                         .catch(err => {
                             error = err;
                         })
@@ -2821,10 +2896,9 @@ describe('events', function() {
                             expect(listenerCount(ac1.signal, 'abort')).toBe(0);
                             expect(listenerCount(ac2.signal, 'abort')).toBe(0);
                             expect(listenerCount(ac3.signal, 'abort')).toBe(0);
-
-                            done();
                         })
                     ;
+                    promises.push(promise);
 
                     expect(listenerCount(ac1.signal, 'abort')).toBe(1);
                     expect(listenerCount(ac2.signal, 'abort')).toBe(1);
@@ -2832,6 +2906,8 @@ describe('events', function() {
 
                     ac1.abort();
                 }
+
+                await Promise.all(promises);
             });
 
             it('with AbortSignal and ServerTiming', function (done) {
