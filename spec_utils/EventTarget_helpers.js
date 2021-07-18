@@ -1,10 +1,24 @@
+'use strict';
 
+/**
+ * @type {function(emitter: EventEmitter, type: string): function[]}
+ */
+let node_getEventListeners = (emitter, type) => [];// eslint-disable-line no-unused-vars
+let has_node_getEventListeners = false;
 
-const {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
-    getEventListeners: node_getEventListeners,
-} = require('events');
+try {
+    const {
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        getEventListeners: _node_getEventListeners,
+    } = require('events');
+
+    node_getEventListeners = _node_getEventListeners;
+    has_node_getEventListeners = true;
+}
+catch (e) {
+    // ignore
+}
 
 const event_target = Symbol.for('nodejs.event_target');
 
@@ -43,7 +57,7 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
         maybeEventTarget.off = off;
         maybeEventTarget.remoteListener = off;
 
-        if (maybeEventTarget[event_target]) {
+        if (has_node_getEventListeners && maybeEventTarget[event_target]) {
             // nodejs native EventTarget
             maybeEventTarget.listenerCount = function(type) {
                 return node_getEventListeners(this, type).length;
@@ -78,15 +92,20 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
     return false;
 };
 
+/**
+ * @param {Object|function} listenersObject
+ * @param {string} type
+ * @returns {EventListenerOrEventListenerObject[]}
+ */
 function handlersFromListenersObject(listenersObject, type) {
     if (typeof listenersObject === 'object' && listenersObject) {
         const handlers = listenersObject[type];
 
-        if (typeof handlers === 'function') {
-            return [ handlers ];
-        }
         if (Array.isArray(handlers)) {
             return handlers;
+        }
+        if (typeof handlers === 'function' || typeof (/** @type {EventListenerObject} */handlers) === 'object') {
+            return [ handlers ];
         }
 
         return [];
@@ -97,14 +116,14 @@ function handlersFromListenersObject(listenersObject, type) {
  *
  * @param {EventTarget|EventEmitter} emitter
  * @param {number|string|symbol} type
- * @returns {[]}
+ * @returns {EventListenerOrEventListenerObject[]}
  */
 function getEventListeners(emitter, type) {
     if (typeof emitter.listeners === 'function') {
         return emitter.listeners(type);
     }
 
-    if (emitter[event_target]) {
+    if (has_node_getEventListeners && emitter[event_target]) {
         // nodejs native EventTarget
         return node_getEventListeners(emitter, type);
     }
@@ -117,7 +136,7 @@ function getEventListeners(emitter, type) {
             const eventTargetImpl = emitter[symbols[0]];
 
             if (eventTargetImpl) {
-                const listeners = eventTargetImpl._eventListeners || eventTargetImpl.listeners || eventTargetImpl.events || eventTargetImpl._events;
+                const listeners = eventTargetImpl._eventListeners || eventTargetImpl.listeners || eventTargetImpl.events || eventTargetImpl._events || emitter._listeners;
                 const handlers = handlersFromListenersObject(listeners, type);
 
                 if (handlers) {
@@ -128,7 +147,7 @@ function getEventListeners(emitter, type) {
     }
 
     {
-        const listeners = emitter.listeners || emitter.events || emitter._events || emitter._eventListeners;
+        const listeners = emitter.listeners || emitter.events || emitter._events || emitter._eventListeners || emitter._listeners;
         const handlers = handlersFromListenersObject(listeners, type);
 
         if (handlers) {
