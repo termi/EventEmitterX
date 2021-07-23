@@ -135,6 +135,46 @@ describe('events', function() {
             });
         });
 
+        describe('destructor', function () {
+            it('should remove all listeners', function () {
+                const ee = new EventEmitter();
+
+                ee.on('foo', () => {});
+                ee.addListener('foo', () => {});
+                ee.once('foo', () => {});
+                ee.prependListener('foo', () => {});
+                ee.prependOnceListener('foo', () => {});
+
+                expect(ee.listenerCount('foo')).toBe(5);
+
+                ee.destructor();
+
+                expect(ee.listenerCount('foo')).toBe(0);
+            });
+
+            it('should not add any listener after destroying', function () {
+                const ee = new EventEmitter();
+
+                ee.on('foo', () => {});
+                ee.addListener('foo', () => {});
+                ee.once('foo', () => {});
+                ee.prependListener('foo', () => {});
+                ee.prependOnceListener('foo', () => {});
+
+                expect(ee.listenerCount('foo')).toBe(5);
+
+                ee.destructor();
+
+                ee.on('foo', () => {});
+                ee.addListener('foo', () => {});
+                ee.once('foo', () => {});
+                ee.prependListener('foo', () => {});
+                ee.prependOnceListener('foo', () => {});
+
+                expect(ee.listenerCount('foo')).toBe(0);
+            });
+        });
+
         describe('events is an alias for EventEmitter', function () {
             it('instanceof', function () {
                 expect(new EventEmitter()).toBeInstanceOf(events);
@@ -518,6 +558,51 @@ describe('events', function() {
                     ee.removeListener('test_duplicates_2', listener2_1);
                     ee.removeListener('test_duplicates_2', listener2_2);
                     expect(ee.listenerCount('test_duplicates_2')).toBe(0);
+                }
+            });
+
+            it(`should emit 'duplicatedListener' if options.listenerOncePerEventType = true`, function () {
+                let counter = 0;
+                let duplicatesCounter = 0;
+                const listener1 = () => { counter++; };
+                const ee = new EventEmitter({ listenerOncePerEventType: true });
+
+                // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
+                //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
+                //  что это новый listener
+                //  Поэтому, в тестах ниже, только on и addListener должны рассматриваться как добавляющие один и тот же
+                //   listener, а все остальные - добавляют свои новые обработчики.
+
+                ee.on('duplicatedListener', (event, listener) => {
+                    expect(event).toBe('test_duplicates');
+                    expect(listener).toBe(listener1);
+
+                    duplicatesCounter++;
+                });
+
+                // first subscribe
+                ee.on('test_duplicates', listener1);
+                // duplicate subscribes
+                ee.on('test_duplicates', listener1);
+                ee.addListener('test_duplicates', listener1);
+                ee.once('test_duplicates', listener1);
+                ee.prependListener('test_duplicates', listener1);
+                ee.prependOnceListener('test_duplicates', listener1);
+
+                ee.emit('test_duplicates', 123);
+
+                {// main tests
+                    expect(ee.listenerCount('duplicatedListener')).toBe(1);
+                    expect(counter).toBe(1);
+                    expect(duplicatesCounter).toBe(5);
+                }
+
+                {// cleanup
+                    ee.removeListener('test_duplicates', listener1);
+                    expect(ee.listenerCount('test_duplicates')).toBe(0);
+
+                    ee.removeAllListeners('duplicatedListener');
+                    expect(ee.listenerCount('duplicatedListener')).toBe(0);
                 }
             });
         });

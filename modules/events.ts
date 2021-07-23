@@ -288,7 +288,8 @@ const EventEmitterEx_Flags_has_error_listener = 1 << 10;
 const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
 const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
 const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
-const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 14;
+const EventEmitterEx_Flags_has_duplicatedListener_listener = 1 << 16;
+const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 21;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
@@ -344,7 +345,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (emitCounter) {
                 this._emitCounter = emitCounter;
 
-                if (emitCounter === console || emitCounter instanceof Object.getPrototypeOf(console).constructor) {
+                if (emitCounter === console
+                    // emitCounter could be console instance from another environment
+                    || _objectIsConsole(emitCounter)
+                ) {
                     this._f |= EventEmitterEx_Flags_emitCounter_isConsole;
                 }
             }
@@ -358,9 +362,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         this.removeAllListeners();
 
         this._addListener = function _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean) {
+            // todo: replace console.warn with:
+            //  const kAddListenerAfterDestroyingCallback = Symbol('kAddListenerAfterDestroyingCallback');
+            //  this[kAddListenerAfterDestroyingCallback]({ event, listener, once, prepend });
             console.warn('Attempt to add listener on destroyed emitter', this, { event, once, prepend });
 
-            return this;
+            return false;
         };
     }
 
@@ -387,6 +394,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const emitCounter = this._emitCounter;
         const handler = this._events[event];
         const argumentsLength = arguments.length;
+        let hasEnyListener = false;
 
         // todo: Вопрос: Если (isErrorEvent == true) нужно ли вызывать событие errorMonitor, если НЕТ подписок на событие 'error'.
         //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
@@ -472,91 +480,74 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
 
-                if (emitCounter) {
-                    if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
-                        emitCounter.count(_eventNameToString(event));
-                    }
-                    else {
-                        (emitCounter as ICounter).count(event);
-                    }
-                }
-
-                return true;
+                hasEnyListener = true;
             }
+            else {
+                const array_handler = handler as Function[];
 
-            const array_handler = handler as Function[];
+                if (array_handler.length) {
+                    // arrayClone
+                    const listeners = array_handler.slice();
 
-            if (array_handler.length) {
-                // arrayClone
-                const listeners = array_handler.slice();
+                    switch (argumentsLength) {
+                        // fast cases
+                        case 1:
+                            if (captureRejections) {
+                                /*@__NOINLINE__*/
+                                emitNone_array_catch(listeners, context, event);
+                            }
+                            else {
+                                /*@__NOINLINE__*/
+                                emitNone_array(listeners, context);
+                            }
+                            break;
+                        case 2:
+                            if (captureRejections) {
+                                /*@__NOINLINE__*/
+                                emitOne_array_catch(listeners, context, a1, event);
+                            }
+                            else {
+                                /*@__NOINLINE__*/
+                                emitOne_array(listeners, context, a1);
+                            }
+                            break;
+                        case 3:
+                            if (captureRejections) {
+                                /*@__NOINLINE__*/
+                                emitTwo_array_catch(listeners, context, a1, a2, event);
+                            }
+                            else {
+                                /*@__NOINLINE__*/
+                                emitTwo_array(listeners, context, a1, a2);
+                            }
+                            break;
+                        case 4:
+                            if (captureRejections) {
+                                /*@__NOINLINE__*/
+                                emitThree_array_catch(listeners, context, a1, a2, a3, event);
+                            }
+                            else {
+                                /*@__NOINLINE__*/
+                                emitThree_array(listeners, context, a1, a2, a3);
+                            }
+                            break;
+                        // slower
+                        default: {
+                            const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
 
-                switch (argumentsLength) {
-                    // fast cases
-                    case 1:
-                        if (captureRejections) {
-                            /*@__NOINLINE__*/
-                            emitNone_array_catch(listeners, context, event);
-                        }
-                        else {
-                            /*@__NOINLINE__*/
-                            emitNone_array(listeners, context);
-                        }
-                        break;
-                    case 2:
-                        if (captureRejections) {
-                            /*@__NOINLINE__*/
-                            emitOne_array_catch(listeners, context, a1, event);
-                        }
-                        else {
-                            /*@__NOINLINE__*/
-                            emitOne_array(listeners, context, a1);
-                        }
-                        break;
-                    case 3:
-                        if (captureRejections) {
-                            /*@__NOINLINE__*/
-                            emitTwo_array_catch(listeners, context, a1, a2, event);
-                        }
-                        else {
-                            /*@__NOINLINE__*/
-                            emitTwo_array(listeners, context, a1, a2);
-                        }
-                        break;
-                    case 4:
-                        if (captureRejections) {
-                            /*@__NOINLINE__*/
-                            emitThree_array_catch(listeners, context, a1, a2, a3, event);
-                        }
-                        else {
-                            /*@__NOINLINE__*/
-                            emitThree_array(listeners, context, a1, a2, a3);
-                        }
-                        break;
-                    // slower
-                    default: {
-                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
-
-                        if (captureRejections) {
-                            /*@__NOINLINE__*/
-                            emitMany_array_catch(listeners, context, args, event);
-                        }
-                        else {
-                            /*@__NOINLINE__*/
-                            emitMany_array(listeners, context, args);
+                            if (captureRejections) {
+                                /*@__NOINLINE__*/
+                                emitMany_array_catch(listeners, context, args, event);
+                            }
+                            else {
+                                /*@__NOINLINE__*/
+                                emitMany_array(listeners, context, args);
+                            }
                         }
                     }
+
+                    hasEnyListener = true;
                 }
-
-                if (emitCounter) {
-                    if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
-                        emitCounter.count(_eventNameToString(event));
-                    }
-                    else {
-                        (emitCounter as ICounter).count(event);
-                    }
-                }
-
-                return true;
             }
         }
         else if (isErrorEvent) {
@@ -584,29 +575,33 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
 
-        if (emitCounter) {
+        if (!!emitCounter && typeof emitCounter.count === 'function') {
             if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
-                emitCounter.count(_eventNameToString(event));
+                (emitCounter as Console).count(_eventNameToString(event));
             }
             else {
                 (emitCounter as ICounter).count(event);
             }
         }
 
-        return false;
+        return hasEnyListener;
     }
 
     // on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject): this;
     on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
-        return this._addListener(event, listener, false, false);
+        this._addListener(event, listener, false, false);
+
+        return this;
     }
 
     once<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
-        return this._addListener(event, listener, false, true);
+        this._addListener(event, listener, false, true);
+
+        return this;
     }
 
     // private _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EventListenerOrEventListenerObject, prepend: boolean): this;
-    protected _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean): this {
+    protected _addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey], prepend: boolean, once: boolean): boolean {
         // const {_she: supportHandleEvent} = this;
         // if (typeof listener === 'object') {
         //     console.log(listener);
@@ -628,6 +623,66 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         const existedHandlerIsFunction = typeof handler === 'function';
         let newLen: number;
 
+        if (has_newListener_listener) {
+            // todo: Разобраться, почему тут TypeScript ругается, хотя описание для 'newListener' в DefaultEventMap есть.
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            this.emit('newListener', event, listener);
+        }
+
+        if (_checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType) && handler) {
+            // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
+            //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
+            //  что это новый listener
+            let isListenerAlreadyExisted = false;
+
+            if (existedHandlerIsFunction) {
+                if (handler === listener) {
+                    isListenerAlreadyExisted = true;
+                }
+                else if (hasAnyOnceListener
+                    && (handler[sOnceListenerWrapperId] !== void 0)
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    && handler.listener === listener
+                ) {
+                    isListenerAlreadyExisted = true;
+                }
+            }
+            else {
+                const listeners = (handler as Function[]);
+
+                for (let i = listeners.length ; i-- > 0 ; ) {
+                    const handler = listeners[i];
+
+                    if (handler === listener) {
+                        isListenerAlreadyExisted = true;
+                        break;
+                    }
+                    else if (
+                        (handler[sOnceListenerWrapperId] !== void 0)
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-ignore
+                        && handler.listener === listener
+                    ) {
+                        isListenerAlreadyExisted = true;
+                        break;
+                    }
+                }
+            }
+
+            if (isListenerAlreadyExisted) {
+                if (_checkBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener)) {
+                    // todo: Добавить 'duplicatedListener' в DefaultEventMap и убрать "@ts-ignore"
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    this.emit('duplicatedListener', event, listener);
+                }
+
+                return false;
+            }
+        }
+
         if (event === 'error') {
             this._f |= EventEmitterEx_Flags_has_error_listener;
         }
@@ -640,64 +695,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         else if (event === 'removeListener') {
             this._f |= EventEmitterEx_Flags_has_removeListener_listener;
         }
-
-        if (has_newListener_listener) {
-            // todo: Разобраться, почему тут TypeScript ругается, хотя описание для 'newListener' в DefaultEventMap есть.
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            this.emit('newListener', event, listener);
-        }
-
-        if (_checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType) && handler) {
-            // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
-            //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
-            //  что это новый listener
-
-            /* todo: send 'duplicatedListener'
-            const sendDuplicatedListener = () => {
-                const event = {
-                    type: 'duplicatedListener',
-                    listenerType: 'duplicatedListener',
-                    listener,
-                };
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                this.emit(event.type, event);
-            };
-            */
-
-            if (existedHandlerIsFunction) {
-                if (handler === listener) {
-                    return this;
-                }
-                else if (hasAnyOnceListener
-                    && (handler[sOnceListenerWrapperId] !== void 0)
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
-                    && handler.listener === listener
-                ) {
-                    return this;
-                }
-            }
-            else {
-                const listeners = (handler as Function[]);
-
-                for (let i = listeners.length ; i-- > 0 ; ) {
-                    const handler = listeners[i];
-
-                    if (handler === listener) {
-                        return this;
-                    }
-                    else if (
-                        (handler[sOnceListenerWrapperId] !== void 0)
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-ignore
-                        && handler.listener === listener
-                    ) {
-                        return this;
-                    }
-                }
-            }
+        else if (event === 'duplicatedListener') {
+            this._f |= EventEmitterEx_Flags_has_duplicatedListener_listener;
         }
 
         if (once) {
@@ -740,11 +739,13 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             console.warn(`Maximum event listeners for "${event}" event!`);
         }
 
-        return this;
+        return true;
     }
 
     addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
-        return this._addListener(event, listener, false, false);
+        this._addListener(event, listener, false, false);
+
+        return this;
     }
 
     removeListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
@@ -762,9 +763,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             return this;
         }
 
-        const has_error_listener = _checkBit(_f, EventEmitterEx_Flags_has_error_listener);
-        const has_errorMonitor_listener = _checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
-        const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
         const hasAnyOnceListener = _onceIds.length > 0;
@@ -894,20 +892,25 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         if (newListenersCount !== void 0) {
             if (newListenersCount === 0) {
-                if (has_error_listener && event === 'error') {
+                if (event === 'error') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
                 }
-                else if (has_errorMonitor_listener && event === errorMonitor) {
+                else if (event === errorMonitor) {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
                 }
-                else if (has_newListener_listener && event === 'newListener') {
+                else if (event === 'newListener') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
                 }
-                else if (has_removeListener_listener && event === 'removeListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
-                    // Если мы удаляем последний 'removeListener', то и кидать событие некому.
-                    // Именно так работает нативный nodejs 'events' - 'removeListener' не вызывается, когда мы удаляем сам 'removeListener'.
-                    has_removeListener_listener = false;
+                else if (event === 'removeListener') {
+                    if (has_removeListener_listener) {
+                        this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                        // Если мы удаляем последний 'removeListener', то и кидать событие некому.
+                        // Именно так работает нативный nodejs 'events' - 'removeListener' не вызывается, когда мы удаляем сам 'removeListener'.
+                        has_removeListener_listener = false;
+                    }
+                }
+                else if (event === 'duplicatedListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
                 }
             }
         }
@@ -946,11 +949,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     prependListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
-        return this._addListener(event, listener, true, false);
+        this._addListener(event, listener, true, false);
+
+        return this;
     }
 
     prependOnceListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
-        return this._addListener(event, listener, true, true);
+        this._addListener(event, listener, true, true);
+
+        return this;
     }
 
     off<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this {
@@ -1042,17 +1049,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 delete _events[event];
 
-                if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
+                if (event === 'error') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
                 }
-                else if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener) && event === errorMonitor) {
+                else if (event === errorMonitor) {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
                 }
-                else if (_checkBit(_f, EventEmitterEx_Flags_has_newListener_listener) && event === 'newListener') {
+                else if (event === 'newListener') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
                 }
-                else if (has_removeListener_listener && event === 'removeListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                else if (event === 'removeListener') {
+                    if (has_removeListener_listener) {
+                        this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                    }
+                }
+                else if (event === 'duplicatedListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
                 }
             }
         }
@@ -1101,17 +1113,22 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 delete _events[event];
 
-                if (_checkBit(_f, EventEmitterEx_Flags_has_error_listener) && event === 'error') {
+                if (event === 'error') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
                 }
-                else if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener) && event === errorMonitor) {
+                else if (event === errorMonitor) {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
                 }
-                else if (_checkBit(_f, EventEmitterEx_Flags_has_newListener_listener) && event === 'newListener') {
+                else if (event === 'newListener') {
                     this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
                 }
-                else if (has_removeListener_listener && event === 'removeListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                else if (event === 'removeListener') {
+                    if (has_removeListener_listener) {
+                        this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
+                    }
+                }
+                else if (event === 'duplicatedListener') {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
                 }
             }
         }
@@ -2329,6 +2346,41 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventN
             ee[kCapture] = prev;
         }
     }
+}
+
+type _NodeConsole = typeof import('node:console');
+
+function _objectIsConsole(object: Console|any) {
+    const mayBeConsole = object as Console;
+    const isConsoleLike = typeof mayBeConsole === 'object'
+        && !!mayBeConsole
+        && typeof mayBeConsole.assert === 'function'
+        && typeof mayBeConsole.clear === 'function'
+        && typeof mayBeConsole.info === 'function'
+        && typeof mayBeConsole.groupCollapsed === 'function'
+        && typeof mayBeConsole.table === 'function'
+        && typeof mayBeConsole.dirxml === 'function'
+        && (mayBeConsole.time + '').includes('[native code]')
+    ;
+    const isNodeJSConsole = isNodeJS
+        && typeof (object as _NodeConsole).Console === 'function'
+        && (object as _NodeConsole).Console.prototype.constructor.name === 'Console'
+        // in nodejs console.toString() === '[object console]'
+        && String(mayBeConsole) === `[object Object]`
+    ;
+    const isBrowserConsole = !isNodeJS
+        && typeof mayBeConsole.hasOwnProperty === 'function'
+        // eslint-disable-next-line no-prototype-builtins
+        && mayBeConsole.hasOwnProperty('memory')
+        // in browser console.toString() === '[object Object]'
+        && String(mayBeConsole) === `[object Object]`
+    ;
+    const isLoggerLike = typeof object["timeReset"] === 'function';
+
+    return isConsoleLike
+        && (isNodeJSConsole || isBrowserConsole)
+        && !isLoggerLike
+    ;
 }
 
 function _checkBit(mask: number, bit: number): boolean {
