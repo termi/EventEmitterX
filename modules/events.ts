@@ -1775,7 +1775,9 @@ interface EventEmitterProxy_Options extends Options {
 export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
     private _proxyHook: EventEmitterProxy_ProxyHook|void;
     private _eventEmitter: INodeEventEmitter|EventEmitterEx|void;
+    // private _eventTarget: DOMEventTarget|void;
     private _proxyHandlers: Record<EventName, (...args: any[]) => void> = {};
+    // private _isEventTarget = false;
 
     /**
      * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запоминать все подписки нп него
@@ -1789,7 +1791,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
      * @param options
      * @param options.proxyHook -
      */
-    constructor(emitter?: INodeEventEmitter|EventEmitterEx, options?: EventEmitterProxy_Options) {
+    constructor(emitter?: INodeEventEmitter|EventEmitterEx/*|DOMEventTarget*/, options?: EventEmitterProxy_Options) {
         super(options);
 
         const {
@@ -1803,7 +1805,19 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             this._proxyHook = void 0;
         }
 
-        this._eventEmitter = emitter || void 0;
+        if (!emitter) {
+            // nothing to do
+        }
+        else if (_isEventEmitterCompatible(emitter as ICompatibleEmitter)) {
+            this._eventEmitter = emitter as INodeEventEmitter|EventEmitterEx;
+        }
+        /* todo: add EventTarget support
+        else if (_isEventTargetCompatible(emitter)) {
+            this._eventTarget = emitter as DOMEventTarget;
+            this._isEventTarget = true;
+        }
+
+         */
     }
 
     setProxyHook(proxyHook: EventEmitterProxy_ProxyHook) {
@@ -1815,7 +1829,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         }
     }
 
-    handleEvent(event: EventName, ...args) {
+    private _onEventEmitterEvent(event: EventName, ...args) {
         switch (args.length) {
             case 0:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1843,6 +1857,17 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
                 super.emit(event, ...args);
         }
     }
+/*
+
+    // EventListenerObject["handleEvent"]
+    public handleEvent(evt: Event) {
+        const {type} = evt;
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        super.emit(type, evt);
+    }
+*/
 
     emit(event, ...args) {
         const {
@@ -1880,27 +1905,27 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         if (eventProxy) {
             // Нам нужно быть уверенным, что обработчик будет подписан на этот type, но только один раз
             // Если он ещё не был подписан, то removeListener ничего не сделает
-            eventEmitter.removeListener(event as NodeEventName, eventProxy);
+            (eventEmitter as EventEmitterEx).removeListener(event as NodeEventName, eventProxy);
         }
         else {
-            eventProxy = this.handleEvent.bind(this, event);
+            eventProxy = this._onEventEmitterEvent.bind(this, event);
             _proxyHandlers[event] = eventProxy;
         }
 
         if (prepend) {
             if (once) {
-                eventEmitter.prependOnceListener(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxy);
             }
             else {
-                eventEmitter.prependListener(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxy);
             }
         }
         else {
             if (once) {
-                eventEmitter.once(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).once(event as NodeEventName, eventProxy);
             }
             else {
-                eventEmitter.on(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).on(event as NodeEventName, eventProxy);
             }
         }
 
