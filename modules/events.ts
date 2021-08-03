@@ -577,7 +577,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
         if (!!emitCounter && typeof emitCounter.count === 'function') {
             if (_checkBit(this._f, EventEmitterEx_Flags_emitCounter_isConsole)) {
-                (emitCounter as Console).count(_eventNameToString(event));
+                (emitCounter as Console).count(String(event));
             }
             else {
                 (emitCounter as ICounter).count(event);
@@ -2011,20 +2011,6 @@ export {errorMonitor, captureRejectionSymbol};
 export const once = EventEmitterEx.once;
 
 export default EventEmitterEx;
-
-/**
- * @private
- * @param eventName
- */
-function _eventNameToString(eventName: EventName) {
-    if (typeof eventName === 'symbol') {
-        const {description = ''} = eventName;
-
-        return description ? `Symbol(${description})` : `Symbol()`;
-    }
-
-    return String(eventName);
-}
 
 /**
  * @private
