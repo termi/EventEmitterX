@@ -29,7 +29,7 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
         maybeEventTarget.emit = function emit(type, ...args) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore
-            const event = new Event(String(typeof type === 'symbol' ? type.description : type));
+            const event = new Event(String(type));
 
             event["args"] = args;
 
