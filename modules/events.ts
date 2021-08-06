@@ -2359,6 +2359,8 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventN
     }
 }
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 type _NodeConsole = typeof import('node:console');
 
 function _objectIsConsole(object: Console|any) {
