@@ -293,7 +293,7 @@ const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 21;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
-export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     private _events: {
         [eventName in keyof EMD<EventMap>]?: Function|Function[]
     } = Object.create(null);
@@ -1766,6 +1766,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     static AbortController = AbortController;
 }
 
+export {
+    EventEmitterEx as EventEmitter,
+    EventEmitterEx,
+};
+
 type EventEmitterProxy_ProxyHook = (type, eventEmitter) => NodeEventEmitter|EventEmitterEx;
 interface EventEmitterProxy_Options extends Options {
     /** Функция, которая вычисляет нужный экземпляр eventEmitter, который относиться к конкретному событию */
@@ -2009,8 +2014,6 @@ export type NodeEventEmitter = INodeEventEmitter;
 
 export {errorMonitor, captureRejectionSymbol};
 export const once = EventEmitterEx.once;
-
-export default EventEmitterEx;
 
 /**
  * @private
