@@ -166,8 +166,10 @@ let _onceListenerIdCounter = 0;
 // This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 
+const _toString = Object.prototype.toString;
+
 const isNodeJS = (function() {
-    if (typeof process === 'object' && typeof require === 'function' && {}.toString.call(process) === "[object process]") {
+    if (typeof process === 'object' && typeof require === 'function' && _toString.call(process) === "[object process]") {
         if (typeof window !== 'undefined') {
             // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
             // workaround for jest+JSDOM
@@ -222,10 +224,13 @@ const {
     };
 })();
 
+export const kDestroyingEvent = Symbol('kDestroyingEvent');
+
 type InnerListeners = {
     'newListener': (eventName: EventName, listener: Listener) => void;
     'removeListener': (eventName: EventName, listener: Listener) => void;
     'error': (error: Error, ...args: any[]) => void;
+    [kDestroyingEvent]: () => void;
 };
 
 // todo: add handleEvent support
@@ -294,6 +299,9 @@ const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
 export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+    public readonly isEventEmitterEx = true;
+    public readonly isEventEmitter = true;
+
     private _events: {
         [eventName in keyof EMD<EventMap>]?: Function|Function[]
     } = Object.create(null);
@@ -358,6 +366,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     destructor() {
         this._f |= EventEmitterEx_Flags_destroyed;
         this._emitCounter = void 0;
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        this.emit(kDestroyingEvent);
 
         this.removeAllListeners();
 
@@ -1330,9 +1342,6 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const errorEventNameIsDefined = !!staticOnceOptions.errorEventName;
         const errorEventName = (staticOnceOptions.errorEventName || 'error') as string|symbol;
         const timeout = staticOnceOptions.timeout || void 0;
-        // options с функцией filter только для статических методов потому, что тут мы можем гарантировать, что
-        //  onceListener - это уникальная функция. Иначе, нужно было бы в _addListener делать кейс, когда
-        //  передаётся один и тот же обработчик (ссылка на функцию), но с разными options.
         /** @borrows StaticOnceOptionsDefault.filter */
         const filter = (typeof staticOnceOptions.filter === 'function' ? staticOnceOptions.filter : void 0)
             || (typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0)
@@ -1825,6 +1834,13 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
          */
     }
 
+    destructor() {
+        this.removeAllListeners();
+
+        this._eventEmitter = void 0;
+        this._proxyHook = void 0;
+    }
+
     setProxyHook(proxyHook: EventEmitterProxy_ProxyHook) {
         if (typeof proxyHook === 'function') {
             this._proxyHook = proxyHook;
@@ -2001,13 +2017,6 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
         return super.removeAllListeners(event);
     }
-
-    destructor() {
-        this.removeAllListeners();
-
-        this._eventEmitter = void 0;
-        this._proxyHook = void 0;
-    }
 }
 
 export type NodeEventEmitter = INodeEventEmitter;
@@ -2114,6 +2123,7 @@ export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitt
  * Check only 'addEventListener' and 'removeEventListener', but not 'dispatchEvent'.
  * Reason: in 'ws' nodule, in file `node_modules/ws/lib/websocket.js` class WebSocket implements only 'addEventListener' and 'removeEventListener'.
  * @param maybeDOMEventTarget
+ * @private
  */
 function _isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object) {
     return !!maybeDOMEventTarget
@@ -2131,13 +2141,38 @@ export function isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Obje
 const _kEventTargetSignalSupport = Symbol('kEventTargetSignalSupport');
 const _abortedSignal = AbortSignal.abort();
 const _noop = function() {};
+const _hasDocument = typeof document !== 'undefined' && !!document;
+let domHasSignalSupport: boolean;
 
 /**
- * // a copy of cftools/web/DOMTools.ts~eventTargetHasSupport rewrite to test only signal
+ * @param eventTarget
+ * @private
+ */
+function _eventTargetIsDOMNode(eventTarget: EventTarget) {
+    return typeof (eventTarget as (Node | {nodeType?: any})).nodeType === 'number'
+        && typeof (eventTarget as (Node | {nodeName?: any})).nodeName === 'string'
+        && 'outerHTML' in eventTarget
+    ;
+}
+
+/**
  * @param eventTarget
  * @private
  */
 function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
+    if (!isNodeJS && _hasDocument && _eventTargetIsDOMNode(eventTarget)) {
+        return domHasSignalSupport ??= _eventTargetHasSignalSupport_inner(document.documentElement || document);
+    }
+
+    return _eventTargetHasSignalSupport_inner(eventTarget);
+}
+
+/**
+ * // a copy of cftools/web/DOMTools.ts~eventTargetHasSupport rewritten to test only options.signal
+ * @param eventTarget
+ * @private
+ */
+function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
     const preValue = eventTarget[_kEventTargetSignalSupport] as boolean|void;
 
     if (preValue !== void 0) {
@@ -2147,14 +2182,16 @@ function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
     // assume the feature isn't supported
     let supportsFeature: true|false = false;
     // create options object with a getter to see if its once property is accessed
-    // see `Let capture, passive, and once be the result of flattening more options.` at [DOM Spec#addEventListener](https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener)
-    const opts = Object.defineProperty({ _v: void 0 }, 'signal', {
+    // see `Let capture, passive, once, and signal be the result of flattening more options.` at [DOM Spec#addEventListener](https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener)
+    const options = Object.defineProperty({ _v: void 0 }, 'signal', {
         get() {
             supportsFeature = true;
 
+            // should return previously saved value if passed, for compatible with some libraries
             return this._v !== void 0 ? this._v : _abortedSignal;
         },
         set(value) {
+            // should save passed value for compatible with some libraries
             this._v = value;
         },
     }) as AddEventListenerOptions;
@@ -2165,8 +2202,8 @@ function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
     //  it will hide the problem with incorrect eventTarget arguments, therefore, you need a good reason to add try/catch.
 
     // Synchronously test out our options
-    eventTarget.addEventListener(testEventType, _noop, opts);
-    eventTarget.removeEventListener(testEventType, _noop, opts);
+    eventTarget.addEventListener(testEventType, _noop, options);
+    eventTarget.removeEventListener(testEventType, _noop, options);
 
     /*
     // Another variant without any listener
@@ -2190,7 +2227,8 @@ type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, Event
 }
 const sOnceListenerWrapperId = Symbol('');
 
-function onceWrapper(this: OnceListenerState, ...args) {
+/** @private */
+function _onceWrapper(this: OnceListenerState, ...args) {
     const idIndex = this.target._onceIds.indexOf(this.id);
 
     if (idIndex !== -1) {
@@ -2205,6 +2243,7 @@ function onceWrapper(this: OnceListenerState, ...args) {
     }
 }
 
+/** @private */
 function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName>(target: EventEmitterEx, type: EventKey, listener: EMD<EventMap>[EventKey]) {
     const id = ++_onceListenerIdCounter;
     const state: OnceListenerState<EMD<EventMap>, EventKey> = {
@@ -2215,7 +2254,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
         listener,
         target,
     };
-    const wrapped = onceWrapper.bind(state) as EMD<EventMap>[EventKey];
+    const wrapped = _onceWrapper.bind(state) as EMD<EventMap>[EventKey];
 
     target._onceIds.push(state.id);
 
@@ -2228,6 +2267,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     return wrapped as EMD<EventMap>[EventKey];
 }
 
+/** @private */
 function emitNone_array(listeners: Function[], self: EventEmitterEx|undefined) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2235,6 +2275,7 @@ function emitNone_array(listeners: Function[], self: EventEmitterEx|undefined) {
     }
 }
 
+/** @private */
 function emitNone_array_catch(listeners: Function[], self: EventEmitterEx|undefined, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2246,6 +2287,7 @@ function emitNone_array_catch(listeners: Function[], self: EventEmitterEx|undefi
     }
 }
 
+/** @private */
 function emitOne_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2253,6 +2295,7 @@ function emitOne_array(listeners: Function[], self: EventEmitterEx|undefined, ar
     }
 }
 
+/** @private */
 function emitOne_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2264,6 +2307,7 @@ function emitOne_array_catch(listeners: Function[], self: EventEmitterEx|undefin
     }
 }
 
+/** @private */
 function emitTwo_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2271,6 +2315,7 @@ function emitTwo_array(listeners: Function[], self: EventEmitterEx|undefined, ar
     }
 }
 
+/** @private */
 function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2282,6 +2327,7 @@ function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx|undefin
     }
 }
 
+/** @private */
 function emitThree_array(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2289,6 +2335,7 @@ function emitThree_array(listeners: Function[], self: EventEmitterEx|undefined, 
     }
 }
 
+/** @private */
 function emitThree_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2300,6 +2347,7 @@ function emitThree_array_catch(listeners: Function[], self: EventEmitterEx|undef
     }
 }
 
+/** @private */
 function emitMany_array(listeners: Function[], self: EventEmitterEx|undefined, args: any[]) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2307,6 +2355,7 @@ function emitMany_array(listeners: Function[], self: EventEmitterEx|undefined, a
     }
 }
 
+/** @private */
 function emitMany_array_catch(listeners: Function[], self: EventEmitterEx|undefined, args: any[], event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
@@ -2318,6 +2367,7 @@ function emitMany_array_catch(listeners: Function[], self: EventEmitterEx|undefi
     }
 }
 
+/** @private */
 function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventName, args: any[]) {
     // Handle Promises/A+ spec, then could be a getter
     // that throws on second use.
@@ -2337,6 +2387,7 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
     }
 }
 
+/** @private */
 function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventName, args: any[]) {
     const captureRejectionHandler = ee[captureRejectionSymbol];
 
@@ -2366,42 +2417,46 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventN
 // @ts-ignore
 type _NodeConsole = typeof import('node:console');
 
+/** @private */
 function _objectIsConsole(object: Console|any) {
+    if (!object || typeof object !== 'object') {
+        return false;
+    }
+
     const mayBeConsole = object as Console;
-    const isConsoleLike = typeof mayBeConsole === 'object'
-        && !!mayBeConsole
-        && typeof mayBeConsole.assert === 'function'
+    const isConsoleLike = typeof mayBeConsole.assert === 'function'
         && typeof mayBeConsole.clear === 'function'
         && typeof mayBeConsole.info === 'function'
         && typeof mayBeConsole.groupCollapsed === 'function'
         && typeof mayBeConsole.table === 'function'
         && typeof mayBeConsole.dirxml === 'function'
-        && (mayBeConsole.time + '').includes('[native code]')
     ;
-    const isNodeJSConsole = isNodeJS
-        && typeof (object as _NodeConsole).Console === 'function'
-        && (object as _NodeConsole).Console.prototype.constructor.name === 'Console'
-        // in nodejs console.toString() === '[object console]'
-        && String(mayBeConsole) === `[object Object]`
-    ;
-    const isBrowserConsole = !isNodeJS
-        && typeof mayBeConsole.hasOwnProperty === 'function'
-        // eslint-disable-next-line no-prototype-builtins
-        && mayBeConsole.hasOwnProperty('memory')
-        // in browser console.toString() === '[object Object]'
-        && String(mayBeConsole) === `[object Object]`
-    ;
-    const isLoggerLike = typeof object["timeReset"] === 'function';
+
+    let isNodeJSConsole = false;
+    let isBrowserConsole = false;
+
+    // in nodejs console.toString() === '[object console]' (in browser console.toString() === '[object Object]')
+    if (_toString.call(mayBeConsole) === '[object console]') {
+        isNodeJSConsole = typeof (mayBeConsole as _NodeConsole).Console === 'function';
+    }
+    else {
+        // in Web there is only one console
+        isBrowserConsole = globalThis["console"] === mayBeConsole;
+        // not needed, but interesting checks:
+        // (mayBeConsole.time + '').includes('[native code]')
+        // (console.memory + '') === '[object MemoryInfo]'
+    }
 
     return isConsoleLike
         && (isNodeJSConsole || isBrowserConsole)
-        && !isLoggerLike
     ;
 }
 
+/** @private */
 function _checkBit(mask: number, bit: number): boolean {
     return (mask & bit) !== 0;
 }
+/** @private */
 function _unsetBit(mask: number, bit: number): number {
     return mask & ~bit;
 }

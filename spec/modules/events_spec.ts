@@ -52,6 +52,7 @@ import events, {
     isEventEmitterCompatible,
     isEventTargetCompatible,
     Listener,
+    kDestroyingEvent,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import {AbortController, AbortControllersGroup, AbortSignal} from 'termi@abortable';
@@ -172,6 +173,22 @@ describe('events', function() {
                 ee.prependOnceListener('foo', () => {});
 
                 expect(ee.listenerCount('foo')).toBe(0);
+            });
+
+            it('should emit kDestroyingEvent on destroying', function () {
+                const ee = new EventEmitter();
+                let wasCalled = false;
+
+                ee.on(kDestroyingEvent, () => {
+                    wasCalled = true;
+                });
+
+                expect(ee.listenerCount(kDestroyingEvent)).toBe(1);
+
+                ee.destructor();
+
+                expect(wasCalled).toBe(true);
+                expect(ee.listenerCount(kDestroyingEvent)).toBe(0);
             });
         });
 
