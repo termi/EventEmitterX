@@ -1,3 +1,4 @@
+'use strict';
 /// <reference types="node" />
 
 // see: https://github.com/nodejs/node/blob/master/lib/events.js
@@ -303,7 +304,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     public readonly isEventEmitter = true;
 
     private _events: {
-        [eventName in keyof EMD<EventMap>]?: Function|Function[]
+        [eventName in keyof EMD<EventMap>]?: Function|Function[];
     } = Object.create(null);
 
     _maxListeners = Infinity;
@@ -1325,7 +1326,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             isEventTarget = _isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
-                return _Promise.reject(new _EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
+                return _Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
             }
         }
 
@@ -1356,13 +1357,13 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let listenersCleanUp: Function|void = void 0;
 
         if (usePrependListener && isEventTarget) {
-            return _Promise.reject(new _EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
+            return _Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
         }
 
         {
             if (signal) {
                 if (!isAbortSignal(signal)) {
-                    return _Promise.reject(new _EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+                    return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
                 }
             }
 
@@ -1775,6 +1776,13 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     static AbortController = AbortController;
 }
 
+const tagEventEmitterEx = 'EventEmitterEx';
+
+if (EventEmitterEx.constructor.name !== tagEventEmitterEx) {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(EventEmitterEx.constructor, 'name', { value: tagEventEmitterEx, configurable: true });
+}
+
 export {
     EventEmitterEx as EventEmitter,
     EventEmitterEx,
@@ -1794,8 +1802,8 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     // private _isEventTarget = false;
 
     /**
-     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запоминать все подписки нп него
-     *  а при вызове removeAllListeners, удалять все подписки, которые прошли через экземпляр этого класса
+     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запоминать все подписки на него
+     *  а при вызове removeAllListeners, удалять все подписки, которые прошли через экземпляр этого класса.
      *
      * Например, мы можем создать экземпляр этого класса передав в конструктор userActionMonitor (который кидает события 'mouse_click').
      *  Передаём этот экземпляр на стороннюю страницу, там подписываются на события 'mouse_click', а когда страница выгружается, при
@@ -2019,6 +2027,13 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     }
 }
 
+const tagEventEmitterProxy = 'EventEmitterProxy';
+
+if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(EventEmitterProxy.constructor, 'name', { value: tagEventEmitterProxy, configurable: true });
+}
+
 export type NodeEventEmitter = INodeEventEmitter;
 
 export {errorMonitor, captureRejectionSymbol};
@@ -2027,7 +2042,7 @@ export const once = EventEmitterEx.once;
 /**
  * @private
  */
-class _EventsTypeError extends TypeError {
+class EventsTypeError extends TypeError {
     code: string|void;
 
     constructor(message = '', code?: string) {
@@ -2051,15 +2066,22 @@ class _EventsTypeError extends TypeError {
     }
 
     static fromObject(error) {
-        if (error instanceof _EventsTypeError) {
+        if (error instanceof EventsTypeError) {
             return error;
         }
         else {
             const { code, message } = error;
 
-            return new _EventsTypeError(message, code);
+            return new EventsTypeError(message, code);
         }
     }
+}
+
+const tagEventsTypeError = 'EventsTypeError';
+
+if (EventsTypeError.constructor.name !== tagEventsTypeError) {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(EventsTypeError.constructor, 'name', { value: tagEventsTypeError, configurable: true });
 }
 
 export class TimeoutError extends Error {
@@ -2074,6 +2096,13 @@ export class TimeoutError extends Error {
             this.stack = (new Error()).stack;
         }
     }
+}
+
+const tagTimeoutError = 'TimeoutError';
+
+if (TimeoutError.constructor.name !== tagTimeoutError) {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(TimeoutError.constructor, 'name', { value: tagTimeoutError, configurable: true });
 }
 
 export function createTimeoutError(message: string) {
