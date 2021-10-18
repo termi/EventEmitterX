@@ -2412,7 +2412,7 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
         }
     }
     catch (err) {
-        that.emit('error', err);
+        that.emit('error', err as Error);
     }
 }
 
