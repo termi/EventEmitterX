@@ -167,6 +167,10 @@ let _onceListenerIdCounter = 0;
 // This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
 // Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
 
+const ERR_INVALID_ARG_TYPE = 'ERR_INVALID_ARG_TYPE';
+const ERR_INVALID_OPTION_TYPE = 'ERR_INVALID_OPTION_TYPE';
+// AbortError code like in native node.js implementation
+const ABORT_ERR = 'ABORT_ERR';
 const _toString = Object.prototype.toString;
 
 const isNodeJS = (function() {
@@ -1326,7 +1330,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             isEventTarget = _isEventTargetCompatible(emitter as DOMEventTarget);
 
             if (!isEventTarget) {
-                return _Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', 'ERR_INVALID_ARG_TYPE'));
+                return _Promise.reject(new EventsTypeError('The "emitter" argument must be an instance of EventEmitter or EventTarget.', ERR_INVALID_ARG_TYPE));
             }
         }
 
@@ -1356,14 +1360,41 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let abortControllersGroup: TAbortControllersGroup|void;
         let listenersCleanUp: Function|void = void 0;
 
-        if (usePrependListener && isEventTarget) {
-            return _Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', 'ERR_INVALID_OPTION_TYPE'));
+        if (isEventTarget) {
+            if (usePrependListener) {
+                return _Promise.reject(new EventsTypeError('The "prepend" option is not supported for EventTarget emitter.', ERR_INVALID_OPTION_TYPE));
+            }
+
+            {
+                let invalidTypeValue;
+
+                if (Array.isArray(types)) {
+                    for (const type of types) {
+                        if (typeof type === 'symbol') {
+                            invalidTypeValue = type;
+
+                            break;
+                        }
+                    }
+                }
+                else if (typeof types === 'symbol') {
+                    invalidTypeValue = types;
+                }
+
+                if (invalidTypeValue !== void 0) {
+                    return _Promise.reject(new EventsTypeError(`The "${typeof invalidTypeValue}" value type of "types" argument is not supported for EventTarget emitter.`, ERR_INVALID_ARG_TYPE));
+                }
+            }
+
+            if (typeof errorEventName === 'symbol') {
+                return _Promise.reject(new EventsTypeError(`The "${typeof errorEventName}" value type of "errorEventName" option is not supported for EventTarget emitter.`, ERR_INVALID_OPTION_TYPE));
+            }
         }
 
         {
             if (signal) {
                 if (!isAbortSignal(signal)) {
-                    return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, 'ERR_INVALID_OPTION_TYPE'));
+                    return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, ERR_INVALID_OPTION_TYPE));
                 }
             }
 
@@ -1375,7 +1406,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             if (signal) {
                 // Return early if already aborted.
                 if (signal.aborted) {
-                    return _Promise.reject(createAbortError());
+                    // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
+                    return _Promise.reject(createAbortError(ABORT_ERR));
                 }
 
                 if (eventTargetListenerOptions && isEventTarget && _eventTargetHasSignalSupport(emitter as DOMEventTarget)) {
@@ -1385,7 +1417,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (hasTiming) {
-            timing!.time(types as string[]);
+            timing!.time(types);
         }
 
         let promise;
@@ -1419,7 +1451,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     if (needErrorListener) {
                         if (isEventTarget) {
                             if (errorEventNameIsDefined) {
-                                // EventTarget does not have `error` event semantics like Node
+                                // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                                 (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                             }
                         }
@@ -1490,10 +1522,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
                         if (typeof timing!.timeClear === 'function') {
-                            timing!.timeClear(types as string[], true);
+                            timing!.timeClear(types, true);
                         }
                         else {
-                            timing!.timeEnd(types as string[], true);
+                            timing!.timeEnd(types, true);
                         }
                         // cleanup
                         timing = void 0;
@@ -1514,7 +1546,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                 if (isEventTarget) {
                     if (errorEventNameIsDefined) {
-                        // EventTarget does not have `error` event semantics like Node
+                        // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                     }
                 }
@@ -1538,7 +1570,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 const eventListener = (...args) => {
                     if (filter) {
                         try {
-                            if (!filter.apply(_emitter, [type, ...args])) {
+                            if (!filter.apply(_emitter, [ type, ...args ])) {
                                 return;
                             }
                         }
@@ -1548,7 +1580,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     }
 
                     if (hasTiming) {
-                        timing!.timeEnd(type as string, true);
+                        timing!.timeEnd(type, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1567,7 +1599,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         //   if (typeof timing!.timeClear === 'function') {
                         //       timing!.timeClear(type as string, true);
                         //   } else { timing!.timeEnd(type as string, true); }
-                        timing!.timeEnd(type as string, true);
+                        timing!.timeEnd(type, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1584,7 +1616,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).removeEventListener(type as string, eventListener, eventTargetListenerOptions);
                         if (errorEventNameIsDefined && needErrorListener) {
-                            // EventTarget does not have `error` event semantics like Node
+                            // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                             (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                         }
                     }
@@ -1601,7 +1633,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 if (isEventTarget) {
                     (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
                     if (errorEventNameIsDefined && needErrorListener) {
-                        // EventTarget does not have `error` event semantics like Node
+                        // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
                     }
                 }
@@ -1645,7 +1677,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             console.error('once#Aborted:', debugInfo, { types, errorEventName });
                         }
 
-                        reject(createAbortError());
+                        // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
+                        reject(createAbortError(ABORT_ERR));
                     }
 
                     abortCallback = void 0;
@@ -1660,7 +1693,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         //   if (typeof timing!.timeClear === 'function') {
                         //       timing!.timeClear(type as string, true);
                         //   } else { timing!.timeEnd(type as string, true); }
-                        timing!.timeEnd(types as string[], true);
+                        timing!.timeEnd(types, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1676,7 +1709,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                     timeoutId = void 0;
 
-                    reject(createTimeoutError('timeout'));
+                    // todo:
+                    //  1. Сделать отдельный класс ошибок EventsOnceError (аналогично EventsTypeError), в котором будут
+                    //   свойства error.types и error.errorType.
+                    //  2. Если types - это массив с количеством элементов большим разумного числа (например, больше 30),
+                    //   то не выводить его в сообщении ошибки, а прикреплять его как error.types).
+                    reject(createTimeoutError(`waiting of ${_typesToArrayStringTag(types, errorEventNameIsDefined ? errorEventName : void 0)} timeout`));
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
@@ -1727,7 +1765,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 if (hasTiming) {
-                    timing!.timeEnd(types as string[], true);
+                    timing!.timeEnd(types, true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -1751,7 +1789,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 if (hasTiming) {
-                    timing!.timeEnd(types as string[], true);
+                    timing!.timeEnd(types, true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -2096,6 +2134,8 @@ export class TimeoutError extends Error {
             this.stack = (new Error()).stack;
         }
     }
+
+    static ETIMEDOUT = 'ETIMEDOUT'
 }
 
 const tagTimeoutError = 'TimeoutError';
@@ -2244,6 +2284,54 @@ function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
     eventTarget[_kEventTargetSignalSupport] = supportsFeature;
 
     return supportsFeature;
+}
+
+const n0 = typeof BigInt !== 'undefined' ? BigInt(0) : void 0;
+
+function _typesToArrayStringTag(types: EventName|EventName[]|void, errorEventName?: EventName) {
+    if (!types && types !== 0 && (n0 === void 0 || (types as EventName & bigint) !== n0)) {
+        types = [];
+    }
+
+    if (errorEventName || errorEventName === 0 || (n0 !== void 0 && (errorEventName as EventName & bigint) === n0)) {
+        if (!Array.isArray(types)) {
+            types = [ types!, errorEventName! ];
+        }
+        else {
+            types = [ ...types, errorEventName! ];
+        }
+    }
+
+    if (Array.isArray(types)) {
+        return JSON.stringify(types.map(value => {
+            const type = typeof value;
+
+            if (type === 'bigint') {
+                // Принудительно приводим к строке BigInt и добавляем 'n' суффикс.
+                return `${String(value)}n`;
+            }
+
+            if (type === 'symbol') {
+                // Принудительно приводим к строке Symbol.
+                return String(value);
+            }
+
+            return value;
+        }));
+    }
+
+    const value = types;
+    const type = typeof (value as EventName & bigint);
+    const singleStringValue =
+        // Принудительно приводим к строке BigInt и добавляем 'n' суффикс.
+        type === 'bigint' ? `${String(value)}n`
+        // It should be explicit String() conversion of `this.name` (`${this.name}` <-- this is wrong if `this.name` is `Symbol`).
+        : type === 'symbol' ? String(value)
+        // number and other leave without toString conversion - JSON.stringify will do the job.
+        : value
+    ;
+
+    return JSON.stringify([ singleStringValue ]);
 }
 
 type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EMD<EventMap> = EventName> = {

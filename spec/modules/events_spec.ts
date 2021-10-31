@@ -2435,6 +2435,50 @@ describe('events', function() {
                 it.skip = function(){};
             }
 
+            it.skip('should throw if "types" argument is Symbol', function(done) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                once(eventTarget, Symbol('invalid-argument'), {
+                    timeout: 10,
+                }).catch(error => {
+                    expect(error).toBeDefined();
+                    expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
+                    expect(error && error.name).toBe('TypeError');
+                    expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+
+                    done();
+                });
+            });
+
+            it.skip('should throw if one of array "types" argument is Symbol', function(done) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                once(eventTarget, [ 'test-123-qwerty', 321132, 987654321n, Symbol('invalid-argument') ], {
+                    timeout: 10,
+                }).catch(error => {
+                    expect(error).toBeDefined();
+                    expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
+                    expect(error && error.name).toBe('TypeError');
+                    expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+
+                    done();
+                });
+            });
+
+            it.skip('should throw if "options.errorEventName" is Symbol', function(done) {
+                once(eventTarget, Math.random().toString(36), {
+                    errorEventName: Symbol('invalid-argument'),
+                    timeout: 10,
+                }).catch(error => {
+                    expect(error).toBeDefined();
+                    expect(error && error.code).toBe('ERR_INVALID_OPTION_TYPE');
+                    expect(error && error.name).toBe('TypeError');
+                    expect(error && error.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
+
+                    done();
+                });
+            });
+
             it.skip('with options.capture', async function () {
                 const data = {
                     test: true,
@@ -3081,37 +3125,194 @@ describe('events', function() {
             });
         });
 
-        it('with timeout', function (done) {
-            let error: DOMException|void = void 0;
-            let counter = 0;
+        describe('with timeout', function() {
+            // https://stackoverflow.com/a/60438234
+            // do not using it.skip to avoid marking tests as "skipped" after running
+            const itif = (condition) => condition ? it : () => {}/*it.skip*/;
 
-            once(ee, 'test7', {
-                timeout: 10,
-            })
-                .then(() => {
-                    counter++;
+            it('simple', function(done) {
+                let error: DOMException|void = void 0;
+                let counter = 0;
+
+                once(ee, 'test7', {
+                    timeout: 10,
                 })
-                .catch(err => {
-                    error = err;
+                    .then(() => {
+                        counter++;
+                    })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(counter).toBe(0);
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(ee.listenerCount('test7')).toBe(0);
+
+                        clearTimeout(timeout);
+
+                        done();
+                    })
+                ;
+
+                const timeout = setTimeout(() => {
+                    ee.emit('test7', ...[1, 2, 3]);
+                }, 100);
+            });
+
+            it('check error message #1.1', function(done) {
+                let error: DOMException|void = void 0;
+
+                once(ee, 1, {
+                    timeout: 1,
                 })
-                .then(() => {
-                    expect(counter).toBe(0);
-                    expect(error).toBeDefined();
-                    expect(error && error.name).toBe('TimeoutError');
-                    expect(ee.listenerCount('test7')).toBe(0);
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' [1] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
 
-                    clearTimeout(timeout);
+                        done();
+                    })
+                ;
+            });
 
-                    done();
+            it('check error message #1.2', function(done) {
+                let error: DOMException|void = void 0;
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                once(ee, 0n, {
+                    timeout: 1,
                 })
-            ;
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' ["0n"] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
 
-            const timeout = setTimeout(() => {
-                ee.emit('test7', ...[1, 2, 3]);
-            }, 100);
+                        done();
+                    })
+                ;
+            });
+
+            it('check error message #1.3', function(done) {
+                let error: DOMException|void = void 0;
+
+                once(ee, 0, {
+                    timeout: 1,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' [0] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        done();
+                    })
+                ;
+            });
+
+            // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
+            itif(!isEventTarget)('check error message #1.4', function(done) {
+                let error: DOMException|void = void 0;
+
+                once(ee, Symbol('timeout-message'), {
+                    timeout: 1,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' ["Symbol(timeout-message)"] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        done();
+                    })
+                ;
+            });
+
+            // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
+            itif(!isEventTarget)('check error message #2', function(done) {
+                let error: DOMException|void = void 0;
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                once(ee, ['timeout-message1', 2, Symbol('timeout-message3'), 0n], {
+                    timeout: 1,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        done();
+                    })
+                ;
+            });
+
+            it('check error message #3', function(done) {
+                let error: DOMException|void = void 0;
+
+                once(ee, 'timeout-message', {
+                    errorEventName: 'timeout-message-error',
+                    timeout: 1,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' ["timeout-message","timeout-message-error"] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        done();
+                    })
+                ;
+            });
+
+            // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
+            itif(!isEventTarget)('check error message #4', function(done) {
+                let error: DOMException|void = void 0;
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                once(ee, ['timeout-message1', 2, Symbol('timeout-message3'), 4n], {
+                    errorEventName: Symbol('timeout-message-error'),
+                    timeout: 1,
+                })
+                    .catch(err => {
+                        error = err;
+                    })
+                    .then(() => {
+                        expect(error).toBeDefined();
+                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
+                        expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        done();
+                    })
+                ;
+            });
         });
 
-        it('with ServerTiming (async/await)', async function () {
+        it('with ServerTiming (async/await)', async function() {
             const ee = new EventEmitter();
             const err = new Error();
 
