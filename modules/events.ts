@@ -2295,7 +2295,7 @@ function _typesToArrayStringTag(types: EventName|EventName[]|void, errorEventNam
 
     if (errorEventName || errorEventName === 0 || (n0 !== void 0 && (errorEventName as EventName & bigint) === n0)) {
         if (!Array.isArray(types)) {
-            types = [ types!, errorEventName! ];
+            types = [ (types! as EventName), errorEventName! ];
         }
         else {
             types = [ ...types, errorEventName! ];
