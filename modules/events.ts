@@ -169,7 +169,13 @@ let _onceListenerIdCounter = 0;
 
 const ERR_INVALID_ARG_TYPE = 'ERR_INVALID_ARG_TYPE';
 const ERR_INVALID_OPTION_TYPE = 'ERR_INVALID_OPTION_TYPE';
-// AbortError code like in native node.js implementation
+/**
+ * AbortError code value like in native node.js implementation
+ @example in node.js: error.code === 'ABORT_ERR'
+ `events.once(new events(), 'test', { signal: AbortSignal.abort() }).catch(err => { console.info(err.code, err.name, err) })`
+ @example in browser: error.code === 20
+ `fetch(location.href, { signal: AbortSignal.abort() }).catch(err => { console.info(err.code, err.name, err) })`
+ */
 const ABORT_ERR = 'ABORT_ERR';
 const _toString = Object.prototype.toString;
 
@@ -2063,6 +2069,8 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
         return super.removeAllListeners(event);
     }
+
+    static ABORT_ERR = ABORT_ERR;
 }
 
 const tagEventEmitterProxy = 'EventEmitterProxy';
@@ -2074,7 +2082,7 @@ if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
 
 export type NodeEventEmitter = INodeEventEmitter;
 
-export {errorMonitor, captureRejectionSymbol};
+export {errorMonitor, captureRejectionSymbol, ABORT_ERR};
 export const once = EventEmitterEx.once;
 
 /**

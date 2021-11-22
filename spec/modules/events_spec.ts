@@ -53,6 +53,7 @@ import events, {
     isEventTargetCompatible,
     Listener,
     kDestroyingEvent,
+    ABORT_ERR,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import {AbortController, AbortControllersGroup, AbortSignal} from 'termi@abortable';
@@ -128,8 +129,8 @@ describe('events', function() {
 
         const ee = new EventEmitter();
 
-        describe('constructor', function () {
-            it('instanceof', function () {
+        describe('constructor', function() {
+            it('instanceof', function() {
                 expect(new EventEmitterEx()).toBeInstanceOf(EventEmitterEx);
                 expect(new EventEmitter()).toBeInstanceOf(EventEmitter);
                 expect(new events()).toBeInstanceOf(events);
@@ -1844,7 +1845,32 @@ describe('events', function() {
             });
         });
 
+        describe('error behaviour', function() {
+            it('case try/catch', async function() {
+                const ee = new EventEmitterEx;
+                let error: Error;
 
+                const promise = new Promise((resolve, reject) => {
+                    try {
+                        ee.on('test', function() {
+                            throw new Error('test');
+                        });
+
+                        ee.emit('test');
+                    }
+                    catch (err) {
+                        reject(err);
+                    }
+                });
+
+                await promise.catch(err => {
+                    error = err;
+                });
+
+                expect(error).toBeDefined();
+                expect(error.message).toInclude('test');
+            });
+        });
     }) as EmptyFunction);
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
@@ -2572,7 +2598,9 @@ describe('events', function() {
                 await promise.catch(error => {
                     wasCatch = true;
 
-                    expect(String(error).includes('Aborted')).toBe(true);
+                    const errorString = String(error);
+
+                    expect([ errorString, errorString.includes('aborted') ]).toEqual([ errorString, true ]);
                     expect(listenerCount(fakeEventTarget, type)).toBe(0);
                     expect(listenerCount(signal, 'abort')).toBe(0);
                 });
@@ -2608,7 +2636,7 @@ describe('events', function() {
                 await promise.catch(error => {
                     wasCatch = true;
 
-                    expect(String(error).includes('Aborted')).toBe(true);
+                    expect(String(error).includes('aborted')).toBe(true);
                     expect(listenerCount(fakeEventTarget, type)).toBe(0);
                     expect(listenerCount(signal, 'abort')).toBe(0);
                 });
@@ -2731,7 +2759,7 @@ describe('events', function() {
                 }).then(() => {
                     throw new Error('test failed');
                 }).catch(err => {
-                    expect(err.code).toBe(/*DOMException.ABORT_ERR*/20);
+                    expect(err.code).toBe(ABORT_ERR);
                 });
             });
 
@@ -2750,7 +2778,7 @@ describe('events', function() {
                     .then(() => {
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
-                        expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                        expect(error && error.code).toBe(ABORT_ERR);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
@@ -2809,9 +2837,9 @@ describe('events', function() {
                 expect(counter).toBe(0);
                 expect(error1).toBeDefined();
                 expect(error2).toBeDefined();
-                expect(error1 && error1.code).toBe(/*DOMException.ABORT_ERR*/20);
+                expect(error1 && error1.code).toBe(ABORT_ERR);
                 expect(error1 && error1.name).toBe('AbortError');
-                expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
+                expect(error2 && error2.code).toBe(ABORT_ERR);
                 expect(error2 && error2.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
@@ -2835,7 +2863,7 @@ describe('events', function() {
                     .then(() => {
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
-                        expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                        expect(error && error.code).toBe(ABORT_ERR);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
@@ -2936,9 +2964,9 @@ describe('events', function() {
                 expect(counter).toBe(0);
                 expect(error1).toBeDefined();
                 expect(error2).toBeDefined();
-                expect(error1 && error1.code).toBe(/*DOMException.ABORT_ERR*/20);
+                expect(error1 && error1.code).toBe(ABORT_ERR);
                 expect(error1 && error1.name).toBe('AbortError');
-                expect(error2 && error2.code).toBe(/*DOMException.ABORT_ERR*/20);
+                expect(error2 && error2.code).toBe(ABORT_ERR);
                 expect(error2 && error2.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
@@ -3006,7 +3034,7 @@ describe('events', function() {
                         })
                         .then(() => {
                             expect(error).toBeDefined();
-                            expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                            expect(error && error.code).toBe(ABORT_ERR);
                             expect(error && error.name).toBe('AbortError');
                             expect(ee.listenerCount('test6')).toBe(0);
                             expect(ee.listenerCount('error')).toBe(0);
@@ -3035,7 +3063,7 @@ describe('events', function() {
                         })
                         .then(() => {
                             expect(error).toBeDefined();
-                            expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                            expect(error && error.code).toBe(ABORT_ERR);
                             expect(error && error.name).toBe('AbortError');
                             expect(ee.listenerCount('test6')).toBe(0);
                             expect(ee.listenerCount('error')).toBe(0);
@@ -3073,7 +3101,7 @@ describe('events', function() {
                         expect(st.length).toBe(1);
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
-                        expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                        expect(error && error.code).toBe(ABORT_ERR);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test10')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
@@ -3106,7 +3134,7 @@ describe('events', function() {
                         expect(st.length).toBe(0);
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
-                        expect(error && error.code).toBe(/*DOMException.ABORT_ERR*/20);
+                        expect(error && error.code).toBe(ABORT_ERR);
                         expect(error && error.name).toBe('AbortError');
                         expect(ee.listenerCount('test10') ).toBe(0);
                         expect(ee.listenerCount('test11')).toBe(0);
