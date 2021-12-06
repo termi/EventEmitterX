@@ -205,6 +205,21 @@ describe('events', function() {
             });
         });
 
+        describe('listener context', function() {
+            it('default', function() {
+                const ee = new EventEmitter();
+                let counter = 0;
+
+                ee.on('test', function() {
+                    counter++;
+
+                    expect(this).toBe(ee);
+                }).emit('test');
+
+                expect(counter).toBe(1);
+            });
+        });
+
         describe('with options.emitCounter', function () {
             it('should call `emitCounter.count(eventName)` for every `EventEmitterEx#emit`', function () {
                 const event1 = 'test-event1';

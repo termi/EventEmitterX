@@ -163,10 +163,6 @@ type EventNamesFrom<T> = T extends EventEmitterEx<infer X> ? keyof X : never;
 // type EventNamesFrom2<T> = EventNamesFrom<T>|EventNamesFrom<T>[];
 type EventNamesFrom3<T> = EventNamesFrom<T>|EventNamesFrom<T>[]|EventName|EventName[];
 
-let _onceListenerIdCounter = 0;
-// This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
-// Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
-
 const ERR_INVALID_ARG_TYPE = 'ERR_INVALID_ARG_TYPE';
 const ERR_INVALID_OPTION_TYPE = 'ERR_INVALID_OPTION_TYPE';
 /**
@@ -195,6 +191,10 @@ const isNodeJS = (function() {
 })();
 
 const {
+    /**
+     * This symbol shall be used to install a listener for only monitoring 'error' events. Listeners installed using this symbol are called before the regular 'error' listeners are called.
+     * Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
+     */
     errorMonitor,
     captureRejectionSymbol,
 }: {
@@ -2368,6 +2368,8 @@ function _onceWrapper(this: OnceListenerState, ...args) {
     }
 }
 
+let _onceListenerIdCounter = 0;
+
 /** @private */
 function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName>(target: EventEmitterEx, type: EventKey, listener: EMD<EventMap>[EventKey]) {
     const id = ++_onceListenerIdCounter;
@@ -2538,10 +2540,6 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventN
     }
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-type _NodeConsole = typeof import('node:console');
-
 /** @private */
 function _objectIsConsole(object: Console|any) {
     if (!object || typeof object !== 'object') {
@@ -2560,9 +2558,10 @@ function _objectIsConsole(object: Console|any) {
     let isNodeJSConsole = false;
     let isBrowserConsole = false;
 
-    // in nodejs console.toString() === '[object console]' (in browser console.toString() === '[object Object]')
+    // * in nodejs console.toString() === '[object console]'
+    // * in browser console.toString() === '[object Object]'
     if (_toString.call(mayBeConsole) === '[object console]') {
-        isNodeJSConsole = typeof (mayBeConsole as _NodeConsole).Console === 'function';
+        isNodeJSConsole = typeof ((mayBeConsole as typeof import('node:console')).Console) === 'function';
     }
     else {
         // in Web there is only one console
