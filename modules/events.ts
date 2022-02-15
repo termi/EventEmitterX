@@ -1485,7 +1485,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         needErrorListener = false;
                     }
 
-                    const eventListener = (...args) => {
+                    const eventListener = (...args: unknown[]) => {
                         if (filter) {
                             try {
                                 if (!filter.apply(_emitter, [type, ...args])) {
@@ -1523,7 +1523,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     }
                 }
 
-                const errorListener = error => {
+                const errorListener = (error: unknown) => {
                     if (hasTiming) {
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
@@ -1573,7 +1573,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             const needErrorListener = type !== errorEventName;
 
             promise = new _Promise<any[]>((resolve, reject) => {
-                const eventListener = (...args) => {
+                const eventListener = (...args: unknown[]) => {
                     if (filter) {
                         try {
                             if (!filter.apply(_emitter, [ type, ...args ])) {
@@ -1598,7 +1598,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                     resolve(args);
                 };
-                const errorListener = error => {
+                const errorListener = (error: unknown) => {
                     if (hasTiming) {
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
@@ -1832,7 +1832,7 @@ export {
     EventEmitterEx,
 };
 
-type EventEmitterProxy_ProxyHook = (type, eventEmitter) => NodeEventEmitter|EventEmitterEx;
+type EventEmitterProxy_ProxyHook = (type: EventName, eventEmitter: ICompatibleEmitter) => NodeEventEmitter|EventEmitterEx;
 interface EventEmitterProxy_Options extends Options {
     /** Функция, которая вычисляет нужный экземпляр eventEmitter, который относиться к конкретному событию */
     proxyHook?: EventEmitterProxy_ProxyHook;
@@ -1902,7 +1902,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         }
     }
 
-    private _onEventEmitterEvent(event: EventName, ...args) {
+    private _onEventEmitterEvent(event: EventName, ...args: unknown[]) {
         switch (args.length) {
             case 0:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1942,18 +1942,18 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     }
 */
 
-    emit(event, ...args) {
+    emit<EventKey extends keyof EMD<EventMap> = keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) {
         const {
             _proxyHook,
             _eventEmitter,
         } = this;
-        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter as ICompatibleEmitter) : _eventEmitter;
 
         if (!eventEmitter) {
             return false;
         }
 
-        return eventEmitter.emit(event, ...args);
+        return eventEmitter.emit(event as NodeEventName, ...args);
     }
 
     emitSelf<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) {
@@ -1967,7 +1967,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             _eventEmitter,
             _proxyHandlers,
         } = this;
-        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+        const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter as ICompatibleEmitter) : _eventEmitter;
 
         if (!eventEmitter) {
             return result;
@@ -2005,7 +2005,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         return result;
     }
 
-    removeListener(event, listener) {
+    removeListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]) {
         const result = super.removeListener(event, listener);
 
         if (this.listenerCount(event) === 0) {
@@ -2014,7 +2014,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
                 _eventEmitter,
                 _proxyHandlers,
             } = this;
-            const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+            const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter as ICompatibleEmitter) : _eventEmitter;
             const proxyHandler = _proxyHandlers[event];
 
             delete _proxyHandlers[event];
@@ -2022,7 +2022,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             if (eventEmitter && proxyHandler) {
                 if (proxyHandler) {
                     try {
-                        eventEmitter.removeListener(event, proxyHandler);
+                        eventEmitter.removeListener(event as NodeEventName, proxyHandler);
                     }
                     catch {
                         // ignore
@@ -2034,7 +2034,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         return result;
     }
 
-    removeAllListeners(event?) {
+    removeAllListeners<EventKey extends keyof EMD<EventMap> = EventName>(event?: EventKey) {
         const {
             _proxyHook,
             _eventEmitter,
@@ -2046,7 +2046,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
                 continue;
             }
 
-            const eventEmitter = _proxyHook ? _proxyHook(event, _eventEmitter) : _eventEmitter;
+            const eventEmitter = _proxyHook ? _proxyHook(event!, _eventEmitter as ICompatibleEmitter) : _eventEmitter;
             const proxyHandler = _proxyHandlers[type];
 
             delete _proxyHandlers[type];
@@ -2111,12 +2111,12 @@ class EventsTypeError extends TypeError {
         return `TypeError: ${message}`;
     }
 
-    static fromObject(error) {
+    static fromObject(error: Error | { code?: string|undefined, message: string }) {
         if (error instanceof EventsTypeError) {
             return error;
         }
         else {
-            const { code, message } = error;
+            const { code, message } = error as { code?: string|undefined, message: string };
 
             return new EventsTypeError(message, code);
         }
@@ -2134,7 +2134,7 @@ export class TimeoutError extends Error {
     name = 'TimeoutError';
     code = 'ETIMEDOUT';
 
-    constructor(...args) {
+    constructor(...args: any[]) {
         super(...args);
 
         if (!this.stack) {
@@ -2353,7 +2353,7 @@ type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, Event
 const sOnceListenerWrapperId = Symbol('');
 
 /** @private */
-function _onceWrapper(this: OnceListenerState, ...args) {
+function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
     const idIndex = this.target._onceIds.indexOf(this.id);
 
     if (idIndex !== -1) {
