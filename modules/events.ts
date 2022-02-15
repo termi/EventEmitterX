@@ -517,7 +517,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         case 1:
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
-                                emitNone_array_catch(listeners, context, event);
+                                emitNone_array_catch.call(this, listeners, context, event);
                             }
                             else {
                                 /*@__NOINLINE__*/
@@ -527,7 +527,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         case 2:
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
-                                emitOne_array_catch(listeners, context, a1, event);
+                                emitOne_array_catch.call(this, listeners, context, a1, event);
                             }
                             else {
                                 /*@__NOINLINE__*/
@@ -537,7 +537,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         case 3:
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
-                                emitTwo_array_catch(listeners, context, a1, a2, event);
+                                emitTwo_array_catch.call(this, listeners, context, a1, a2, event);
                             }
                             else {
                                 /*@__NOINLINE__*/
@@ -547,7 +547,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         case 4:
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
-                                emitThree_array_catch(listeners, context, a1, a2, a3, event);
+                                emitThree_array_catch.call(this, listeners, context, a1, a2, a3, event);
                             }
                             else {
                                 /*@__NOINLINE__*/
@@ -560,7 +560,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
-                                emitMany_array_catch(listeners, context, args, event);
+                                emitMany_array_catch.call(this, listeners, context, args, event);
                             }
                             else {
                                 /*@__NOINLINE__*/
@@ -2403,7 +2403,7 @@ function emitNone_array(listeners: Function[], self: EventEmitterEx|undefined) {
 }
 
 /** @private */
-function emitNone_array_catch(listeners: Function[], self: EventEmitterEx|undefined, event: EventName) {
+function emitNone_array_catch(this: EventEmitterEx, listeners: Function[], self: EventEmitterEx|undefined, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self);
@@ -2423,7 +2423,7 @@ function emitOne_array(listeners: Function[], self: EventEmitterEx|undefined, ar
 }
 
 /** @private */
-function emitOne_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, event: EventName) {
+function emitOne_array_catch(this: EventEmitterEx, listeners: Function[], self: EventEmitterEx|undefined, arg1: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1);
@@ -2443,7 +2443,7 @@ function emitTwo_array(listeners: Function[], self: EventEmitterEx|undefined, ar
 }
 
 /** @private */
-function emitTwo_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, event: EventName) {
+function emitTwo_array_catch(this: EventEmitterEx, listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2);
@@ -2463,7 +2463,7 @@ function emitThree_array(listeners: Function[], self: EventEmitterEx|undefined, 
 }
 
 /** @private */
-function emitThree_array_catch(listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any, event: EventName) {
+function emitThree_array_catch(this: EventEmitterEx, listeners: Function[], self: EventEmitterEx|undefined, arg1: any, arg2: any, arg3: any, event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2, arg3);
@@ -2483,7 +2483,7 @@ function emitMany_array(listeners: Function[], self: EventEmitterEx|undefined, a
 }
 
 /** @private */
-function emitMany_array_catch(listeners: Function[], self: EventEmitterEx|undefined, args: any[], event: EventName) {
+function emitMany_array_catch(this: EventEmitterEx, listeners: Function[], self: EventEmitterEx|undefined, args: any[], event: EventName) {
     const len = listeners.length;
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].apply(self, args);
