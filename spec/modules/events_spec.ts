@@ -359,9 +359,9 @@ describe('events', function() {
                 });
                 let callCounter = 0;
                 const callContexts: undefined[] = [];
-                const onTest = function(this: undefined) {
+                const onTest = function(this: EventEmitterEx|undefined) {
                     callCounter++;
-                    callContexts.push(this);
+                    callContexts.push(this as undefined);
                 };
 
                 emitter.on('test', onTest);
@@ -384,9 +384,9 @@ describe('events', function() {
                 });
                 let callCounter = 0;
                 const callContexts: EventEmitterEx[] = [];
-                const onTest = function(this: EventEmitterEx) {
+                const onTest = function(this: EventEmitterEx|undefined) {
                     callCounter++;
-                    callContexts.push(this);
+                    callContexts.push(this as EventEmitterEx);
                 };
 
                 emitter.on('test', onTest);
@@ -439,7 +439,7 @@ describe('events', function() {
                         expect(listener).toBe(listener1);
 
                         // 'newListener' should call be before `listener` is added in known listeners list
-                        expect(this.listenerCount(name)).toBe(0);
+                        expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
                     }
                 });
 
@@ -672,7 +672,7 @@ describe('events', function() {
                         expect(listener).toBe(listener1);
 
                         // 'removeListener' should call after `listener` is removed from known listeners list
-                        expect(this.listenerCount(name)).toBe(0);
+                        expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
                     }
                 });
 
@@ -1863,7 +1863,6 @@ describe('events', function() {
         describe('error behaviour', function() {
             it('case try/catch', async function() {
                 const ee = new EventEmitterEx;
-                let error: Error;
 
                 const promise = new Promise((resolve, reject) => {
                     try {
@@ -1878,12 +1877,10 @@ describe('events', function() {
                     }
                 });
 
-                await promise.catch(err => {
-                    error = err;
+                await promise.catch(error => {
+                    expect(error).toBeDefined();
+                    expect(error.message).toInclude('test');
                 });
-
-                expect(error).toBeDefined();
-                expect(error.message).toInclude('test');
             });
         });
     }) as EmptyFunction);

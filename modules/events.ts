@@ -47,7 +47,7 @@ export interface ICompatibleEmitter {
     // prependOnceListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
 }
 // type NodeEventEmitter = EventEmitter;
-export declare type Listener = (...args: any[]) => Promise<any> | void;
+export declare type Listener = (this: EventEmitterEx|undefined, ...args: any[]) => Promise<any> | void;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
     handleEvent(...args: Parameters<EventMap[EventKey]>): Promise<any> | void;
@@ -314,7 +314,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     public readonly isEventEmitter = true;
 
     private _events: {
-        [eventName in keyof EMD<EventMap>]?: Function|Function[];
+        [eventName in keyof EMD<EventMap>]?: Listener|Listener[];
     } = Object.create(null);
 
     _maxListeners = Infinity;
@@ -739,20 +739,20 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else if (existedHandlerIsFunction) {
             if (prepend) {
-                _events[event] = [ listener, handler as Function ];
+                _events[event] = [ listener, handler as Listener ];
             }
             else {
-                _events[event] = [ handler as Function, listener ];
+                _events[event] = [ handler as Listener, listener ];
             }
 
             newLen = 2;
         }
         else {
             if (prepend) {
-                newLen = (handler as Function[]).unshift(listener);
+                newLen = (handler as Listener[]).unshift(listener);
             }
             else {
-                newLen = (handler as Function[]).push(listener);
+                newLen = (handler as Listener[]).push(listener);
             }
         }
 
@@ -820,7 +820,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else if (hasAnyOnceListener) {
             // remove only first link to once listener
-            const listeners = (handler as Function[]);
+            const listeners = handler as Listener[];
             let index = -1;
 
             newListenersCount = listeners.length;
@@ -882,7 +882,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else {
             // remove only first link to listener
-            const listeners = (handler as Function[]);
+            const listeners = (handler as Listener[]);
             const index = listeners.indexOf(listener);
 
             newListenersCount = listeners.length;
