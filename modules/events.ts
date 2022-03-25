@@ -10,6 +10,8 @@
 //  - тесты:
 //    - https://github.com/nodejs/node/blob/master/test/parallel/test-eventtarget.js
 
+// also see: https://github.com/jonathanong/ee-first
+
 import type ServerTiming from 'termi@ServerTiming';
 import type {
     // default as TAbortController,
@@ -2130,6 +2132,7 @@ if (EventsTypeError.constructor.name !== tagEventsTypeError) {
     Object.defineProperty(EventsTypeError.constructor, 'name', { value: tagEventsTypeError, configurable: true });
 }
 
+// see: https://github.com/bjyoungblood/es6-error/blob/master/src/index.js
 export class TimeoutError extends Error {
     name = 'TimeoutError';
     code = 'ETIMEDOUT';
