@@ -51,6 +51,7 @@ import events, {
     EventName,
     isEventEmitterCompatible,
     isEventTargetCompatible,
+    getEventListeners,
     Listener,
     kDestroyingEvent,
     ABORT_ERR,
@@ -1907,6 +1908,35 @@ describe('events', function() {
         it('instanceof', function () {
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterEx);
+        });
+
+        it('destructor', function () {
+            const emitter = new EventEmitterEx();
+            const proxy = new EventEmitterProxy(emitter);
+
+            proxy.on('test1', () => {});
+            proxy.on('test2', () => {});
+            emitter.on('test3', () => {});
+
+            let wasDestroyed = false;
+
+            proxy.on(kDestroyingEvent, () => { wasDestroyed = true; });
+
+            expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
+                .toBe(2)
+            ;
+            expect(getEventListeners(emitter, 'test1').length).toBe(1);
+            expect(getEventListeners(emitter, 'test2').length).toBe(1);
+
+            proxy.destructor();
+
+            expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
+                .toBe(0)
+            ;
+            expect(getEventListeners(emitter, 'test1').length).toBe(0);
+            expect(getEventListeners(emitter, 'test2').length).toBe(0);
+            expect(getEventListeners(emitter, 'test3').length).toBe(1);
+            expect(wasDestroyed).toBe(true);
         });
 
         it('simple example', function() {

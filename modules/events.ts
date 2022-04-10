@@ -32,21 +32,29 @@ type INodeEventEmitter = NodeJS.EventEmitter;
 type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
 
 /**
- * Это минимально совместимый с кодом {@link EventEmitterEx.once} emitter, отличающийся от EventEmitter:
+ * Это публичный минимально совместимый с кодом {@link EventEmitterEx.once} emitter, отличающийся от EventEmitter:
  * * для ICompatibleEmitter нужны только некоторые методы из всех методов EventEmitter
  * * методы ICompatibleEmitter **могут** не возвращать this
  */
 export interface ICompatibleEmitter {
     on: ReplaceReturnType<INodeEventEmitter["on"], any>;
-    // on: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    addListener: ReplaceReturnType<INodeEventEmitter["addListener"], any>;
     once: ReplaceReturnType<INodeEventEmitter["once"], any>;
-    // once: (event: string | symbol, listener: (...args: any[]) => void) => any;
     removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
-    // removeListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
     prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
-    // prependListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
     prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
-    // prependOnceListener: (event: string | symbol, listener: (...args: any[]) => void) => any;
+    emit: ReplaceReturnType<INodeEventEmitter["emit"], any>;
+}
+/**
+ * Это приватный минимально совместимый emitter
+ * @private
+ */
+interface IMinimum_CompatibleEmitter_private {
+    on: ReplaceReturnType<INodeEventEmitter["on"], any>;
+    once: ReplaceReturnType<INodeEventEmitter["once"], any>;
+    removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
+    prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
+    prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
 }
 // type NodeEventEmitter = EventEmitter;
 export declare type Listener = (this: EventEmitterEx|undefined, ...args: any[]) => Promise<any> | void;
@@ -199,15 +207,20 @@ const {
      */
     errorMonitor,
     captureRejectionSymbol,
+
+    getEventListeners: nodejs_events_getEventListeners,
 }: {
     readonly errorMonitor: typeof import("events").errorMonitor,
     readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
+    readonly getEventListeners: typeof import("events").getEventListeners | void,
 } = (function(): {
     readonly errorMonitor: typeof import("events").errorMonitor,
     readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
+    readonly getEventListeners: typeof import("events").getEventListeners | void,
 } {
     let errorMonitor: typeof import("events").errorMonitor | void;
     let captureRejectionSymbol: typeof import("events").captureRejectionSymbol | void;
+    let getEventListeners: typeof import("events").getEventListeners | void;
 
     if (isNodeJS) {
         // this is nodejs
@@ -216,6 +229,7 @@ const {
 
             errorMonitor = events.errorMonitor;
             captureRejectionSymbol = events.captureRejectionSymbol;
+            getEventListeners = events.getEventListeners;
         }
         catch {
             // ignore
@@ -234,8 +248,10 @@ const {
     return {
         errorMonitor,
         captureRejectionSymbol,
+        getEventListeners,
     };
 })();
+const has_nodejs_events_getEventListeners = typeof nodejs_events_getEventListeners === 'function';
 
 export const kDestroyingEvent = Symbol('kDestroyingEvent');
 
@@ -284,6 +300,13 @@ const sCleanAbortPromise = Symbol();
  * @private
  */
 const kCapture = Symbol('kCapture');
+/**
+ * Non-public sign that this object is EventEmitterEx.
+ *
+ * This symbol should be visible only in this module or in modules with subclasses.
+ * @private
+ */
+const kIsEventEmitterEx = Symbol();
 
 // listenerOncePerEventType, listener can be registered at most once per event type
 const EventEmitterEx_Flags_listenerOncePerEventType = 1 << 1;
@@ -314,6 +337,7 @@ const EventEmitterEx_Flags_destroyed = 1 << 30;
 export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     public readonly isEventEmitterEx = true;
     public readonly isEventEmitter = true;
+    protected readonly [kIsEventEmitterEx] = true;
 
     private _events: {
         [eventName in keyof EMD<EventMap>]?: Listener|Listener[];
@@ -1301,9 +1325,58 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
     //   init: [Function (anonymous)],
-    //   static getEventListeners(emitter: EventEmitter|DOMEventTarget, type: string)
-    //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
 
+    // todo:
+    //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
+    static getEventListeners(
+        emitter: DOMEventTarget|EventEmitterEx|INodeEventEmitter|ICompatibleEmitter,
+        eventName: EventName,
+    ) {
+        if (isEventEmitterEx(emitter)) {
+            return emitter.listeners(eventName);
+        }
+        else if (has_nodejs_events_getEventListeners) {
+            // todo: write new function isNodeEventEmitter and use it here
+            // this is node env, maybe emitter is native node EventEmitter or DOMEventTarget
+            if (isEventEmitterCompatible(emitter)) {
+                if (typeof (emitter as INodeEventEmitter).listeners === 'function') {
+                    return (emitter as INodeEventEmitter).listeners(eventName as string|symbol);
+                }
+
+                // if emitter is compatible, but not native node EventEmitter, node getEventListeners will throw a error:
+                //  `The "emitter" argument must be an instance of EventEmitter or EventTarget. Received an instance of {tag of emitter}`
+                return nodejs_events_getEventListeners(emitter as INodeEventEmitter, eventName as string|symbol);
+            }
+            else if (isEventTargetCompatible(emitter)) {
+                if (isNodeJS) {
+                    // if emitter is compatible, but not native node EventEmitter, node getEventListeners will throw a error:
+                    //  `The "emitter" argument must be an instance of EventEmitter or EventTarget. Received an instance of {tag of emitter}`
+                    return nodejs_events_getEventListeners(emitter, eventName as string|symbol);
+                }
+                else {
+                    // Most likely, events module and events.getEventListeners function was polyfilled.
+                    const errorMessage = 'EventEmitterEx.getEventListeners: (node=false)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter or EventTarget. This EventTarget is unsupported';
+                    const error = new TypeError(errorMessage);
+
+                    error["code"] = 'ERR_INVALID_ARG_TYPE';
+
+                    throw error;
+                }
+            }
+        }
+
+        const errorMessage = isNodeJS
+            ? 'EventEmitterEx.getEventListeners: (node=true)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter or EventTarget'
+            : 'EventEmitterEx.getEventListeners: (node=false)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter'
+        ;
+        const error = new TypeError(errorMessage);
+
+        error["code"] = 'ERR_INVALID_ARG_TYPE';
+
+        throw error;
+    }
+
+    // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
     static once<EE extends EventEmitterEx=EventEmitterEx>(emitter: EventEmitterEx, types: EventNamesFrom3<EE>, options?: StaticOnceOptions<EE, EventNamesFrom<EE>>): Promise<any[]>;
     static once(nodeEmitter: INodeEventEmitter, events: string|symbol|(string|symbol)[], options?: StaticOnceOptions<INodeEventEmitter, string|symbol>): Promise<any[]>;
     static once(eventTarget: DOMEventTarget, types: string|string[], options?: StaticOnceOptionsEventTarget): Promise<[Event]>;
@@ -1889,7 +1962,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     }
 
     destructor() {
-        this.removeAllListeners();
+        super.destructor();
 
         this._eventEmitter = void 0;
         this._proxyHook = void 0;
@@ -2086,6 +2159,7 @@ export type NodeEventEmitter = INodeEventEmitter;
 
 export {errorMonitor, captureRejectionSymbol, ABORT_ERR};
 export const once = EventEmitterEx.once;
+export const getEventListeners = EventEmitterEx.getEventListeners;
 
 /**
  * @private
@@ -2182,7 +2256,7 @@ function checkListener(listener: Function, supportHandleEvent = false) {
  * @param emitter
  * @private
  */
-function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICompatibleEmitter|Object) {
+function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICompatibleEmitter|IMinimum_CompatibleEmitter_private|Object): emitter is IMinimum_CompatibleEmitter_private {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
@@ -2190,7 +2264,7 @@ function _isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|ICo
     ;
 }
 
-export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object) {
+export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitter|Object): emitter is ICompatibleEmitter {
     return _isEventEmitterCompatible(emitter)
         && typeof (emitter as INodeEventEmitter).addListener === 'function'
         && typeof (emitter as INodeEventEmitter).once === 'function'
@@ -2198,6 +2272,22 @@ export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitt
         && typeof (emitter as INodeEventEmitter).emit === 'function'
     ;
 }
+
+// todo: isNodeEventEmitter - check emitter is EventEmitter from 'node:events' module or from 'events' module polyfill.
+
+/**
+ * Check if emitter is instance of EventEmitterEx from current running environment.
+ *
+ * Note: if emitter is instance of EventEmitterEx from another environment, this method returns false.
+ * @param emitter
+ */
+export function isEventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap>(emitter: EventEmitterEx|Object): emitter is EventEmitterEx<EventMap> {
+    return !!emitter
+        && emitter[kIsEventEmitterEx] === true
+    ;
+}
+
+// todo: isNodeEventTarget - check emitter is EventTarget(NodeEventTarget) from 'node:events' module or from 'events' module polyfill, but not browser EventTarget.
 
 /**
  * Check only 'addEventListener' and 'removeEventListener', but not 'dispatchEvent'.
