@@ -43,7 +43,7 @@ export interface ICompatibleEmitter {
     removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
     prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
     prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
-    emit: ReplaceReturnType<INodeEventEmitter["emit"], any>;
+    emit: (eventName: string|symbol|any, ...args: any[]) => boolean | any;
 }
 /**
  * Это приватный минимально совместимый emitter
