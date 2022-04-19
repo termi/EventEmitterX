@@ -210,17 +210,17 @@ const {
 
     getEventListeners: nodejs_events_getEventListeners,
 }: {
-    readonly errorMonitor: typeof import("events").errorMonitor,
-    readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
-    readonly getEventListeners: typeof import("events").getEventListeners | void,
+    readonly errorMonitor: typeof import("node:events").errorMonitor,
+    readonly captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol,
+    readonly getEventListeners: typeof import("node:events").getEventListeners | void,
 } = (function(): {
-    readonly errorMonitor: typeof import("events").errorMonitor,
-    readonly captureRejectionSymbol: typeof import("events").captureRejectionSymbol,
-    readonly getEventListeners: typeof import("events").getEventListeners | void,
+    readonly errorMonitor: typeof import("node:events").errorMonitor,
+    readonly captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol,
+    readonly getEventListeners: typeof import("node:events").getEventListeners | void,
 } {
-    let errorMonitor: typeof import("events").errorMonitor | void;
-    let captureRejectionSymbol: typeof import("events").captureRejectionSymbol | void;
-    let getEventListeners: typeof import("events").getEventListeners | void;
+    let errorMonitor: typeof import("node:events").errorMonitor | void;
+    let captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol | void;
+    let getEventListeners: typeof import("node:events").getEventListeners | void;
 
     if (isNodeJS) {
         // this is nodejs
@@ -239,10 +239,10 @@ const {
     if (!errorMonitor || (errorMonitor as unknown as string) === 'error') {
         // Проверка на errorMonitor === 'error' добавлена для того, чтобы на 100% исключить возможность зацикливания
         //  EventEmitterEx#emit при отправки 'error'.
-        errorMonitor = Symbol('events.errorMonitor') as typeof import("events").errorMonitor;
+        errorMonitor = Symbol('events.errorMonitor') as typeof import("node:events").errorMonitor;
     }
     if (!captureRejectionSymbol) {
-        captureRejectionSymbol = Symbol.for('nodejs.rejection') as typeof import("events").captureRejectionSymbol;
+        captureRejectionSymbol = Symbol.for('nodejs.rejection') as typeof import("node:events").captureRejectionSymbol;
     }
 
     return {
@@ -1883,8 +1883,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         return promise;
     }
 
-    static readonly errorMonitor = errorMonitor as typeof import("events").errorMonitor;
-    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("events").captureRejectionSymbol;
+    static readonly errorMonitor = errorMonitor as typeof import("node:events").errorMonitor;
+    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("node:events").captureRejectionSymbol;
     // domain is not supported
     static readonly usingDomains = false;
 
