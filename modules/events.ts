@@ -785,7 +785,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         if (_maxListeners !== Infinity && _maxListeners <= newLen) {
             // todo: EventEmitterEx.sOnMaxListeners = Symbol('sOnMaxListeners');
             //  emit(EventEmitterEx.sOnMaxListeners, newLen, event, `Maximum event listeners for "${event}" event!`);
-            console.warn(`Maximum event listeners for "${event}" event!`);
+            console.warn(`Maximum event listeners for "${String(event)}" event!`);
         }
 
         return true;
@@ -1917,7 +1917,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     private _proxyHook: EventEmitterProxy_ProxyHook|void;
     private _eventEmitter: INodeEventEmitter|EventEmitterEx|void;
     // private _eventTarget: DOMEventTarget|void;
-    private _proxyHandlers: Record<EventName, (...args: any[]) => void> = {};
+    private _proxyHandlers: Partial<Record<EventName, (...args: any[]) => void>> = {};
     // private _isEventTarget = false;
 
     /**
