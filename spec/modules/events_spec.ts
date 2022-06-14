@@ -60,6 +60,7 @@ import ServerTiming from 'termi@ServerTiming';
 import {AbortController, AbortControllersGroup, AbortSignal} from 'termi@abortable';
 import LoggerCap from '../../utils/LoggerCap';
 import {FakeEventTarget} from "../../spec_utils/FakeEventTarget";
+import {Deferred} from "../../spec_utils/Deferred";
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -1882,6 +1883,112 @@ describe('events', function() {
                     expect(error).toBeDefined();
                     expect(error.message).toInclude('test');
                 });
+            });
+        });
+
+        describe('cases', function() {
+            it('#on with asyncIterator and "for await ... of"', async function() {
+                const ee = new EventEmitterEx();
+                const ac = new AbortController();
+
+                const createEventsAsyncIterator = function(ee: EventEmitterEx, event: EventName, signal: AbortSignal) {
+                    let deferred: Deferred | void;
+                    let isAborted = false;
+                    const eventsPool: (unknown[])[] = [];
+                    const onEvent = (...args: unknown[]) => {
+                        if (isAborted) {
+                            return;
+                        }
+
+                        eventsPool.push(args);
+
+                        if (deferred) {
+                            deferred.resolve(void 0);
+                            deferred = void 0;
+                        }
+                    };
+                    const onAbort = () => {
+                        isAborted = true;
+                        signal.removeEventListener('abort', onAbort);
+                        ee.removeListener(event, onEvent);
+
+                        if (deferred) {// Prevent Deferred(Promise) from being in 'pending' status forever
+                            // using 'resolve' and not 'reject' due <asyncIterator>.next() has logic with isAborted check
+                            deferred.resolve(void 0);
+                            deferred = void 0;
+                        }
+                    };
+
+                    ee.on(event, onEvent);
+
+                    signal.addEventListener('abort', onAbort);
+
+                    return {
+                        [Symbol.asyncIterator]() {
+                            return {
+                                next() {
+                                    if (isAborted) {
+                                        return Promise.resolve({ value: void 0, done: true });
+                                    }
+
+                                    if (eventsPool.length) {
+                                        const eventArgs = eventsPool.shift();
+
+                                        return Promise.resolve({
+                                            value: eventArgs,
+                                            done: false,
+                                        });
+                                    }
+
+                                    deferred = new Deferred();
+
+                                    return deferred.then(() => {
+                                        return this.next();
+                                    });
+                                },
+                                return() {
+                                    onAbort();
+
+                                    return this.next();
+                                },
+                            };
+                        },
+                    };
+                };
+
+                setImmediate(() => {
+                    ee.emit('test', 1);
+                    ee.emit('test', 2);
+                });
+
+                const events: (unknown[])[] = [];
+                const onAsyncEventHandled = () => {
+                    if (events.length === 2) {
+                        setImmediate(() => {
+                            ee.emit('test', 3);
+                        });
+                    }
+                    if (events.length === 3) {
+                        ac.abort();
+                    }
+                };
+                const asyncIterator = createEventsAsyncIterator(ee, 'test', ac.signal);
+
+                expect(listenerCount(ac.signal, 'abort')).toBe(1);
+
+                for await (const event of asyncIterator) {
+                    events.push(event);
+
+                    onAsyncEventHandled();
+                }
+
+                expect(events).toEqual([
+                    [ 1 ],
+                    [ 2 ],
+                    [ 3 ],
+                ]);
+                expect(ee.listenerCount('test')).toBe(0);
+                expect(listenerCount(ac.signal, 'abort')).toBe(0);
             });
         });
     }) as EmptyFunction);
