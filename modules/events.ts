@@ -2062,18 +2062,18 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
         if (prepend) {
             if (once) {
-                (eventEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxy!);
             }
             else {
-                (eventEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxy!);
             }
         }
         else {
             if (once) {
-                (eventEmitter as EventEmitterEx).once(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).once(event as NodeEventName, eventProxy!);
             }
             else {
-                (eventEmitter as EventEmitterEx).on(event as NodeEventName, eventProxy);
+                (eventEmitter as EventEmitterEx).on(event as NodeEventName, eventProxy!);
             }
         }
 
