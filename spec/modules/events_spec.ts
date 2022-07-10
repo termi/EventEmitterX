@@ -57,10 +57,10 @@ import events, {
     ABORT_ERR,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
-import {AbortController, AbortControllersGroup, AbortSignal} from 'termi@abortable';
+import { AbortController, AbortControllersGroup, AbortSignal } from 'termi@abortable';
 import LoggerCap from '../../utils/LoggerCap';
-import {FakeEventTarget} from "../../spec_utils/FakeEventTarget";
-import {Deferred} from "../../spec_utils/Deferred";
+import { FakeEventTarget } from "../../spec_utils/FakeEventTarget";
+import { Deferred } from "../../spec_utils/Deferred";
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -69,8 +69,8 @@ const {
     createDomEventLike,
 } = require('../../spec_utils/EventTarget_helpers');
 
-let {EventEmitter} = events;
-const {errorMonitor} = events;
+let { EventEmitter } = events;
+const { errorMonitor } = events;
 
 function isTestError(error: Error) {
     const errorString = String(error);
@@ -139,8 +139,8 @@ describe('events', function() {
             });
         });
 
-        describe('destructor', function () {
-            it('should remove all listeners', function () {
+        describe('destructor', function() {
+            it('should remove all listeners', function() {
                 const ee = new EventEmitter();
 
                 ee.on('foo', () => {});
@@ -156,7 +156,7 @@ describe('events', function() {
                 expect(ee.listenerCount('foo')).toBe(0);
             });
 
-            it('should not add any listener after destroying', function () {
+            it('should not add any listener after destroying', function() {
                 const ee = new EventEmitter();
 
                 ee.on('foo', () => {});
@@ -178,7 +178,7 @@ describe('events', function() {
                 expect(ee.listenerCount('foo')).toBe(0);
             });
 
-            it('should emit kDestroyingEvent on destroying', function () {
+            it('should emit kDestroyingEvent on destroying', function() {
                 const ee = new EventEmitter();
                 let wasCalled = false;
 
@@ -195,14 +195,14 @@ describe('events', function() {
             });
         });
 
-        describe('events is an alias for EventEmitter', function () {
-            it('instanceof', function () {
+        describe('events is an alias for EventEmitter', function() {
+            it('instanceof', function() {
                 expect(new EventEmitter()).toBeInstanceOf(events);
             });
         });
 
-        describe('EventEmitterEx is an alias for EventEmitter', function () {
-            it('instanceof', function () {
+        describe('EventEmitterEx is an alias for EventEmitter', function() {
+            it('instanceof', function() {
                 expect(new EventEmitter()).toBeInstanceOf(EventEmitterEx);
             });
         });
@@ -222,8 +222,8 @@ describe('events', function() {
             });
         });
 
-        describe('with options.emitCounter', function () {
-            it('should call `emitCounter.count(eventName)` for every `EventEmitterEx#emit`', function () {
+        describe('with options.emitCounter', function() {
+            it('should call `emitCounter.count(eventName)` for every `EventEmitterEx#emit`', function() {
                 const event1 = 'test-event1';
                 const event2 = 'test-event2';
                 const numericEventType = 123;
@@ -284,7 +284,7 @@ describe('events', function() {
                 }
             });
 
-            it('options.emitCounter as global.console', function () {
+            it('options.emitCounter as global.console', function() {
                 const eventType = 'test-event1';
                 const numericEventType = 123;
                 const testSymbol = Symbol('testSymbol');
@@ -322,7 +322,7 @@ describe('events', function() {
                 console.count = console_count;
             });
 
-            it('options.emitCounter as LoggerCap', function () {
+            it('options.emitCounter as LoggerCap', function() {
                 const eventType = 'test-event1';
                 const numericEventType = 123;
                 const testSymbol = Symbol('testSymbol');
@@ -354,8 +354,8 @@ describe('events', function() {
             });
         });
 
-        describe('with options.listenerWithoutThis', function () {
-            it('with options.listenerWithoutThis = true: should not pass emitter instance to listener', function () {
+        describe('with options.listenerWithoutThis', function() {
+            it('with options.listenerWithoutThis = true: should not pass emitter instance to listener', function() {
                 const emitter = new EventEmitter({
                     listenerWithoutThis: true,
                 });
@@ -380,7 +380,7 @@ describe('events', function() {
                 expect(callContexts).toEqual((new Array(callCounter)).fill(void 0));
             });
 
-            it('(default) with options.listenerWithoutThis = false: should pass emitter instance to listener', function () {
+            it('(default) with options.listenerWithoutThis = false: should pass emitter instance to listener', function() {
                 const emitter = new EventEmitter({
                     listenerWithoutThis: false,
                 });
@@ -406,8 +406,8 @@ describe('events', function() {
             });
         });
 
-        describe('#on/#addListener + #once + #prependListener + #prependOnceListener', function () {
-            it('should returns this', function () {
+        describe('#on/#addListener + #once + #prependListener + #prependOnceListener', function() {
+            it('should returns this', function() {
                 const ee = new EventEmitter();
 
                 expect(ee.on('foo', () => {})).toBe(ee);
@@ -418,7 +418,7 @@ describe('events', function() {
             });
 
             // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-add-listeners.js
-            it('should call "newListener" for each new listeners', function () {
+            it('should call "newListener" for each new listeners', function() {
                 let counter = 0;
                 const listener1 = jest.fn(() => { counter++; });
                 const listener2 = jest.fn(() => { counter += 2; });
@@ -463,15 +463,15 @@ describe('events', function() {
                     expect(counter).toBe(7);
 
                     expect(onceNewListener).toHaveBeenCalled();
-                    expect(onceNewListener.mock.calls).toEqual([['hello_on', listener1]]);
+                    expect(onceNewListener.mock.calls).toEqual([ [ 'hello_on', listener1 ] ]);
 
                     expect(listener1).toHaveBeenCalled();
-                    expect(listener1.mock.calls).toEqual([['a', 'b'], [1, 2], [sTest1, sTest2]]);
+                    expect(listener1.mock.calls).toEqual([ [ 'a', 'b' ], [ 1, 2 ], [ sTest1, sTest2 ] ]);
                     expect(listener2).toHaveBeenCalled();
-                    expect(listener2.mock.calls).toEqual([[1], [2]]);
+                    expect(listener2.mock.calls).toEqual([ [ 1 ], [ 2 ] ]);
 
-                    expect(events_newListener_emitted).toEqual(['hello_on', 'hello_addListener', 'hello_once', 'hello_prepend', 'hello_prependOnce']);
-                    expect(listeners_newListener_emitted).toEqual([listener1, listener1, listener2, listener1, listener2]);
+                    expect(events_newListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once', 'hello_prepend', 'hello_prependOnce' ]);
+                    expect(listeners_newListener_emitted).toEqual([ listener1, listener1, listener2, listener1, listener2 ]);
                 }
 
                 {// cleanup
@@ -488,7 +488,7 @@ describe('events', function() {
                 }
             });
 
-            it('"newListener" event with multiply listeners', function () {
+            it('"newListener" event with multiply listeners', function() {
                 let counter = 0;
                 const listener = () => { counter++; };
                 const eventName = 'test123';
@@ -524,7 +524,7 @@ describe('events', function() {
                 }
 
                 {// main tests #2
-                    expect(ee.listeners(eventName)).toEqual([listener, listener, listener, listener, listener]);
+                    expect(ee.listeners(eventName)).toEqual([ listener, listener, listener, listener, listener ]);
                 }
 
                 {// logic #2
@@ -535,7 +535,10 @@ describe('events', function() {
                     expect(counter).toBe(5);
 
                     expect(newListener).toHaveBeenCalled();
-                    expect(newListener.mock.calls).toEqual([[eventName, listener], [eventName, listener], [eventName, listener], [eventName, listener], [eventName, listener]]);
+                    expect(newListener.mock.calls).toEqual([
+                        [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
+                        [ eventName, listener ], [ eventName, listener ],
+                    ]);
                 }
 
                 {// cleanup
@@ -547,7 +550,7 @@ describe('events', function() {
                 }
             });
 
-            it('should not add duplicated listeners if options.listenerOncePerEventType = true', function () {
+            it('should not add duplicated listeners if options.listenerOncePerEventType = true', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 const listener1 = () => { counter1++; };
@@ -596,7 +599,7 @@ describe('events', function() {
                 }
             });
 
-            it(`should emit 'duplicatedListener' if options.listenerOncePerEventType = true`, function () {
+            it(`should emit 'duplicatedListener' if options.listenerOncePerEventType = true`, function() {
                 let counter = 0;
                 let duplicatesCounter = 0;
                 const listener1 = () => { counter++; };
@@ -642,8 +645,8 @@ describe('events', function() {
             });
         });
 
-        describe('#removeListener/#off', function () {
-            it('should returns this', function () {
+        describe('#removeListener/#off', function() {
+            it('should returns this', function() {
                 const ee = new EventEmitter();
 
                 expect(ee.removeListener('foo', () => {})).toBe(ee);
@@ -651,9 +654,9 @@ describe('events', function() {
             });
 
             // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-listeners.js
-            it('should call "removeListener" for each removed listeners', function () {
+            it('should call "removeListener" for each removed listeners', function() {
                 let counter = 0;
-                const listener1 =() => { counter++; };
+                const listener1 = () => { counter++; };
                 const listener2 = () => { counter += 2; };
                 const events_removeListener_emitted: (string|number|symbol)[] = [];
                 const listeners_removeListener_emitted: Function[] = [];
@@ -699,10 +702,10 @@ describe('events', function() {
                     expect(counter).toBe(4);
 
                     expect(onceRemoveListener).toHaveBeenCalled();
-                    expect(onceRemoveListener.mock.calls).toEqual([['hello_on', listener1]]);
+                    expect(onceRemoveListener.mock.calls).toEqual([ [ 'hello_on', listener1 ] ]);
 
-                    expect(events_removeListener_emitted).toEqual(['hello_on', 'hello_addListener', 'hello_once']);
-                    expect(listeners_removeListener_emitted).toEqual([listener1, listener1, listener2]);
+                    expect(events_removeListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once' ]);
+                    expect(listeners_removeListener_emitted).toEqual([ listener1, listener1, listener2 ]);
                 }
 
                 {// finale check
@@ -715,7 +718,7 @@ describe('events', function() {
                 }
             });
 
-            it('"removeListener" event with multiply listeners', function () {
+            it('"removeListener" event with multiply listeners', function() {
                 const listener = () => { /* nothing to do here */ };
                 const eventName = 'test123';
                 let removeListenerCounter = 0;
@@ -744,7 +747,7 @@ describe('events', function() {
                 }
 
                 {// main tests #2
-                    expect(ee.listeners(eventName)).toEqual([listener, listener, listener, listener, listener]);
+                    expect(ee.listeners(eventName)).toEqual([ listener, listener, listener, listener, listener ]);
                 }
 
                 {// logic
@@ -764,7 +767,10 @@ describe('events', function() {
 
                 {// main tests #3
                     expect(onceRemoveListener).toHaveBeenCalled();
-                    expect(onceRemoveListener.mock.calls).toEqual([[eventName, listener], [eventName, listener], [eventName, listener], [eventName, listener], [eventName, listener]]);
+                    expect(onceRemoveListener.mock.calls).toEqual([
+                        [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
+                        [ eventName, listener ], [ eventName, listener ],
+                    ]);
                 }
 
                 {// cleanup
@@ -776,7 +782,7 @@ describe('events', function() {
                 }
             });
 
-            it('call removeListener() in "removeListener" event', function () {
+            it('call removeListener() in "removeListener" event', function() {
                 let counter = 0;
                 const listener1 = () => { counter += 1; };
                 const listener2 = () => { counter += 2; };
@@ -800,7 +806,7 @@ describe('events', function() {
                     expect(counter).toBe(0);
 
                     expect(onceRemoveListener).toHaveBeenCalled();
-                    expect(onceRemoveListener.mock.calls).toEqual([[eventName, listener1]]);
+                    expect(onceRemoveListener.mock.calls).toEqual([ [ eventName, listener1 ] ]);
                 }
 
                 {// finale check
@@ -809,10 +815,10 @@ describe('events', function() {
                 }
             });
 
-            it('call removeListener() in handler', function () {
+            it('call removeListener() in handler', function() {
                 let counter = 0;
                 const eventName = 'test12345';
-                const listener1 = jest.fn(function (this: EventEmitterEx) {
+                const listener1 = jest.fn(function(this: EventEmitterEx) {
                     this.removeListener(eventName, listener2);
                 });
                 const listener2 = () => { counter += 1; };
@@ -842,8 +848,8 @@ describe('events', function() {
             });
         });
 
-        describe('[#on + #removeListener] logic', function () {
-            it('should call listener multiple times', function () {
+        describe('[#on + #removeListener] logic', function() {
+            it('should call listener multiple times', function() {
                 let counter = 0;
                 const listener = () => { counter++; };
 
@@ -857,7 +863,7 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should call listener multiple times for multiple listeners', function () {
+            it('should call listener multiple times for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
@@ -887,9 +893,9 @@ describe('events', function() {
                 expect(ee.listenerCount('test3')).toBe(0);
             });
 
-            it('should not call listener after removeListener', function () {
+            it('should not call listener after removeListener', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.emit('test');
@@ -900,7 +906,7 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            it('should not call listener after removeListener multiple times for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
@@ -932,7 +938,7 @@ describe('events', function() {
                 expect(ee.listenerCount('test3')).toBe(0);
             });
 
-            it('event name as symbol', function () {
+            it('event name as symbol', function() {
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-symbols.js
                 const eventNameSymbol = Symbol('eventNameSymbol');
                 let counter = 0;
@@ -950,7 +956,7 @@ describe('events', function() {
                 expect(ee.listenerCount(eventNameSymbol)).toBe(0);
             });
 
-            it('event name as number', function () {
+            it('event name as number', function() {
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-symbols.js
                 const eventNameNumber = 123456789;
                 let counter = 0;
@@ -969,10 +975,10 @@ describe('events', function() {
             });
         });
 
-        describe('[#on + #removeListener] logic - use same listener multiple times', function () {
-            it('should call listener multiple times', function () {
+        describe('[#on + #removeListener] logic - use same listener multiple times', function() {
+            it('should call listener multiple times', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
@@ -986,9 +992,9 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('#removeListener should remove only one copy of listener', function () {
+            it('#removeListener should remove only one copy of listener', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
@@ -1014,13 +1020,13 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should call listener multiple times for multiple listeners', function () {
+            it('should call listener multiple times for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test1', listener1);
@@ -1053,9 +1059,9 @@ describe('events', function() {
                 expect(ee.listenerCount('test3')).toBe(0);
             });
 
-            it('removeListener should remove only first matched listener', function () {
+            it('removeListener should remove only first matched listener', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
@@ -1069,13 +1075,13 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('removeListener should remove only first matched listener for multiple listeners', function () {
+            it('removeListener should remove only first matched listener for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test1', listener1);
@@ -1117,12 +1123,12 @@ describe('events', function() {
             });
         });
 
-        describe('[#on + #removeListener] logic - use same listener multiple times - with listenerOncePerEventType=true', function () {
+        describe('[#on + #removeListener] logic - use same listener multiple times - with listenerOncePerEventType=true', function() {
             const ee = new EventEmitter({ listenerOncePerEventType: true });
 
-            it('should call listener multiple times', function () {
+            it('should call listener multiple times', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
@@ -1135,13 +1141,13 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should call listener multiple times for multiple listeners', function () {
+            it('should call listener multiple times for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test1', listener1);
@@ -1171,9 +1177,9 @@ describe('events', function() {
                 expect(ee.listenerCount('test3')).toBe(0);
             });
 
-            it('should not call listener after removeListener', function () {
+            it('should not call listener after removeListener', function() {
                 let counter = 0;
-                const listener = () => { counter++ };
+                const listener = () => { counter++; };
 
                 ee.on('test', listener);
                 ee.on('test', listener);
@@ -1186,13 +1192,13 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should not call listener after removeListener multiple times for multiple listeners', function () {
+            it('should not call listener after removeListener multiple times for multiple listeners', function() {
                 let counter1 = 0;
                 let counter2 = 0;
                 let counter3 = 0;
-                const listener1 = () => { counter1++ };
-                const listener2 = () => { counter2++ };
-                const listener3 = () => { counter3++ };
+                const listener1 = () => { counter1++; };
+                const listener2 = () => { counter2++; };
+                const listener3 = () => { counter3++; };
 
                 ee.on('test1', listener1);
                 ee.on('test1', listener1);
@@ -1222,9 +1228,9 @@ describe('events', function() {
             });
         });
 
-        describe('#emit', function () {
-            describe('simple case', function () {
-                it('single listener', function () {
+        describe('#emit', function() {
+            describe('simple case', function() {
+                it('single listener', function() {
                     let counter = 0;
                     const listener = () => { counter++; };
 
@@ -1238,7 +1244,7 @@ describe('events', function() {
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
-                it('multiply listeners', function () {
+                it('multiply listeners', function() {
                     let counter = 0;
                     const listener = () => { counter++; };
 
@@ -1255,8 +1261,8 @@ describe('events', function() {
                 });
             });
 
-            describe('should not call handler added in current called handler', function () {
-                it('single listener', function () {
+            describe('should not call handler added in current called handler', function() {
+                it('single listener', function() {
                     let counter1 = 0;
                     let counter2 = 0;
                     let counter3 = 0;
@@ -1282,7 +1288,7 @@ describe('events', function() {
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
-                it('multiply listeners', function () {
+                it('multiply listeners', function() {
                     let counter1 = 0;
                     let counter2 = 0;
                     let counter3 = 0;
@@ -1309,8 +1315,8 @@ describe('events', function() {
                 });
             });
 
-            describe('should call handler removed in current called handler', function () {
-                it('single listener', function () {
+            describe('should call handler removed in current called handler', function() {
+                it('single listener', function() {
                     let counter1 = 0;
                     let counter2 = 0;
                     let counter3 = 0;
@@ -1336,7 +1342,7 @@ describe('events', function() {
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
-                it('multiply listeners', function () {
+                it('multiply listeners', function() {
                     let counter1 = 0;
                     let counter2 = 0;
                     let counter3 = 0;
@@ -1367,7 +1373,7 @@ describe('events', function() {
                 });
             });
 
-            describe('arguments length test', function () {
+            describe('arguments length test', function() {
                 const ee = new EventEmitterEx<{
                     'test-args0': () => void,
                     'test-args1': (a: number) => void,
@@ -1377,7 +1383,7 @@ describe('events', function() {
                     'test-argsN': (...args: string[]) => void,
                 }>();
 
-                it('args.length = 0', function () {
+                it('args.length = 0', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, ...args) {
                         expect(this).toBe(ee);
                         expect(args.length).toBe(0);
@@ -1399,7 +1405,7 @@ describe('events', function() {
                     }
                 });
 
-                it('args.length = 1', function () {
+                it('args.length = 1', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, a) {
                         expect(this).toBe(ee);
                         expect(a).toBe(9);
@@ -1422,7 +1428,7 @@ describe('events', function() {
                     }
                 });
 
-                it('args.length = 2', function () {
+                it('args.length = 2', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, a, b) {
                         expect(this).toBe(ee);
                         expect(a).toBe(8);
@@ -1446,7 +1452,7 @@ describe('events', function() {
                     }
                 });
 
-                it('args.length = 3', function () {
+                it('args.length = 3', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, a, b, c) {
                         expect(this).toBe(ee);
                         expect(a).toBe(7);
@@ -1471,7 +1477,7 @@ describe('events', function() {
                     }
                 });
 
-                it('args.length = 9', function () {
+                it('args.length = 9', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, n1, n2, n3, n4, n5, n6, n7, n8, n9) {
                         expect(this).toBe(ee);
                         expect(n1).toBe(1);
@@ -1502,7 +1508,7 @@ describe('events', function() {
                     }
                 });
 
-                it('args.length = N', function () {
+                it('args.length = N', function() {
                     const expectedArgs = randArr30;
                     const listener = jest.fn(function(this: EventEmitterEx, ...args) {
                         expect(this).toBe(ee);
@@ -1528,18 +1534,18 @@ describe('events', function() {
             });
         });
 
-        describe('events.errorMonitor', function () {
+        describe('events.errorMonitor', function() {
             // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-error-monitor.js
 
-            it(`events.errorMonitor is a Symbol`, function () {
+            it(`events.errorMonitor is a Symbol`, function() {
                 expect(typeof errorMonitor).toBe('symbol');
             });
 
-            describe(`without 'error' listener`, function () {
+            describe(`without 'error' listener`, function() {
                 // todo: На данный момент НЕ вызываем событие errorMonitor, если НЕТ подписок на событие 'error'.
                 //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
 
-                it(`single listener`, function () {
+                it(`single listener`, function() {
                     const theErr = new Error('MyError');
                     const monitorListener1 = jest.fn((/*err*/) => {
                         // {// main tests #1
@@ -1565,7 +1571,7 @@ describe('events', function() {
                         expect(err).toBe(theErr);
 
                         expect(monitorListener1).not.toHaveBeenCalled();
-                        // expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                        // expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup
@@ -1574,7 +1580,7 @@ describe('events', function() {
                     }
                 });
 
-                it(`multiply listeners`, function () {
+                it(`multiply listeners`, function() {
                     const theErr = new Error('MyError');
                     const monitorListener1 = jest.fn(() => {});
                     const monitorListener2 = jest.fn((/*err*/) => {
@@ -1602,10 +1608,10 @@ describe('events', function() {
                         expect(err).toBe(theErr);
 
                         expect(monitorListener1).not.toHaveBeenCalled();
-                        // expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                        // expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
 
                         expect(monitorListener2).not.toHaveBeenCalled();
-                        // expect(monitorListener2.mock.calls).toEqual([[theErr]]);
+                        // expect(monitorListener2.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup
@@ -1616,9 +1622,9 @@ describe('events', function() {
                 });
             });
 
-            describe(`with 'error' listener`, function () {
+            describe(`with 'error' listener`, function() {
 
-                it(`single listener`, function () {
+                it(`single listener`, function() {
                     const theErr = new Error('MyError');
                     const monitorListener1 = jest.fn((err) => {
                         {// main tests 1
@@ -1651,10 +1657,10 @@ describe('events', function() {
 
                     {// main tests #3
                         expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
 
                         expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(errorListener1.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup
@@ -1665,7 +1671,7 @@ describe('events', function() {
                     }
                 });
 
-                it(`multiply listeners`, function () {
+                it(`multiply listeners`, function() {
                     const theErr = new Error('MyError');
                     const monitorListener1 = jest.fn(() => {});
                     const monitorListener2 = jest.fn((err) => {
@@ -1702,14 +1708,14 @@ describe('events', function() {
 
                     {// main tests #3
                         expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
                         expect(monitorListener2).toHaveBeenCalled();
-                        expect(monitorListener2.mock.calls).toEqual([[theErr]]);
+                        expect(monitorListener2.mock.calls).toEqual([ [ theErr ] ]);
 
                         expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([[theErr]]);
+                        expect(errorListener1.mock.calls).toEqual([ [ theErr ] ]);
                         expect(errorListener2).toHaveBeenCalled();
-                        expect(errorListener2.mock.calls).toEqual([[theErr]]);
+                        expect(errorListener2.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup
@@ -1722,7 +1728,7 @@ describe('events', function() {
                     }
                 });
 
-                it(`complex case`, function () {
+                it(`complex case`, function() {
                     const theErr1 = new Error('MyError1');
                     const theErr2 = new Error('MyError2');
                     const expectedArgs = randArr30.slice(0, 10);
@@ -1764,17 +1770,17 @@ describe('events', function() {
                     }
 
                     {// main tests #3
-                        const expectedCallArgs = [theErr1, theErr2, ...expectedArgs];
+                        const expectedCallArgs = [ theErr1, theErr2, ...expectedArgs ];
 
                         expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([expectedCallArgs]);
+                        expect(monitorListener1.mock.calls).toEqual([ expectedCallArgs ]);
                         expect(monitorListener2).toHaveBeenCalled();
-                        expect(monitorListener2.mock.calls).toEqual([expectedCallArgs]);
+                        expect(monitorListener2.mock.calls).toEqual([ expectedCallArgs ]);
 
                         expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([expectedCallArgs]);
+                        expect(errorListener1.mock.calls).toEqual([ expectedCallArgs ]);
                         expect(errorListener2).toHaveBeenCalled();
-                        expect(errorListener2.mock.calls).toEqual([expectedCallArgs]);
+                        expect(errorListener2.mock.calls).toEqual([ expectedCallArgs ]);
                     }
 
                     {// cleanup
@@ -1790,8 +1796,8 @@ describe('events', function() {
         });
 
         // todo: more tests here: https://github.com/nodejs/node/blob/master/test/parallel/test-events-once.js
-        describe('#once', function () {
-            it('should emit once', function () {
+        describe('#once', function() {
+            it('should emit once', function() {
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-once.js
                 let counter = 0;
 
@@ -1805,7 +1811,7 @@ describe('events', function() {
                 expect(ee.listenerCount('test')).toBe(0);
             });
 
-            it('should not emit after removeListener', function () {
+            it('should not emit after removeListener', function() {
                 let counter = 0;
                 const listener = () => {
                     counter++;
@@ -1821,8 +1827,8 @@ describe('events', function() {
             });
         });
 
-        describe('non-standard #hasListener', function () {
-            it('should detect without handler', function () {
+        describe('non-standard #hasListener', function() {
+            it('should detect without handler', function() {
                 const ee = new EventEmitterEx();
 
                 const handler1 = () => {};
@@ -1840,7 +1846,7 @@ describe('events', function() {
                 expect(ee.hasListener('test_4')).toBe(true);
             });
 
-            it('should detect with handler', function () {
+            it('should detect with handler', function() {
                 const ee = new EventEmitterEx();
 
                 const handler1 = () => {};
@@ -2012,12 +2018,12 @@ describe('events', function() {
     }
 
     describe('EventEmitterProxy', function() {
-        it('instanceof', function () {
+        it('instanceof', function() {
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterEx);
         });
 
-        it('destructor', function () {
+        it('destructor', function() {
             const emitter = new EventEmitterEx();
             const proxy = new EventEmitterProxy(emitter);
 
@@ -2113,7 +2119,7 @@ describe('events', function() {
 
     describe('events.once', function _EventEmitter_once() {
         let EventEmitter = EventEmitterEx;
-        let {once} = EventEmitterEx;
+        let { once } = EventEmitterEx;
 
         {
             // eslint-disable-next-line prefer-rest-params
@@ -2143,7 +2149,7 @@ describe('events', function() {
             once = compatibleOnce_for_EventTarget(once);
         }
 
-        it('should emit once', function (done) {
+        it('should emit once', function(done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [ 'test', 1, {} ];
@@ -2170,7 +2176,7 @@ describe('events', function() {
             ee.emit('test1', ...expectedArgs);
         });
 
-        it('should emit once (async/await)', async function () {
+        it('should emit once (async/await)', async function() {
             const expectedArgs = [ 'test', 1, {} ];
             const argsArray: any[] = [];
 
@@ -2191,7 +2197,7 @@ describe('events', function() {
         });
 
         describe(`'error' handling`, function() {
-            it(`should reject with error on 'error' event`, function (done) {
+            it(`should reject with error on 'error' event`, function(done) {
                 const expectedError = new Error('REJECT PROMISE');
                 let error = void 0;
 
@@ -2218,7 +2224,7 @@ describe('events', function() {
                 ee.emit('error', expectedError);
             });
 
-            it(`should reject with error on 'error' event (async/await)`, async function () {
+            it(`should reject with error on 'error' event (async/await)`, async function() {
                 const expectedError = new Error('REJECT PROMISE');
                 let error = null;
 
@@ -2248,7 +2254,7 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should not reject if 'error' event is main listener type`, function (done) {
+            it(`should not reject if 'error' event is main listener type`, function(done) {
                 const err = new Error();
 
                 once(ee, 'error', {
@@ -2256,7 +2262,7 @@ describe('events', function() {
                     errorEventName: isEventTarget ? 'error' : void 0,
                 })
                     .then(args => {
-                        expect(args).toEqual([err, 1, 2, 3]);
+                        expect(args).toEqual([ err, 1, 2, 3 ]);
 
                         done();
                     })
@@ -2267,7 +2273,7 @@ describe('events', function() {
                 ee.emit('error', err, 1, 2, 3);
             });
 
-            it(`should not reject if 'error' event is main listener type (async/await)`, async function () {
+            it(`should not reject if 'error' event is main listener type (async/await)`, async function() {
                 const err = new Error();
 
                 setImmediate(() => {
@@ -2279,19 +2285,19 @@ describe('events', function() {
                     errorEventName: isEventTarget ? 'error' : void 0,
                 });
 
-                expect(args).toEqual([err, 1, 2, 3]);
+                expect(args).toEqual([ err, 1, 2, 3 ]);
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should not reject if 'error' event is in main listeners types`, function (done) {
+            it(`should not reject if 'error' event is in main listeners types`, function(done) {
                 const err = new Error();
 
-                once(ee, ['test1', 'test2', 'error'], {
+                once(ee, [ 'test1', 'test2', 'error' ], {
                     // EventTarget does not have `error` event semantics like Node
                     errorEventName: isEventTarget ? 'error' : void 0,
                 })
                     .then(args => {
-                        expect(args).toEqual([err, 1, 2, 3]);
+                        expect(args).toEqual([ err, 1, 2, 3 ]);
                         expect(ee.listenerCount('test1')).toBe(0);
                         expect(ee.listenerCount('test2')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
@@ -2307,23 +2313,23 @@ describe('events', function() {
                 ee.emit('error', err, 1, 2, 3);
             });
 
-            it(`should not reject if 'error' event is in main listeners types (async/await)`, async function () {
+            it(`should not reject if 'error' event is in main listeners types (async/await)`, async function() {
                 const err = new Error();
 
                 setImmediate(() => {
                     ee.emit('error', err, 1, 2, 3);
                 });
 
-                const args = await once(ee, ['test1', 'test2', 'error'], {
+                const args = await once(ee, [ 'test1', 'test2', 'error' ], {
                     // EventTarget does not have `error` event semantics like Node
                     errorEventName: isEventTarget ? 'error' : void 0,
                 });
 
-                expect(args).toEqual([err, 1, 2, 3]);
+                expect(args).toEqual([ err, 1, 2, 3 ]);
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should reject with error on custom error event`, function (done) {
+            it(`should reject with error on custom error event`, function(done) {
                 const expectedError = new Error('REJECT PROMISE');
                 const customErrorEventName = 'custom_error1';
                 let error = void 0;
@@ -2350,7 +2356,7 @@ describe('events', function() {
                 ee.emit(customErrorEventName, expectedError);
             });
 
-            it(`should reject with error on custom error event (async/await)`, async function () {
+            it(`should reject with error on custom error event (async/await)`, async function() {
                 const expectedError = new Error('REJECT PROMISE');
                 const customErrorEventName = 'custom_error2';
                 let error = null;
@@ -2378,14 +2384,14 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should not reject if custom error event is main listener type`, function (done) {
+            it(`should not reject if custom error event is main listener type`, function(done) {
                 const customErrorEventName = 'custom_error1-1';
 
                 once(ee, customErrorEventName, {
                     errorEventName: customErrorEventName,
                 })
                     .then(args => {
-                        expect(args).toEqual([1, 2, 3]);
+                        expect(args).toEqual([ 1, 2, 3 ]);
                         expect(ee.listenerCount(customErrorEventName)).toBe(0);
 
                         done();
@@ -2397,7 +2403,7 @@ describe('events', function() {
                 ee.emit(customErrorEventName, 1, 2, 3);
             });
 
-            it(`should not reject if custom error event is main listener type (async/await)`, async function () {
+            it(`should not reject if custom error event is main listener type (async/await)`, async function() {
                 const customErrorEventName = 'custom_error1-2';
 
                 setImmediate(() => {
@@ -2408,18 +2414,18 @@ describe('events', function() {
                     errorEventName: customErrorEventName,
                 });
 
-                expect(args).toEqual([1, 2, 3]);
+                expect(args).toEqual([ 1, 2, 3 ]);
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should not reject if custom error event is in main listeners types`, function (done) {
+            it(`should not reject if custom error event is in main listeners types`, function(done) {
                 const customErrorEventName = 'custom_error1-1';
 
-                once(ee, ['test1', 'test2', customErrorEventName], {
+                once(ee, [ 'test1', 'test2', customErrorEventName ], {
                     errorEventName: customErrorEventName,
                 })
                     .then(args => {
-                        expect(args).toEqual([1, 2, 3]);
+                        expect(args).toEqual([ 1, 2, 3 ]);
                         expect(ee.listenerCount('test1')).toBe(0);
                         expect(ee.listenerCount('test2')).toBe(0);
                         expect(ee.listenerCount(customErrorEventName)).toBe(0);
@@ -2435,22 +2441,22 @@ describe('events', function() {
                 ee.emit(customErrorEventName, 1, 2, 3);
             });
 
-            it(`should not reject if custom error event is in main listeners types (async/await)`, async function () {
+            it(`should not reject if custom error event is in main listeners types (async/await)`, async function() {
                 const customErrorEventName = 'custom_error1-2';
 
                 setImmediate(() => {
                     ee.emit(customErrorEventName, 1, 2, 3);
                 });
 
-                const args = await once(ee, ['test1', 'test2', customErrorEventName], {
+                const args = await once(ee, [ 'test1', 'test2', customErrorEventName ], {
                     errorEventName: customErrorEventName,
                 });
 
-                expect(args).toEqual([1, 2, 3]);
+                expect(args).toEqual([ 1, 2, 3 ]);
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should not reject if custom error event is main listener and 'error' event emitted`, async function () {
+            it(`should not reject if custom error event is main listener and 'error' event emitted`, async function() {
                 const err = new Error();
                 const customErrorEventName = 'custom_error1-3';
 
@@ -2478,7 +2484,7 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should reject if 'error' event is main listener and custom error event emitted`, async function () {
+            it(`should reject if 'error' event is main listener and custom error event emitted`, async function() {
                 const customErrorEventName = 'custom_error1-3';
                 const error = new Error('custom');
 
@@ -2524,7 +2530,7 @@ describe('events', function() {
                 it.skip = function(){};
             }
 
-            it.skip('with options.prepend', function (done) {
+            it.skip('with options.prepend', function(done) {
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-prepend.js
                 let counter = 0;
                 const isEvent = Symbol('isEvent');
@@ -2582,10 +2588,10 @@ describe('events', function() {
                     done();
                 });
 
-                ee.emit('test5-1', createDomEventLike('test5-1', {position: 1, [isEvent]: true}));
-                ee.emit('test5-1', createDomEventLike('test5-1', {position: 2, [isEvent]: true}));
-                ee.emit('test5-1', createDomEventLike('test5-1', {position: 3, [isEvent]: true}));
-                ee.emit('test5-1', createDomEventLike('test5-1', {position: 4, [isEvent]: true}));
+                ee.emit('test5-1', createDomEventLike('test5-1', { position: 1, [isEvent]: true }));
+                ee.emit('test5-1', createDomEventLike('test5-1', { position: 2, [isEvent]: true }));
+                ee.emit('test5-1', createDomEventLike('test5-1', { position: 3, [isEvent]: true }));
+                ee.emit('test5-1', createDomEventLike('test5-1', { position: 4, [isEvent]: true }));
 
                 ee.removeListener('test5-1', defaultListener);
             });
@@ -2654,7 +2660,7 @@ describe('events', function() {
                 });
             });
 
-            it.skip('with options.capture', async function () {
+            it.skip('with options.capture', async function() {
                 const data = {
                     test: true,
                 };
@@ -2666,7 +2672,7 @@ describe('events', function() {
 
                 await once(eventTarget, 'test5-2', {
                     capture: true,
-                }).then(([event]) => {
+                }).then(([ event ]) => {
                     expect((event as CustomEvent<typeof data>).detail).toBe(data);
                     expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
                 });
@@ -2689,7 +2695,7 @@ describe('events', function() {
 
                         return true;
                     },
-                }).then(([event]) => {
+                }).then(([ event ]) => {
                     expect((event as CustomEvent<typeof data>).detail).toBe(data);
                     expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
                     expect(event.defaultPrevented).toBe(false);
@@ -2713,7 +2719,7 @@ describe('events', function() {
 
                         return true;
                     },
-                }).then(([event]) => {
+                }).then(([ event ]) => {
                     expect((event as CustomEvent<typeof data>).detail).toBe(data);
                     expect(listenerCount(eventTarget, 'test5-2')).toBe(0);
                     expect(event.defaultPrevented).toBe(true);
@@ -2796,7 +2802,7 @@ describe('events', function() {
             it.skip = itSkip;
         });
 
-        it('with options.filter', function (done) {
+        it('with options.filter', function(done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [
@@ -2807,15 +2813,21 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, 'test5', {filter: (type, ...args) => args[1] === 9})
+                once(ee, 'test5', { filter: (type, ...args) => args[1] === 9 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
-                once(ee, 'test5', {filter: (type, ...args) => args[1] === 5})
+                    .catch(err => (
+                        error = err
+                    )),
+                once(ee, 'test5', { filter: (type, ...args) => args[1] === 5 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
-                once(ee, 'test5', {filter: (type, ...args) => args[1] === 1})
+                    .catch(err => (
+                        error = err
+                    )),
+                once(ee, 'test5', { filter: (type, ...args) => args[1] === 1 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
+                    .catch(err => (
+                        error = err
+                    )),
             ]).then(() => {
                 expect(error).toBe(expectedError);
                 expect(argsArray).toEqual(expectedArgs);
@@ -2834,7 +2846,7 @@ describe('events', function() {
             ee.emit('test5', ...[ 'test', 9, {} ]);
         });
 
-        it('with options.filter - this should be EventEmitter', async function () {
+        it('with options.filter - this should be EventEmitter', async function() {
             let passedEventEmitter: typeof ee | null = null;
 
             setImmediate(() => {
@@ -2847,15 +2859,15 @@ describe('events', function() {
 
                     return true;
                 },
-            })
+            });
 
             expect(passedEventEmitter).toBe(ee);
-            expect(actualArgs).toEqual([1, 2, 3]);
+            expect(actualArgs).toEqual([ 1, 2, 3 ]);
             expect(ee.listenerCount('test-ee-this')).toBe(0);
             expect(ee.listenerCount('error')).toBe(0);
         });
 
-        it('with options.filter and multi-names', function (done) {
+        it('with options.filter and multi-names', function(done) {
             const expectedError = null;
             let error = null;
             const expectedArgs = [
@@ -2866,15 +2878,21 @@ describe('events', function() {
             const argsArray: any[] = [];
 
             Promise.all([
-                once(ee, ['test5-1', 'test5-2'], {filter: (type, ...args) => args[1] === 9})
+                once(ee, [ 'test5-1', 'test5-2' ], { filter: (type, ...args) => args[1] === 9 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
-                once(ee, ['test5-2', 'test5-1'], {filter: (type, ...args) => args[1] === 5})
+                    .catch(err => (
+                        error = err
+                    )),
+                once(ee, [ 'test5-2', 'test5-1' ], { filter: (type, ...args) => args[1] === 5 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
-                once(ee, ['test5-1', 'test5-2'], {filter: (type, ...args) => args[1] === 1})
+                    .catch(err => (
+                        error = err
+                    )),
+                once(ee, [ 'test5-1', 'test5-2' ], { filter: (type, ...args) => args[1] === 1 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (error = err)),
+                    .catch(err => (
+                        error = err
+                    )),
             ]).then(() => {
                 expect(error).toBe(expectedError);
                 expect(argsArray).toEqual(expectedArgs);
@@ -2912,7 +2930,7 @@ describe('events', function() {
                 });
             });
 
-            it('with AbortSignal', function (done) {
+            it('with AbortSignal', function(done) {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
@@ -2940,10 +2958,10 @@ describe('events', function() {
                 expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
-                ee.emit('test6', ...[1, 2, 3]);
+                ee.emit('test6', ...[ 1, 2, 3 ]);
             });
 
-            it('with AbortSignal (async/await)', async function () {
+            it('with AbortSignal (async/await)', async function() {
                 let error1: DOMException|void = void 0;
                 let error2: DOMException|void = void 0;
                 let counter = 0;
@@ -2953,8 +2971,8 @@ describe('events', function() {
                 setImmediate(() => {
                     ac1.abort();
                     ac2.abort();
-                    ee.emit('test6', ...[1, 2, 3]);
-                    ee.emit('test6', ...[1, 2, 3]);
+                    ee.emit('test6', ...[ 1, 2, 3 ]);
+                    ee.emit('test6', ...[ 1, 2, 3 ]);
                 });
 
                 try {
@@ -2996,7 +3014,7 @@ describe('events', function() {
                 expect(listenerCount(ac2.signal, 'abort')).toBe(0);
             });
 
-            it(`with AbortController's`, function (done) {
+            it(`with AbortController's`, function(done) {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
@@ -3027,10 +3045,10 @@ describe('events', function() {
                 expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
                 ac1.abort();
-                ee.emit('test6', ...[1, 2, 3]);
+                ee.emit('test6', ...[ 1, 2, 3 ]);
             });
 
-            it(`with AbortController's - without abort()`, function (done) {
+            it(`with AbortController's - without abort()`, function(done) {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
@@ -3058,10 +3076,10 @@ describe('events', function() {
                 expect(listenerCount(ac1.signal, 'abort')).toBe(1);
                 expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
-                ee.emit('test6', ...[1, 2, 3]);
+                ee.emit('test6', ...[ 1, 2, 3 ]);
             });
 
-            it(`with AbortController's (async/await)`, async function () {
+            it(`with AbortController's (async/await)`, async function() {
                 let error1: DOMException|void = void 0;
                 let error2: DOMException|void = void 0;
                 let counter = 0;
@@ -3072,8 +3090,8 @@ describe('events', function() {
                 setImmediate(() => {
                     ac1.abort();
                     ac2.abort();
-                    ee.emit('test6', ...[1, 2, 3]);
-                    ee.emit('test6', ...[1, 2, 3]);
+                    ee.emit('test6', ...[ 1, 2, 3 ]);
+                    ee.emit('test6', ...[ 1, 2, 3 ]);
                 });
 
                 try {
@@ -3124,7 +3142,7 @@ describe('events', function() {
                 expect(listenerCount(acg.signal, 'abort')).toBe(0);
             });
 
-            it(`with AbortController's (async/await) - without abort()`, async function () {
+            it(`with AbortController's (async/await) - without abort()`, async function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
@@ -3132,7 +3150,7 @@ describe('events', function() {
                 const acg = new AbortControllersGroup([ ac1, ac2 ]);
 
                 setImmediate(() => {
-                    ee.emit('test6', ...[1, 2, 3]);
+                    ee.emit('test6', ...[ 1, 2, 3 ]);
                 });
 
                 try {
@@ -3168,7 +3186,7 @@ describe('events', function() {
                 expect(listenerCount(acg.signal, 'abort')).toBe(0);
             });
 
-            it(`with AbortSignal and AbortController's`, async function () {
+            it(`with AbortSignal and AbortController's`, async function() {
                 const promises: Promise<any>[] = [];
 
                 {
@@ -3233,7 +3251,7 @@ describe('events', function() {
                 await Promise.all(promises);
             });
 
-            it('with AbortSignal and ServerTiming', function (done) {
+            it('with AbortSignal and ServerTiming', function(done) {
                 const st = new ServerTiming();
                 let error: DOMException|void = void 0;
                 let counter = 0;
@@ -3263,16 +3281,16 @@ describe('events', function() {
                 expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
-                ee.emit('test10', ...[1, 2, 3]);
+                ee.emit('test10', ...[ 1, 2, 3 ]);
             });
 
-            it('with AbortSignal and ServerTiming and multi-names', function (done) {
+            it('with AbortSignal and ServerTiming and multi-names', function(done) {
                 const st = new ServerTiming();
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
 
-                once(ee, ['test10', 'test11', 'test12'], { signal: ac.signal, timing: st })
+                once(ee, [ 'test10', 'test11', 'test12' ], { signal: ac.signal, timing: st })
                     .then(() => {
                         counter++;
                     })
@@ -3285,7 +3303,7 @@ describe('events', function() {
                         expect(error).toBeDefined();
                         expect(error && error.code).toBe(ABORT_ERR);
                         expect(error && error.name).toBe('AbortError');
-                        expect(ee.listenerCount('test10') ).toBe(0);
+                        expect(ee.listenerCount('test10')).toBe(0);
                         expect(ee.listenerCount('test11')).toBe(0);
                         expect(ee.listenerCount('test12')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
@@ -3298,7 +3316,7 @@ describe('events', function() {
                 expect(listenerCount(ac.signal, 'abort')).toBe(1);
 
                 ac.abort();
-                ee.emit('test11', ...[1, 2, 3]);
+                ee.emit('test11', ...[ 1, 2, 3 ]);
             });
         });
 
@@ -3333,7 +3351,7 @@ describe('events', function() {
                 ;
 
                 const timeout = setTimeout(() => {
-                    ee.emit('test7', ...[1, 2, 3]);
+                    ee.emit('test7', ...[ 1, 2, 3 ]);
                 }, 100);
             });
 
@@ -3426,7 +3444,7 @@ describe('events', function() {
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                once(ee, ['timeout-message1', 2, Symbol('timeout-message3'), 0n], {
+                once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 0n ], {
                     timeout: 1,
                 })
                     .catch(err => {
@@ -3470,7 +3488,7 @@ describe('events', function() {
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                once(ee, ['timeout-message1', 2, Symbol('timeout-message3'), 4n], {
+                once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
                     errorEventName: Symbol('timeout-message-error'),
                     timeout: 1,
                 })
@@ -3534,7 +3552,7 @@ describe('events', function() {
             }
         });
 
-        it('with ServerTiming and few events (async/await)', async function () {
+        it('with ServerTiming and few events (async/await)', async function() {
             const ee = new EventEmitter();
             const st = new ServerTiming();
             let error: Error|void = void 0;
@@ -3568,7 +3586,7 @@ describe('events', function() {
             ]);
 
             expect(st.length).toBe(3);
-            expect(st.getTimings().map(a => a.description)).toEqual(['test9-1', 'test9-2', 'test9-3']);
+            expect(st.getTimings().map(a => a.description)).toEqual([ 'test9-1', 'test9-2', 'test9-3' ]);
             expect(error).toBeDefined();
             expect(ee.listenerCount('test9-1')).toBe(0);
             expect(ee.listenerCount('test9-2')).toBe(0);
@@ -3589,7 +3607,7 @@ describe('events', function() {
                     expect(typeof lister).toBe('function');
                 });
                 ee.on('newListener', (name, lister) => {
-                    expect(typeof name).toBeOneOf(['string', 'number', 'symbol']);
+                    expect(typeof name).toBeOneOf([ 'string', 'number', 'symbol' ]);
                     expect(typeof lister).toBe('function');
                 });
                 ee.on('error', (error) => {
