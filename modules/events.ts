@@ -448,7 +448,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         // todo: Вопрос: Если (isErrorEvent == true) нужно ли вызывать событие errorMonitor, если НЕТ подписок на событие 'error'.
         //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
         if (handler) {
-            const {_f} = this;
+            const { _f } = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterEx_Flags_has_error_listener);
             const captureRejections = _checkBit(_f, EventEmitterEx_Flags_captureRejections);
             const listenerWithoutThis = _checkBit(_f, EventEmitterEx_Flags_listenerWithoutThis);
@@ -512,7 +512,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         break;
                     // slower
                     default: {
-                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+                        const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
 
                         result = func_handler.apply(context, args);
                     }
@@ -523,7 +523,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     // is the most common case so we do not pay any perf
                     // penalty
                     if (result !== undefined && result !== null) {
-                        const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+                        const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
 
                         _addCatch(this, result, event, args);
                     }
@@ -582,7 +582,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             break;
                         // slower
                         default: {
-                            const [, ...args] = arguments;// eslint-disable-line prefer-rest-params
+                            const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
 
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
@@ -701,7 +701,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             else {
                 const listeners = (handler as Function[]);
 
-                for (let i = listeners.length ; i-- > 0 ; ) {
+                for (let i = listeners.length ; i-- > 0 ;) {
                     const handler = listeners[i];
 
                     if (handler === listener) {
@@ -851,7 +851,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
             newListenersCount = listeners.length;
 
-            for (let i = listeners.length ; i-- > 0 ; ) {
+            for (let i = listeners.length ; i-- > 0 ;) {
                 const handler = listeners[i];
 
                 if (handler === listener) {
@@ -1072,7 +1072,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     else {
                         const listeners = (handler as Listener[]);
 
-                        for (let i = listeners.length ; i-- > 0 ; ) {
+                        for (let i = listeners.length ; i-- > 0 ;) {
                             const listener = listeners[i];
 
                             const onceWrapperId = listener[sOnceListenerWrapperId];
@@ -1147,7 +1147,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     else {
                         const listeners = (handler as Function[]);
 
-                        for (let i = listeners.length ; i-- > 0 ; ) {
+                        for (let i = listeners.length ; i-- > 0 ;) {
                             const handler = listeners[i];
 
                             const onceWrapperId = handler[sOnceListenerWrapperId];
@@ -1187,6 +1187,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
     setMaxListeners(n: number): this {
         this._maxListeners = n;
+
         return this;
     }
 
@@ -1563,7 +1564,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     const eventListener = (...args: unknown[]) => {
                         if (filter) {
                             try {
-                                if (!filter.apply(_emitter, [type, ...args])) {
+                                if (!filter.apply(_emitter, [ type, ...args ])) {
                                     return;
                                 }
                             }
@@ -2157,7 +2158,7 @@ if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
 
 export type NodeEventEmitter = INodeEventEmitter;
 
-export {errorMonitor, captureRejectionSymbol, ABORT_ERR};
+export { errorMonitor, captureRejectionSymbol, ABORT_ERR };
 export const once = EventEmitterEx.once;
 export const getEventListeners = EventEmitterEx.getEventListeners;
 
@@ -2178,7 +2179,7 @@ class EventsTypeError extends TypeError {
     }
 
     toString() {
-        const {code, message} = this;
+        const { code, message } = this;
 
         if (code) {
             return `TypeError [${code}]: ${message}`;
@@ -2220,7 +2221,7 @@ export class TimeoutError extends Error {
         }
     }
 
-    static ETIMEDOUT = 'ETIMEDOUT'
+    static ETIMEDOUT = 'ETIMEDOUT';
 }
 
 const tagTimeoutError = 'TimeoutError';
