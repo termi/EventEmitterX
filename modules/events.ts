@@ -2277,15 +2277,24 @@ export function isEventEmitterCompatible(emitter: EventEmitterEx|INodeEventEmitt
 // todo: isNodeEventEmitter - check emitter is EventEmitter from 'node:events' module or from 'events' module polyfill.
 
 /**
- * Check if emitter is instance of EventEmitterEx from current running environment.
+ * Check if emitter is instance of EventEmitterEx from current running context/environment.
  *
- * Note: if emitter is instance of EventEmitterEx from another environment, this method returns false.
+ * Note: if emitter is instance of EventEmitterEx from another context/environment, this method returns false.
  * @param emitter
  */
 export function isEventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap>(emitter: EventEmitterEx|Object): emitter is EventEmitterEx<EventMap> {
-    return !!emitter
-        && emitter[kIsEventEmitterEx] === true
-    ;
+    // fast pre-check of public property "isEventEmitterEx"
+    if (!emitter || !(emitter as EventEmitterEx).isEventEmitterEx) {
+        return false;
+    }
+
+    if (emitter[kIsEventEmitterEx] === true) {
+        // this is EventEmitterEx from this context/environment
+        return true;
+    }
+
+    // check if emitter is EventEmitterEx from another context/environment
+    return _findConstructorName(emitter, 'EventEmitterEx');
 }
 
 // todo: isNodeEventTarget - check emitter is EventTarget(NodeEventTarget) from 'node:events' module or from 'events' module polyfill, but not browser EventTarget.
@@ -2296,14 +2305,14 @@ export function isEventEmitterEx<EventMap extends DefaultEventMap = DefaultEvent
  * @param maybeDOMEventTarget
  * @private
  */
-function _isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object) {
+function _isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object): maybeDOMEventTarget is DOMEventTarget {
     return !!maybeDOMEventTarget
         && typeof (maybeDOMEventTarget as DOMEventTarget).addEventListener === 'function'
         && typeof (maybeDOMEventTarget as DOMEventTarget).removeEventListener === 'function'
     ;
 }
 
-export function isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object) {
+export function isEventTargetCompatible(maybeDOMEventTarget: DOMEventTarget|Object): maybeDOMEventTarget is DOMEventTarget {
     return _isEventTargetCompatible(maybeDOMEventTarget)
         && typeof (maybeDOMEventTarget as DOMEventTarget).dispatchEvent === 'function'
     ;
@@ -2319,7 +2328,7 @@ let domHasSignalSupport: boolean;
  * @param eventTarget
  * @private
  */
-function _eventTargetIsDOMNode(eventTarget: EventTarget) {
+function _eventTargetIsDOMNode(eventTarget: EventTarget): eventTarget is Node {
     return typeof (eventTarget as (Node | {nodeType?: any})).nodeType === 'number'
         && typeof (eventTarget as (Node | {nodeName?: any})).nodeName === 'string'
         && 'outerHTML' in eventTarget
@@ -2668,6 +2677,33 @@ function _objectIsConsole(object: Console|any) {
     return isConsoleLike
         && (isNodeJSConsole || isBrowserConsole)
     ;
+}
+
+/**
+ * Important warning: tools such as UglifyJS/Terser will minify class name and therefore proto.constructor.name
+ *
+ * @example Workaround for this case:
+ if (ClassName.prototype.constructor.name !== 'ClassName') {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(ClassName.prototype.constructor, 'name', { value: 'ClassName', configurable: true });
+}
+ *
+ * @param object
+ * @param constructorName
+ * @private
+ */
+function _findConstructorName(object: Object, constructorName: string) {
+    let proto = object && typeof object === 'object' && Object.getPrototypeOf(object) || void 0;
+
+    while (proto) {
+        if (proto.constructor.name === constructorName) {
+            return true;
+        }
+
+        proto = Object.getPrototypeOf(proto);
+    }
+
+    return false;
 }
 
 /** @private */

@@ -44,13 +44,15 @@ const NodeEventTarget = EventTarget;
 import EmptyFunction = jest.EmptyFunction;
 import {
     EventEmitter as NodeEventEmitter,
-} from 'events';
+} from 'node:events';
+import { runInNewContext } from 'node:vm';
 import events, {
     EventEmitterEx,
     EventEmitterProxy,
     EventName,
     isEventEmitterCompatible,
     isEventTargetCompatible,
+    isEventEmitterEx,
     getEventListeners,
     Listener,
     kDestroyingEvent,
@@ -3638,6 +3640,129 @@ describe('events', function() {
 
             // TypeScript should emit this names and types for arguments: `name: EventName, listener: Listener, a: string, b: number`
             ee.emit('test2', 'test', () => {}, 'test', 123);
+        });
+    });
+
+    describe('type Guards', function() {
+        it('isEventTargetCompatible', function() {
+            {
+                expect(isEventTargetCompatible({
+                    addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean) {
+                        console.info(type, callback, options);
+                    },
+                    removeEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: EventListenerOptions | boolean) {
+                        console.info(type, callback, options);
+                    },
+                    dispatchEvent(event: Event): boolean {
+                        console.info(event);
+
+                        return false;
+                    },
+                } as EventTarget)).toBe(true);
+            }
+            {
+                expect(isEventTargetCompatible({
+                    addEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: AddEventListenerOptions | boolean) {
+                        console.info(type, callback, options);
+                    },
+                    removeEventListener(type: string, callback: EventListenerOrEventListenerObject | null, options?: EventListenerOptions | boolean) {
+                        console.info(type, callback, options);
+                    },
+                })).toBe(false);
+            }
+        });
+
+        it('isEventEmitterCompatible', function() {
+            const eventEmitterCompatible = {
+                on(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                once(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                prependListener(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                removeListener(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                addListener(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                prependOnceListener(eventName: string | symbol, listener: (...args: any[]) => void) {
+                    console.info(eventName, listener);
+
+                    return this;
+                },
+                emit(eventName: string | symbol, ...args): boolean {
+                    console.info(eventName, args);
+
+                    return false;
+                },
+            } as NodeJS.EventEmitter;
+
+            {
+                expect(isEventEmitterCompatible(eventEmitterCompatible)).toBe(true);
+            }
+            {
+                const not_eventEmitterCompatible = { ...eventEmitterCompatible };
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                delete not_eventEmitterCompatible.emit;
+
+                expect(isEventEmitterCompatible(not_eventEmitterCompatible)).toBe(false);
+            }
+        });
+
+        it('isEventEmitterEx from this context', function() {
+            const eventEmitterEx = new EventEmitterEx();
+
+            expect(isEventEmitterEx(eventEmitterEx)).toBe(true);
+
+            const eventEmitterProxy = new EventEmitterProxy(eventEmitterEx);
+
+            expect(isEventEmitterEx(eventEmitterProxy)).toBe(true);
+        });
+
+        it('isEventEmitterEx from another context', function() {
+            console.info(' ---- ', require.resolve('../../modules/events'));
+
+            const contextObject = {
+                events_module_path: require.resolve('../../modules/events'),
+                __filename,
+                currentRequire: require,
+                EventEmitterEx: void 0 as typeof EventEmitterEx | undefined,
+            };
+
+            // Нужно это вызвать, чтобы require который создасться функцией createRequire, не залезал в кеш уже
+            //  выполненных модулей.
+            jest.resetModules();
+
+            // language=js
+            runInNewContext(`
+            const require = currentRequire('node:module').createRequire(__filename);
+            const { EventEmitterEx } = require(globalThis.events_module_path);
+            globalThis.EventEmitterEx = EventEmitterEx;
+            `, contextObject);
+
+            expect(contextObject.EventEmitterEx).toBeDefined();
+            expect(contextObject.EventEmitterEx).not.toBe(EventEmitterEx);
+
+            const eeex = new contextObject.EventEmitterEx();
+
+            expect(isEventEmitterCompatible(eeex)).toBe(true);
+            expect(isEventEmitterEx(eeex)).toBe(true);
         });
     });
 });
