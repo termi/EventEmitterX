@@ -20,6 +20,7 @@ import type {
 import {
     createAbortError,
     isAbortSignal,
+    isAbortError,
     AbortControllersGroup,
     AbortSignal,
 } from 'termi@abortable';
@@ -182,7 +183,16 @@ const ERR_INVALID_OPTION_TYPE = 'ERR_INVALID_OPTION_TYPE';
  @example in browser: error.code === 20
  `fetch(location.href, { signal: AbortSignal.abort() }).catch(err => { console.info(err.code, err.name, err) })`
  */
-const ABORT_ERR = 'ABORT_ERR';
+const ABORT_ERR = (function _getDefaultAbortErrorCode() {
+    if (typeof DOMException !== 'undefined') {
+        // In WEB `signal.reason.code == DOMException.ABORT_ERR`
+        return /*DOMException.ABORT_ERR*/20;
+    }
+    else {
+        // Mimic nodejs ABORT_ERR `signal.reason.code == 'ABORT_ERR'`
+        return 'ABORT_ERR';
+    }
+})();
 const _toString = Object.prototype.toString;
 
 const isNodeJS = (function() {
@@ -256,10 +266,10 @@ const has_nodejs_events_getEventListeners = typeof nodejs_events_getEventListene
 export const kDestroyingEvent = Symbol('kDestroyingEvent');
 
 type InnerListeners = {
-    'newListener': (eventName: EventName, listener: Listener) => void;
-    'removeListener': (eventName: EventName, listener: Listener) => void;
-    'error': (error: Error, ...args: any[]) => void;
-    [kDestroyingEvent]: () => void;
+    'newListener': (eventName: EventName, listener: Listener) => void,
+    'removeListener': (eventName: EventName, listener: Listener) => void,
+    'error': (error: Error, ...args: any[]) => void,
+    [kDestroyingEvent]: () => void,
 };
 
 // todo: add handleEvent support
@@ -287,7 +297,7 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     getMaxListeners(): number;
     listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
     rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
-    eventNames(): Array<NodeEventName>;
+    eventNames(): NodeEventName[];
     listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
 }
 /** cast type of any event emitter to typed event emitter */
@@ -1298,7 +1308,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         return [ ...(handler as _TEventMap[EventKey][]) ];
     }
 
-    eventNames(): Array<NodeEventName> {
+    eventNames(): NodeEventName[] {
         // todo: return number key as number
         return Object.keys(this._events);
     }
@@ -1489,7 +1499,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 // Return early if already aborted.
                 if (signal.aborted) {
                     // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
-                    return _Promise.reject(createAbortError(ABORT_ERR));
+                    return _Promise.reject(createAbortError(ABORT_ERR, signal.reason));
                 }
 
                 if (eventTargetListenerOptions && isEventTarget && _eventTargetHasSignalSupport(emitter as DOMEventTarget)) {
@@ -1505,10 +1515,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let promise;
 
         if (Array.isArray(types)) {
-            let winnerEventType: void|(typeof types extends Array<infer T> ? T : typeof types);
+            let winnerEventType: void|(typeof types extends (infer T)[] ? T : typeof types);
 
             promise = new _Promise<any[]>((resolve, reject) => {
-                const eventListenersByType: [ type: typeof types extends Array<infer T> ? T : never, listener: Listener ][] = [];
+                const eventListenersByType: [ type: typeof types extends (infer T)[] ? T : never, listener: Listener ][] = [];
                 let needErrorListener = true;
 
                 listenersCleanUp = function() {
@@ -1759,8 +1769,14 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             console.error('once#Aborted:', debugInfo, { types, errorEventName });
                         }
 
-                        // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
-                        reject(createAbortError(ABORT_ERR));
+                        const signalReason = signal?.reason;
+                        const abortError = isAbortError(signalReason)
+                            ? signalReason
+                            // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
+                            : createAbortError(ABORT_ERR, signalReason)
+                        ;
+
+                        reject(abortError);
                     }
 
                     abortCallback = void 0;
@@ -2231,8 +2247,8 @@ if (TimeoutError.constructor.name !== tagTimeoutError) {
     Object.defineProperty(TimeoutError.constructor, 'name', { value: tagTimeoutError, configurable: true });
 }
 
-export function createTimeoutError(message: string) {
-    return new TimeoutError(message);
+export function createTimeoutError(message: string, cause?: any) {
+    return new TimeoutError(message, cause !== void 0 ? { cause } : void 0);
 }
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
@@ -2446,12 +2462,12 @@ function _typesToArrayStringTag(types: EventName|EventName[]|void, errorEventNam
 }
 
 type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EMD<EventMap> = EventName> = {
-    id: number;
-    type: EventKey;
-    fired: boolean;
-    wrapFn: EMD<EventMap>[EventKey];
-    listener: Listener;
-    target: EventEmitterEx;
+    id: number,
+    type: EventKey,
+    fired: boolean,
+    wrapFn: EMD<EventMap>[EventKey],
+    listener: Listener,
+    target: EventEmitterEx,
 }
 const sOnceListenerWrapperId = Symbol('');
 
@@ -2467,7 +2483,16 @@ function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
 
     if (!this.fired) {
         this.fired = true;
-        this.listener.apply(this.target, args);
+
+        const maybePromise = this.listener.apply(this.target, args);
+
+        if (!!maybePromise && typeof maybePromise.catch === 'function') {
+            maybePromise.catch(error => {
+                // todo: Передавать эту ошибку в специальный обработчик для асинхронных ошибок eventHandler'ов
+                //  Сюда _emitUnhandledRejectionOrErr ?
+                console.error(error);
+            });
+        }
     }
 }
 
@@ -2605,7 +2630,8 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
         const then = promise.then;
 
         if (typeof then === 'function') {
-            then.call(promise, undefined, function(err) {
+            // Нужно ли тут перехватывать ошибку через catch?
+            void then.call(promise, undefined, function(err) {
                 // The callback is called with nextTick to avoid a follow-up
                 // rejection from this promise.
                 setImmediate(_emitUnhandledRejectionOrErr, that, err, type, args);

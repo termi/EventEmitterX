@@ -1561,7 +1561,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch(e) {
+                    catch (e) {
                         err = e;
                     }
 
@@ -1598,7 +1598,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch(e) {
+                    catch (e) {
                         err = e;
                     }
 
@@ -1645,7 +1645,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch(e) {
+                    catch (e) {
                         // This code should be unreachable
                         {// main tests #2
                             expect(false).toBe(true);
@@ -1696,7 +1696,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch(e) {
+                    catch (e) {
                         // This code should be unreachable
                         {// main tests #2
                             expect(false).toBe(true);
@@ -1759,7 +1759,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr1, theErr2, ...expectedArgs);
                     }
-                    catch(e) {
+                    catch (e) {
                         // This code should be unreachable
                         {// main tests #2
                             expect(false).toBe(true);
@@ -2247,7 +2247,7 @@ describe('events', function() {
 
                     await promise;
                 }
-                catch(err) {
+                catch (err) {
                     error = err;
                 }
 
@@ -2377,7 +2377,7 @@ describe('events', function() {
 
                     await promise;
                 }
-                catch(err) {
+                catch (err) {
                     error = err;
                 }
 
@@ -2744,7 +2744,7 @@ describe('events', function() {
                 expect(listenerCount(fakeEventTarget, type)).toBe(1);
                 expect(listenerCount(signal, 'abort')).toBe(2);
 
-                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal; });
+                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal });
 
                 expect(addEventListenerOptions.signal).toBe(signal);
 
@@ -2781,7 +2781,7 @@ describe('events', function() {
                 expect(listenerCount(fakeEventTarget, type)).toBe(1);
                 expect(listenerCount(signal, 'abort')).toBe(1);
 
-                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal; });
+                const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal });
 
                 expect(addEventListenerOptions.signal).not.toBe(signal);
                 expect(addEventListenerOptions.signal).not.toBeDefined();
@@ -2986,7 +2986,7 @@ describe('events', function() {
 
                     counter++;
                 }
-                catch(err) {
+                catch (err) {
                     if (isTestError(err)) {
                         throw err;
                     }
@@ -2999,7 +2999,7 @@ describe('events', function() {
 
                     counter++;
                 }
-                catch(err) {
+                catch (err) {
                     error2 = err;
                 }
 
@@ -3107,7 +3107,7 @@ describe('events', function() {
 
                     counter++;
                 }
-                catch(err) {
+                catch (err) {
                     if (isTestError(err)) {
                         throw err;
                     }
@@ -3120,7 +3120,7 @@ describe('events', function() {
 
                     counter++;
                 }
-                catch(err) {
+                catch (err) {
                     if (isTestError(err)) {
                         throw err;
                     }
@@ -3169,7 +3169,7 @@ describe('events', function() {
 
                     counter++;
                 }
-                catch(err) {
+                catch (err) {
                     if (isTestError(err)) {
                         throw err;
                     }
@@ -3545,7 +3545,7 @@ describe('events', function() {
                         errorEventName: isEventTarget ? 'error' : void 0,
                     });
                 }
-                catch(err) {
+                catch (err) {
                     //
                 }
 
@@ -3759,7 +3759,7 @@ describe('events', function() {
             expect(contextObject.EventEmitterEx).toBeDefined();
             expect(contextObject.EventEmitterEx).not.toBe(EventEmitterEx);
 
-            const eeex = new contextObject.EventEmitterEx();
+            const eeex = new contextObject.EventEmitterEx!();
 
             expect(isEventEmitterCompatible(eeex)).toBe(true);
             expect(isEventEmitterEx(eeex)).toBe(true);
