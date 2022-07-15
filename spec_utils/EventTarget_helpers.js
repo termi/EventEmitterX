@@ -166,19 +166,20 @@ module.exports.listenerCount = function listenerCount(emitter, type) {
     }
 
     return getEventListeners(emitter, type).length;
-}
+};
 
 module.exports.compatibleOnce_for_EventTarget = function(once) {
     return function(emitter, type, options) {
         if (options && options.filter) {
-            const {filter} = options;
+            const { filter } = options;
 
             options.filter = function(type, ...args) {
                 if (args[0] instanceof Event && args[0]["args"]) {
-                    return filter.apply(this, [type, ...args[0]["args"]]);
+                    return filter.apply(this, [ type, ...args[0]["args"] ]);
                 }
-                return filter.apply(this, [type, ...args]);
-            }
+
+                return filter.apply(this, [ type, ...args ]);
+            };
         }
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -187,6 +188,7 @@ module.exports.compatibleOnce_for_EventTarget = function(once) {
             if (result[0] instanceof Event && result[0]["args"]) {
                 return result[0]["args"];
             }
+
             return result;
         }).catch(error => {
             if (error instanceof Event && error["args"]) {
