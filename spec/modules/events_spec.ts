@@ -1,3 +1,4 @@
+/* eslint-disable promise/always-return */
 /**
  * @jest-environment jsdom
  */
@@ -275,7 +276,7 @@ describe('events', function() {
                     ee.emit(numericEventType);
                     ee.emit(testSymbol);
 
-                    expect(emitCounter_count).toHaveBeenCalled();
+                    expect(emitCounter_count).toHaveBeenCalledTimes(5);
                     expect(emitCounter_count.mock.calls).toEqual([
                         [ event1 ],
                         [ event2 ],
@@ -311,7 +312,7 @@ describe('events', function() {
                     //  of `console`.time-methods doesn't have `Symbol()` support.
                     ee.emit(anonymous_testSymbol2);
 
-                    expect(console_count_mock).toHaveBeenCalled();
+                    expect(console_count_mock).toHaveBeenCalledTimes(5);
                     expect(console_count_mock.mock.calls).toEqual([
                         [ eventType ],
                         [ String(numericEventType) ],
@@ -437,7 +438,7 @@ describe('events', function() {
                     listeners_newListener_emitted.push(listener);
                 });
 
-                const onceNewListener = jest.fn(function(name, listener) {
+                const onceNewListener = jest.fn(function(this: EventEmitterEx, name, listener) {
                     {// additional tests
                         expect(name).toBe('hello_on');
                         expect(listener).toBe(listener1);
@@ -464,13 +465,15 @@ describe('events', function() {
                 {// main tests
                     expect(counter).toBe(7);
 
-                    expect(onceNewListener).toHaveBeenCalled();
-                    expect(onceNewListener.mock.calls).toEqual([ [ 'hello_on', listener1 ] ]);
+                    expect(onceNewListener).toHaveBeenCalledTimes(1);
+                    expect(onceNewListener).toHaveBeenCalledWith('hello_on', listener1);
 
-                    expect(listener1).toHaveBeenCalled();
-                    expect(listener1.mock.calls).toEqual([ [ 'a', 'b' ], [ 1, 2 ], [ sTest1, sTest2 ] ]);
-                    expect(listener2).toHaveBeenCalled();
-                    expect(listener2.mock.calls).toEqual([ [ 1 ], [ 2 ] ]);
+                    expect(listener1).toHaveBeenNthCalledWith(1, 'a', 'b');
+                    expect(listener1).toHaveBeenNthCalledWith(2, 1, 2);
+                    expect(listener1).toHaveBeenNthCalledWith(3, sTest1, sTest2);
+
+                    expect(listener2).toHaveBeenNthCalledWith(1, 1);
+                    expect(listener2).toHaveBeenNthCalledWith(2, 2);
 
                     expect(events_newListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once', 'hello_prepend', 'hello_prependOnce' ]);
                     expect(listeners_newListener_emitted).toEqual([ listener1, listener1, listener2, listener1, listener2 ]);
@@ -536,7 +539,7 @@ describe('events', function() {
                 {// main tests #3
                     expect(counter).toBe(5);
 
-                    expect(newListener).toHaveBeenCalled();
+                    expect(newListener).toHaveBeenCalledTimes(5);
                     expect(newListener.mock.calls).toEqual([
                         [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
                         [ eventName, listener ], [ eventName, listener ],
@@ -673,7 +676,7 @@ describe('events', function() {
                     listeners_removeListener_emitted.push(listener);
                 });
 
-                const onceRemoveListener = jest.fn(function(name, listener) {
+                const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
                     {// additional tests
                         expect(name).toBe('hello_on');
                         expect(listener).toBe(listener1);
@@ -703,8 +706,8 @@ describe('events', function() {
                 {// main tests
                     expect(counter).toBe(4);
 
-                    expect(onceRemoveListener).toHaveBeenCalled();
-                    expect(onceRemoveListener.mock.calls).toEqual([ [ 'hello_on', listener1 ] ]);
+                    expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                    expect(onceRemoveListener).toHaveBeenCalledWith('hello_on', listener1);
 
                     expect(events_removeListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once' ]);
                     expect(listeners_removeListener_emitted).toEqual([ listener1, listener1, listener2 ]);
@@ -768,7 +771,7 @@ describe('events', function() {
                 }
 
                 {// main tests #3
-                    expect(onceRemoveListener).toHaveBeenCalled();
+                    expect(onceRemoveListener).toHaveBeenCalledTimes(5);
                     expect(onceRemoveListener.mock.calls).toEqual([
                         [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
                         [ eventName, listener ], [ eventName, listener ],
@@ -807,8 +810,8 @@ describe('events', function() {
                 {// main tests
                     expect(counter).toBe(0);
 
-                    expect(onceRemoveListener).toHaveBeenCalled();
-                    expect(onceRemoveListener.mock.calls).toEqual([ [ eventName, listener1 ] ]);
+                    expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                    expect(onceRemoveListener).toHaveBeenCalledWith(eventName, listener1);
                 }
 
                 {// finale check
@@ -840,6 +843,8 @@ describe('events', function() {
                     expect(counter).toBe(1);
                     expect(ee.listenerCount(eventName)).toBe(1);
 
+                    expect(listener1).toHaveBeenCalledTimes(2);
+                    // eslint-disable-next-line jest/prefer-called-with
                     expect(listener1).toHaveBeenCalled();
                 }
 
@@ -1388,7 +1393,7 @@ describe('events', function() {
                 it('args.length = 0', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, ...args) {
                         expect(this).toBe(ee);
-                        expect(args.length).toBe(0);
+                        expect(args).toHaveLength(0);
                     });
 
                     ee.on('test-args0', listener);
@@ -1398,8 +1403,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-args0');
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-args0');
@@ -1411,7 +1415,8 @@ describe('events', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, a) {
                         expect(this).toBe(ee);
                         expect(a).toBe(9);
-                        expect(arguments.length).toBe(1);
+                        // eslint-disable-next-line prefer-rest-params
+                        expect(arguments).toHaveLength(1);
                     });
 
                     ee.on('test-args1', listener);
@@ -1421,8 +1426,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-args1', 9);
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-args1');
@@ -1435,7 +1439,8 @@ describe('events', function() {
                         expect(this).toBe(ee);
                         expect(a).toBe(8);
                         expect(b).toBe('b2');
-                        expect(arguments.length).toBe(2);
+                        // eslint-disable-next-line prefer-rest-params
+                        expect(arguments).toHaveLength(2);
                     });
 
                     ee.on('test-args2', listener);
@@ -1445,8 +1450,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-args2', 8, 'b2');
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-args2');
@@ -1460,7 +1464,8 @@ describe('events', function() {
                         expect(a).toBe(7);
                         expect(b).toBe('b3');
                         expect(c).toBe(sTest1);
-                        expect(arguments.length).toBe(3);
+                        // eslint-disable-next-line prefer-rest-params
+                        expect(arguments).toHaveLength(3);
                     });
 
                     ee.on('test-args3', listener);
@@ -1470,8 +1475,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-args3', 7, 'b3', sTest1);
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-args3');
@@ -1491,7 +1495,8 @@ describe('events', function() {
                         expect(n7).toBe(7);
                         expect(n8).toBe(8);
                         expect(n9).toBe(9);
-                        expect(arguments.length).toBe(9);
+                        // eslint-disable-next-line prefer-rest-params
+                        expect(arguments).toHaveLength(9);
                     });
 
                     ee.on('test-args9', listener);
@@ -1501,8 +1506,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-args9', 1, 2, 3, 4, 5, 6, 7, 8, 9);
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-args9');
@@ -1515,7 +1519,8 @@ describe('events', function() {
                     const listener = jest.fn(function(this: EventEmitterEx, ...args) {
                         expect(this).toBe(ee);
                         expect(args).toEqual(expectedArgs);
-                        expect(arguments.length).toBe(expectedArgs.length);
+                        // eslint-disable-next-line prefer-rest-params
+                        expect(arguments).toHaveLength(expectedArgs.length);
                     });
 
                     ee.on('test-argsN', listener);
@@ -1525,8 +1530,7 @@ describe('events', function() {
                     // test#2 with multiply listeners
                     ee.emit('test-argsN', ...expectedArgs);
 
-                    expect(listener).toHaveBeenCalled();
-                    expect(listener.mock.calls.length).toEqual(3);
+                    expect(listener).toHaveBeenCalledTimes(3);
 
                     {// cleanup
                         ee.removeAllListeners('test-argsN');
@@ -1625,7 +1629,6 @@ describe('events', function() {
             });
 
             describe(`with 'error' listener`, function() {
-
                 it(`single listener`, function() {
                     const theErr = new Error('MyError');
                     const monitorListener1 = jest.fn((err) => {
@@ -1648,7 +1651,7 @@ describe('events', function() {
                     catch (e) {
                         // This code should be unreachable
                         {// main tests #2
-                            expect(false).toBe(true);
+                            throw new Error('Unreachable code!!!');
                         }
                     }
 
@@ -1658,11 +1661,11 @@ describe('events', function() {
                     }
 
                     {// main tests #3
-                        expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(monitorListener1).toHaveBeenCalledTimes(1);
+                        expect(monitorListener1).toHaveBeenCalledWith(theErr);
 
-                        expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(errorListener1).toHaveBeenCalledTimes(1);
+                        expect(errorListener1).toHaveBeenCalledWith(theErr);
                     }
 
                     {// cleanup
@@ -1699,7 +1702,7 @@ describe('events', function() {
                     catch (e) {
                         // This code should be unreachable
                         {// main tests #2
-                            expect(false).toBe(true);
+                            throw new Error('Unreachable code!!!');
                         }
                     }
 
@@ -1709,15 +1712,15 @@ describe('events', function() {
                     }
 
                     {// main tests #3
-                        expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
-                        expect(monitorListener2).toHaveBeenCalled();
-                        expect(monitorListener2.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(monitorListener1).toHaveBeenCalledTimes(1);
+                        expect(monitorListener1).toHaveBeenCalledWith(theErr);
+                        expect(monitorListener2).toHaveBeenCalledTimes(1);
+                        expect(monitorListener2).toHaveBeenCalledWith(theErr);
 
-                        expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([ [ theErr ] ]);
-                        expect(errorListener2).toHaveBeenCalled();
-                        expect(errorListener2.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(errorListener1).toHaveBeenCalledTimes(1);
+                        expect(errorListener1).toHaveBeenCalledWith(theErr);
+                        expect(errorListener2).toHaveBeenCalledTimes(1);
+                        expect(errorListener2).toHaveBeenCalledWith(theErr);
                     }
 
                     {// cleanup
@@ -1762,7 +1765,7 @@ describe('events', function() {
                     catch (e) {
                         // This code should be unreachable
                         {// main tests #2
-                            expect(false).toBe(true);
+                            throw new Error('Unreachable code!!!');
                         }
                     }
 
@@ -1774,15 +1777,15 @@ describe('events', function() {
                     {// main tests #3
                         const expectedCallArgs = [ theErr1, theErr2, ...expectedArgs ];
 
-                        expect(monitorListener1).toHaveBeenCalled();
-                        expect(monitorListener1.mock.calls).toEqual([ expectedCallArgs ]);
-                        expect(monitorListener2).toHaveBeenCalled();
-                        expect(monitorListener2.mock.calls).toEqual([ expectedCallArgs ]);
+                        expect(monitorListener1).toHaveBeenCalledTimes(1);
+                        expect(monitorListener1).toHaveBeenCalledWith(...expectedCallArgs);
+                        expect(monitorListener2).toHaveBeenCalledTimes(1);
+                        expect(monitorListener2).toHaveBeenCalledWith(...expectedCallArgs);
 
-                        expect(errorListener1).toHaveBeenCalled();
-                        expect(errorListener1.mock.calls).toEqual([ expectedCallArgs ]);
-                        expect(errorListener2).toHaveBeenCalled();
-                        expect(errorListener2.mock.calls).toEqual([ expectedCallArgs ]);
+                        expect(errorListener1).toHaveBeenCalledTimes(1);
+                        expect(errorListener1).toHaveBeenCalledWith(...expectedCallArgs);
+                        expect(errorListener2).toHaveBeenCalledTimes(1);
+                        expect(errorListener2).toHaveBeenCalledWith(...expectedCallArgs);
                     }
 
                     {// cleanup
@@ -1887,10 +1890,18 @@ describe('events', function() {
                     }
                 });
 
+                let isThrow = false;
+
                 await promise.catch(error => {
+                    isThrow = true;
+
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(error).toBeDefined();
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(error.message).toInclude('test');
                 });
+
+                expect(isThrow).toBe(true);
             });
         });
 
@@ -1934,7 +1945,7 @@ describe('events', function() {
                     return {
                         [Symbol.asyncIterator]() {
                             return {
-                                next() {
+                                next(): Promise<{ value: any, done: boolean }> {
                                     if (isAborted) {
                                         return Promise.resolve({ value: void 0, done: true });
                                     }
@@ -2003,12 +2014,16 @@ describe('events', function() {
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
         class EventEmitterExSubClass extends EventEmitterEx {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
             on(...args) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 return super.on(...args);
             }
 
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
             removeListener(...args) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
@@ -2040,17 +2055,17 @@ describe('events', function() {
             expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
                 .toBe(2)
             ;
-            expect(getEventListeners(emitter, 'test1').length).toBe(1);
-            expect(getEventListeners(emitter, 'test2').length).toBe(1);
+            expect(getEventListeners(emitter, 'test1')).toHaveLength(1);
+            expect(getEventListeners(emitter, 'test2')).toHaveLength(1);
 
             proxy.destructor();
 
             expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
                 .toBe(0)
             ;
-            expect(getEventListeners(emitter, 'test1').length).toBe(0);
-            expect(getEventListeners(emitter, 'test2').length).toBe(0);
-            expect(getEventListeners(emitter, 'test3').length).toBe(1);
+            expect(getEventListeners(emitter, 'test1')).toHaveLength(0);
+            expect(getEventListeners(emitter, 'test2')).toHaveLength(0);
+            expect(getEventListeners(emitter, 'test3')).toHaveLength(1);
             expect(wasDestroyed).toBe(true);
         });
 
@@ -2069,17 +2084,17 @@ describe('events', function() {
             emitter.emit('test');
 
             // on emitter, it should be proxyHandler and `() => { counter1++; }` handler
-            expect(emitter.listenerCount('test')).toEqual(2);
-            expect(emitter.hasListener('test', handler1)).toEqual(true);
+            expect(emitter.listenerCount('test')).toBe(2);
+            expect(emitter.hasListener('test', handler1)).toBe(true);
             // on proxy, it should be `() => { counter2++; }` handler
-            expect(proxy.listenerCount('test')).toEqual(1);
-            expect(proxy.hasListener('test', handler2)).toEqual(true);
+            expect(proxy.listenerCount('test')).toBe(1);
+            expect(proxy.hasListener('test', handler2)).toBe(true);
 
             // remove all listeners on proxy and remove only proxy handlers from emitter
             proxy.removeAllListeners();
 
-            expect(emitter.listenerCount('test')).toEqual(1);
-            expect(proxy.listenerCount('test')).toEqual(0);
+            expect(emitter.listenerCount('test')).toBe(1);
+            expect(proxy.listenerCount('test')).toBe(0);
 
             expect(counter1).toBe(1);
             expect(counter2).toBe(1);
@@ -2117,6 +2132,10 @@ describe('events', function() {
             expect(counter1).toBe(2);
             expect(counter2).toBe(2);
         });
+
+        it.todo('#removeAllListeners(void 0)');
+        it.todo('#removeAllListeners(eventName)');
+        it.todo('#removeAllListeners() with _proxyHook');
     });
 
     describe('events.once', function _EventEmitter_once() {
@@ -2151,31 +2170,31 @@ describe('events', function() {
             once = compatibleOnce_for_EventTarget(once);
         }
 
-        it('should emit once', function(done) {
+        it('should emit once', function() {
             const expectedError = null;
-            let error = null;
+            let error: Error | string | null = null;
             const expectedArgs = [ 'test', 1, {} ];
             const argsArray: any[] = [];
 
-            once(ee, 'test1')
+            const promise = once(ee, 'test1')
                 .then(actualArgs => {
                     argsArray.push(actualArgs as any[]);
                 })
-                .catch(err => {
+                .catch((err: Error | string) => {
                     error = err;
                 })
                 .then(() => {
                     expect(error).toBe(expectedError);
                     expect(argsArray).toEqual([ expectedArgs ]);
                     expect(ee.listenerCount('test1')).toBe(0);
-
-                    done();
                 })
             ;
 
             expect(ee.listenerCount('test1')).toBe(1);
 
             ee.emit('test1', ...expectedArgs);
+
+            return promise;
         });
 
         it('should emit once (async/await)', async function() {
@@ -2199,11 +2218,11 @@ describe('events', function() {
         });
 
         describe(`'error' handling`, function() {
-            it(`should reject with error on 'error' event`, function(done) {
+            it(`should reject with error on 'error' event`, function() {
                 const expectedError = new Error('REJECT PROMISE');
                 let error = void 0;
 
-                once(ee, 'test3', {
+                const promise = once(ee, 'test3', {
                     // EventTarget does not have `error` event semantics like Node
                     errorEventName: isEventTarget ? 'error' : void 0,
                 })
@@ -2215,8 +2234,6 @@ describe('events', function() {
                         expect(error).toBe(expectedError);
                         expect(ee.listenerCount('test3')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -2224,6 +2241,8 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(1);
 
                 ee.emit('error', expectedError);
+
+                return promise;
             });
 
             it(`should reject with error on 'error' event (async/await)`, async function() {
@@ -2256,23 +2275,23 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should not reject if 'error' event is main listener type`, function(done) {
+            it(`should not reject if 'error' event is main listener type`, function() {
                 const err = new Error();
 
-                once(ee, 'error', {
+                const promise = once(ee, 'error', {
                     // EventTarget does not have `error` event semantics like Node
                     errorEventName: isEventTarget ? 'error' : void 0,
                 })
                     .then(args => {
                         expect(args).toEqual([ err, 1, 2, 3 ]);
-
-                        done();
                     })
                 ;
 
                 expect(ee.listenerCount('error')).toBe(1);
 
                 ee.emit('error', err, 1, 2, 3);
+
+                return promise;
             });
 
             it(`should not reject if 'error' event is main listener type (async/await)`, async function() {
@@ -2291,10 +2310,10 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should not reject if 'error' event is in main listeners types`, function(done) {
+            it(`should not reject if 'error' event is in main listeners types`, function() {
                 const err = new Error();
 
-                once(ee, [ 'test1', 'test2', 'error' ], {
+                const promise = once(ee, [ 'test1', 'test2', 'error' ], {
                     // EventTarget does not have `error` event semantics like Node
                     errorEventName: isEventTarget ? 'error' : void 0,
                 })
@@ -2303,8 +2322,6 @@ describe('events', function() {
                         expect(ee.listenerCount('test1')).toBe(0);
                         expect(ee.listenerCount('test2')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -2313,6 +2330,8 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(1);
 
                 ee.emit('error', err, 1, 2, 3);
+
+                return promise;
             });
 
             it(`should not reject if 'error' event is in main listeners types (async/await)`, async function() {
@@ -2331,12 +2350,12 @@ describe('events', function() {
                 expect(ee.listenerCount('error')).toBe(0);
             });
 
-            it(`should reject with error on custom error event`, function(done) {
+            it(`should reject with error on custom error event`, function() {
                 const expectedError = new Error('REJECT PROMISE');
                 const customErrorEventName = 'custom_error1';
                 let error = void 0;
 
-                once(ee, 'test3', {
+                const promise = once(ee, 'test3', {
                     errorEventName: customErrorEventName,
                 })
                     .catch(err => {
@@ -2347,8 +2366,6 @@ describe('events', function() {
                         expect(error).toBe(expectedError);
                         expect(ee.listenerCount('test3')).toBe(0);
                         expect(ee.listenerCount(customErrorEventName)).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -2356,6 +2373,8 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(1);
 
                 ee.emit(customErrorEventName, expectedError);
+
+                return promise;
             });
 
             it(`should reject with error on custom error event (async/await)`, async function() {
@@ -2386,23 +2405,23 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should not reject if custom error event is main listener type`, function(done) {
+            it(`should not reject if custom error event is main listener type`, function() {
                 const customErrorEventName = 'custom_error1-1';
 
-                once(ee, customErrorEventName, {
+                const promise = once(ee, customErrorEventName, {
                     errorEventName: customErrorEventName,
                 })
                     .then(args => {
                         expect(args).toEqual([ 1, 2, 3 ]);
                         expect(ee.listenerCount(customErrorEventName)).toBe(0);
-
-                        done();
                     })
                 ;
 
                 expect(ee.listenerCount(customErrorEventName)).toBe(1);
 
                 ee.emit(customErrorEventName, 1, 2, 3);
+
+                return promise;
             });
 
             it(`should not reject if custom error event is main listener type (async/await)`, async function() {
@@ -2420,10 +2439,10 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(0);
             });
 
-            it(`should not reject if custom error event is in main listeners types`, function(done) {
+            it(`should not reject if custom error event is in main listeners types`, function() {
                 const customErrorEventName = 'custom_error1-1';
 
-                once(ee, [ 'test1', 'test2', customErrorEventName ], {
+                const promise = once(ee, [ 'test1', 'test2', customErrorEventName ], {
                     errorEventName: customErrorEventName,
                 })
                     .then(args => {
@@ -2431,8 +2450,6 @@ describe('events', function() {
                         expect(ee.listenerCount('test1')).toBe(0);
                         expect(ee.listenerCount('test2')).toBe(0);
                         expect(ee.listenerCount(customErrorEventName)).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -2441,6 +2458,8 @@ describe('events', function() {
                 expect(ee.listenerCount(customErrorEventName)).toBe(1);
 
                 ee.emit(customErrorEventName, 1, 2, 3);
+
+                return promise;
             });
 
             it(`should not reject if custom error event is in main listeners types (async/await)`, async function() {
@@ -2532,11 +2551,14 @@ describe('events', function() {
                 it.skip = function(){};
             }
 
-            it.skip('with options.prepend', function(done) {
+            // eslint-disable-next-line jest/no-disabled-tests
+            it.skip('with options.prepend', function() {
+                type TestEvent = Event & { position: number };
+
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-prepend.js
                 let counter = 0;
                 const isEvent = Symbol('isEvent');
-                const defaultListener = function(event) {
+                const defaultListener = function(event: TestEvent) {
                     event.stopImmediatePropagation();
 
                     if (event.position === 4) {
@@ -2548,6 +2570,7 @@ describe('events', function() {
 
                 // Если prepend работает правильно и обработчик события внутри once ставиться в начало всех обработчиков
                 //  событий, то у event ещё не будет вызван stopImmediatePropagation, на момент попадания в filter.
+                // eslint-disable-next-line jest/valid-expect-in-promise
                 const promise1 = once(ee, 'test5-1', {
                     prepend: true,
                     filter(type, event) {
@@ -2565,6 +2588,7 @@ describe('events', function() {
                 ;
 
                 // Если prepend не указан, то сначала выполниться defaultListener, который создаст событие с position = 5.
+                // eslint-disable-next-line jest/valid-expect-in-promise
                 const promise2 = once(ee, 'test5-1', {
                     filter(type, event) {
                         return event.position === 5;
@@ -2582,12 +2606,10 @@ describe('events', function() {
 
                 expect(listenerCount(ee, 'test5-1')).toBe(3);
 
-                Promise.all([ promise1, promise2 ]).then(() => {
+                const promise = Promise.all([ promise1, promise2 ]).then(() => {
                     expect(counter).toBe(2);
                     expect(ee.listenerCount('test5-1')).toBe(0);
                     expect(ee.listenerCount('error')).toBe(0);
-
-                    done();
                 });
 
                 ee.emit('test5-1', createDomEventLike('test5-1', { position: 1, [isEvent]: true }));
@@ -2596,6 +2618,8 @@ describe('events', function() {
                 ee.emit('test5-1', createDomEventLike('test5-1', { position: 4, [isEvent]: true }));
 
                 ee.removeListener('test5-1', defaultListener);
+
+                return promise;
             });
 
             it.skip = itSkip;
@@ -2618,50 +2642,69 @@ describe('events', function() {
                 it.skip = function(){};
             }
 
-            it.skip('should throw if "types" argument is Symbol', function(done) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                once(eventTarget, Symbol('invalid-argument'), {
-                    timeout: 10,
-                }).catch(error => {
-                    expect(error).toBeDefined();
-                    expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
-                    expect(error && error.name).toBe('TypeError');
-                    expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+            // eslint-disable-next-line jest/no-disabled-tests
+            it.skip('should throw if "types" argument is Symbol', async function() {
+                let error: (Error & { code: number | string }) | null = null;
 
-                    done();
-                });
+                try {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    await once(eventTarget, Symbol('invalid-argument'), {
+                        timeout: 10,
+                    });
+                }
+                catch (err) {
+                    error = err;
+                }
+
+                expect_toBeDefined(error);
+                expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
+                expect(error && error.name).toBe('TypeError');
+                expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
-            it.skip('should throw if one of array "types" argument is Symbol', function(done) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                once(eventTarget, [ 'test-123-qwerty', 321132, 987654321n, Symbol('invalid-argument') ], {
-                    timeout: 10,
-                }).catch(error => {
-                    expect(error).toBeDefined();
-                    expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
-                    expect(error && error.name).toBe('TypeError');
-                    expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+            // eslint-disable-next-line jest/no-disabled-tests
+            it.skip('should throw if one of array "types" argument is Symbol', async function() {
+                let error: (Error & { code: number | string }) | null = null;
 
-                    done();
-                });
+                try {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-ignore
+                    await once(eventTarget, [ 'test-123-qwerty', 321132, 987654321n, Symbol('invalid-argument') ], {
+                        timeout: 10,
+                    });
+                }
+                catch (err) {
+                    error = err;
+                }
+
+                expect_toBeDefined(error);
+                expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
+                expect(error && error.name).toBe('TypeError');
+                expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
-            it.skip('should throw if "options.errorEventName" is Symbol', function(done) {
-                once(eventTarget, Math.random().toString(36), {
-                    errorEventName: Symbol('invalid-argument'),
-                    timeout: 10,
-                }).catch(error => {
-                    expect(error).toBeDefined();
-                    expect(error && error.code).toBe('ERR_INVALID_OPTION_TYPE');
-                    expect(error && error.name).toBe('TypeError');
-                    expect(error && error.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
+            // eslint-disable-next-line jest/no-disabled-tests
+            it.skip('should throw if "options.errorEventName" is Symbol', async function() {
+                let error: (Error & { code: number | string }) | null = null;
 
-                    done();
-                });
+                try {
+                    await once(eventTarget, Math.random().toString(36), {
+                        errorEventName: Symbol('invalid-argument'),
+                        timeout: 10,
+                    });
+                }
+                catch (err) {
+                    error = err;
+                }
+
+                expect_toBeDefined(error);
+                expect(error && error.code).toBe('ERR_INVALID_OPTION_TYPE');
+                expect(error && error.name).toBe('TypeError');
+                expect(error && error.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
             });
 
+            // eslint-disable-next-line jest/no-disabled-tests
             it.skip('with options.capture', async function() {
                 const data = {
                     test: true,
@@ -2680,6 +2723,7 @@ describe('events', function() {
                 });
             });
 
+            // eslint-disable-next-line jest/no-disabled-tests
             it.skip('with options.passive=true', async function() {
                 const data = {
                     test: true,
@@ -2704,6 +2748,7 @@ describe('events', function() {
                 });
             });
 
+            // eslint-disable-next-line jest/no-disabled-tests
             it.skip('with options.passive=false', async function() {
                 const data = {
                     test: true,
@@ -2728,6 +2773,7 @@ describe('events', function() {
                 });
             });
 
+            // eslint-disable-next-line jest/no-disabled-tests
             it.skip('with options.signal should pass signal to compatible addEventListener', async function() {
                 const fakeEventTarget = new FakeEventTarget();
                 const ac = new AbortController();
@@ -2757,14 +2803,18 @@ describe('events', function() {
 
                     const errorString = String(error);
 
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect([ errorString, errorString.includes('aborted') ]).toEqual([ errorString, true ]);
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(listenerCount(fakeEventTarget, type)).toBe(0);
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(listenerCount(signal, 'abort')).toBe(0);
                 });
 
                 expect(wasCatch).toBe(true);
             });
 
+            // eslint-disable-next-line jest/no-disabled-tests
             it.skip('with options.signal should NOT pass signal to incompatible addEventListener', async function() {
                 const fakeEventTarget = new FakeEventTarget();
                 const ac = new AbortController();
@@ -2784,7 +2834,7 @@ describe('events', function() {
                 const addEventListenerOptions = fakeEventTarget.getListenersOptions(type)[0] as (AddEventListenerOptions & { signal?: AbortSignal });
 
                 expect(addEventListenerOptions.signal).not.toBe(signal);
-                expect(addEventListenerOptions.signal).not.toBeDefined();
+                expect(addEventListenerOptions.signal).toBeUndefined();
 
                 ac.abort();
 
@@ -2793,8 +2843,11 @@ describe('events', function() {
                 await promise.catch(error => {
                     wasCatch = true;
 
-                    expect(String(error).includes('aborted')).toBe(true);
+                    // eslint-disable-next-line jest/no-conditional-expect
+                    expect(String(error)).toContain('aborted');
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(listenerCount(fakeEventTarget, type)).toBe(0);
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(listenerCount(signal, 'abort')).toBe(0);
                 });
 
@@ -2804,9 +2857,9 @@ describe('events', function() {
             it.skip = itSkip;
         });
 
-        it('with options.filter', function(done) {
+        it('with options.filter', function() {
             const expectedError = null;
-            let error = null;
+            let error: Error | string | null = null;
             const expectedArgs = [
                 [ 'test', 1, {} ],
                 [ 'test', 5, {} ],
@@ -2814,20 +2867,20 @@ describe('events', function() {
             ];
             const argsArray: any[] = [];
 
-            Promise.all([
+            const promise = Promise.all([
                 once(ee, 'test5', { filter: (type, ...args) => args[1] === 9 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
                 once(ee, 'test5', { filter: (type, ...args) => args[1] === 5 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
                 once(ee, 'test5', { filter: (type, ...args) => args[1] === 1 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
             ]).then(() => {
@@ -2835,9 +2888,8 @@ describe('events', function() {
                 expect(argsArray).toEqual(expectedArgs);
                 expect(ee.listenerCount('test5')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
-
-                done();
             });
+
             expect(listenerCount(ee, 'test5')).toBe(3);
 
             ee.emit('test5', ...[ 'test', 0, {} ]);
@@ -2846,6 +2898,8 @@ describe('events', function() {
             ee.emit('test5', ...[ 'test', 5, {} ]);
             ee.emit('test5', ...[ 'test', 7, {} ]);
             ee.emit('test5', ...[ 'test', 9, {} ]);
+
+            return promise;
         });
 
         it('with options.filter - this should be EventEmitter', async function() {
@@ -2869,9 +2923,9 @@ describe('events', function() {
             expect(ee.listenerCount('error')).toBe(0);
         });
 
-        it('with options.filter and multi-names', function(done) {
+        it('with options.filter and multi-names', function() {
             const expectedError = null;
-            let error = null;
+            let error: Error | string | null = null;
             const expectedArgs = [
                 [ 'test', 1, {} ],
                 [ 'test', 5, {} ],
@@ -2879,20 +2933,20 @@ describe('events', function() {
             ];
             const argsArray: any[] = [];
 
-            Promise.all([
+            const promise = Promise.all([
                 once(ee, [ 'test5-1', 'test5-2' ], { filter: (type, ...args) => args[1] === 9 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
                 once(ee, [ 'test5-2', 'test5-1' ], { filter: (type, ...args) => args[1] === 5 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
                 once(ee, [ 'test5-1', 'test5-2' ], { filter: (type, ...args) => args[1] === 1 })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
-                    .catch(err => (
+                    .catch((err: Error | string) => (
                         error = err
                     )),
             ]).then(() => {
@@ -2900,8 +2954,6 @@ describe('events', function() {
                 expect(argsArray).toEqual(expectedArgs);
                 expect(ee.listenerCount('test5-1')).toBe(0);
                 expect(ee.listenerCount('test5-2')).toBe(0);
-
-                done();
             });
 
             expect(listenerCount(ee, 'test5-1')).toBe(3);
@@ -2919,6 +2971,8 @@ describe('events', function() {
             ee.emit('test5-2', ...[ 'test', 7, {} ]);
             ee.emit('test5-1', ...[ 'test', 9, {} ]);
             ee.emit('test5-2', ...[ 'test', 9, {} ]);
+
+            return promise;
         });
 
         describe('abortable EventEmitterEx.once', function() {
@@ -2928,16 +2982,17 @@ describe('events', function() {
                 }).then(() => {
                     throw new Error('test failed');
                 }).catch(err => {
+                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(err.code).toBe(ABORT_ERR);
                 });
             });
 
-            it('with AbortSignal', function(done) {
+            it('with AbortSignal', function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
 
-                once(ee, 'test6', { signal: ac.signal })
+                const promise = once(ee, 'test6', { signal: ac.signal })
                     .then(() => {
                         counter++;
                     })
@@ -2952,8 +3007,6 @@ describe('events', function() {
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -2961,6 +3014,8 @@ describe('events', function() {
 
                 ac.abort();
                 ee.emit('test6', ...[ 1, 2, 3 ]);
+
+                return promise;
             });
 
             it('with AbortSignal (async/await)', async function() {
@@ -3016,13 +3071,13 @@ describe('events', function() {
                 expect(listenerCount(ac2.signal, 'abort')).toBe(0);
             });
 
-            it(`with AbortController's`, function(done) {
+            it(`with AbortController's`, function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
                 const ac2 = new NativeAbortController();
 
-                once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
+                const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
                     .then(() => {
                         counter++;
                     })
@@ -3038,8 +3093,6 @@ describe('events', function() {
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac1.signal, 'abort')).toBe(0);
                         expect(listenerCount(ac2.signal, 'abort')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -3048,15 +3101,17 @@ describe('events', function() {
 
                 ac1.abort();
                 ee.emit('test6', ...[ 1, 2, 3 ]);
+
+                return promise;
             });
 
-            it(`with AbortController's - without abort()`, function(done) {
+            it(`with AbortController's - without abort()`, function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
                 const ac2 = new NativeAbortController();
 
-                once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
+                const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ] })
                     .then(() => {
                         counter++;
                     })
@@ -3065,13 +3120,11 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(1);
-                        expect(error).not.toBeDefined();
+                        expect(error).toBeUndefined();
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac1.signal, 'abort')).toBe(0);
                         expect(listenerCount(ac2.signal, 'abort')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -3079,6 +3132,8 @@ describe('events', function() {
                 expect(listenerCount(ac2.signal, 'abort')).toBe(1);
 
                 ee.emit('test6', ...[ 1, 2, 3 ]);
+
+                return promise;
             });
 
             it(`with AbortController's (async/await)`, async function() {
@@ -3180,7 +3235,7 @@ describe('events', function() {
                 acg.close();
 
                 expect(counter).toBe(1);
-                expect(error).not.toBeDefined();
+                expect(error).toBeUndefined();
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
                 expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3197,6 +3252,7 @@ describe('events', function() {
                     const ac2 = new AbortController();
                     const ac3 = new AbortController();
 
+                    // eslint-disable-next-line jest/valid-expect-in-promise
                     const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
                         .catch(err => {
                             error = err;
@@ -3212,6 +3268,7 @@ describe('events', function() {
                             expect(listenerCount(ac3.signal, 'abort')).toBe(0);
                         })
                     ;
+
                     promises.push(promise);
 
                     expect(listenerCount(ac1.signal, 'abort')).toBe(1);
@@ -3226,6 +3283,7 @@ describe('events', function() {
                     const ac2 = new AbortController();
                     const ac3 = new AbortController();
 
+                    // eslint-disable-next-line jest/valid-expect-in-promise
                     const promise = once(ee, 'test6', { abortControllers: [ ac1, ac2 ], signal: ac3.signal })
                         .catch(err => {
                             error = err;
@@ -3241,6 +3299,7 @@ describe('events', function() {
                             expect(listenerCount(ac3.signal, 'abort')).toBe(0);
                         })
                     ;
+
                     promises.push(promise);
 
                     expect(listenerCount(ac1.signal, 'abort')).toBe(1);
@@ -3253,13 +3312,13 @@ describe('events', function() {
                 await Promise.all(promises);
             });
 
-            it('with AbortSignal and ServerTiming', function(done) {
+            it('with AbortSignal and ServerTiming', function() {
                 const st = new ServerTiming();
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
 
-                once(ee, 'test10', { signal: ac.signal, timing: st })
+                const promise = once(ee, 'test10', { signal: ac.signal, timing: st })
                     .then(() => {
                         counter++;
                     })
@@ -3267,7 +3326,7 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(st.length).toBe(1);
+                        expect(st).toHaveLength(1);
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
                         expect(error && error.code).toBe(ABORT_ERR);
@@ -3275,8 +3334,6 @@ describe('events', function() {
                         expect(ee.listenerCount('test10')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -3284,15 +3341,17 @@ describe('events', function() {
 
                 ac.abort();
                 ee.emit('test10', ...[ 1, 2, 3 ]);
+
+                return promise;
             });
 
-            it('with AbortSignal and ServerTiming and multi-names', function(done) {
+            it('with AbortSignal and ServerTiming and multi-names', function() {
                 const st = new ServerTiming();
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
 
-                once(ee, [ 'test10', 'test11', 'test12' ], { signal: ac.signal, timing: st })
+                const promise = once(ee, [ 'test10', 'test11', 'test12' ], { signal: ac.signal, timing: st })
                     .then(() => {
                         counter++;
                     })
@@ -3300,7 +3359,7 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(st.length).toBe(0);
+                        expect(st).toHaveLength(0);
                         expect(counter).toBe(0);
                         expect(error).toBeDefined();
                         expect(error && error.code).toBe(ABORT_ERR);
@@ -3310,8 +3369,6 @@ describe('events', function() {
                         expect(ee.listenerCount('test12')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
-
-                        done();
                     })
                 ;
 
@@ -3319,19 +3376,21 @@ describe('events', function() {
 
                 ac.abort();
                 ee.emit('test11', ...[ 1, 2, 3 ]);
+
+                return promise;
             });
         });
 
         describe('with timeout', function() {
             // https://stackoverflow.com/a/60438234
             // do not using it.skip to avoid marking tests as "skipped" after running
-            const itif = (condition) => condition ? it : () => {}/*it.skip*/;
+            const itif = (condition: boolean) => condition ? it : () => {}/*it.skip*/;
 
-            it('simple', function(done) {
+            it('simple', function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
 
-                once(ee, 'test7', {
+                const promise = once(ee, 'test7', {
                     timeout: 10,
                 })
                     .then(() => {
@@ -3347,20 +3406,20 @@ describe('events', function() {
                         expect(ee.listenerCount('test7')).toBe(0);
 
                         clearTimeout(timeout);
-
-                        done();
                     })
                 ;
 
                 const timeout = setTimeout(() => {
                     ee.emit('test7', ...[ 1, 2, 3 ]);
                 }, 100);
+
+                return promise;
             });
 
-            it('check error message #1.1', function(done) {
+            it('check error message #1.1', function() {
                 let error: DOMException|void = void 0;
 
-                once(ee, 1, {
+                return once(ee, 1, {
                     timeout: 1,
                 })
                     .catch(err => {
@@ -3371,18 +3430,16 @@ describe('events', function() {
                         expect(error && error.name).toBe('TimeoutError');
                         expect(error && error.message).toInclude(' [1] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
-            it('check error message #1.2', function(done) {
+            it('check error message #1.2', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                once(ee, 0n, {
+                return once(ee, 0n, {
                     timeout: 1,
                 })
                     .catch(err => {
@@ -3393,16 +3450,14 @@ describe('events', function() {
                         expect(error && error.name).toBe('TimeoutError');
                         expect(error && error.message).toInclude(' ["0n"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
-            it('check error message #1.3', function(done) {
+            it('check error message #1.3', function() {
                 let error: DOMException|void = void 0;
 
-                once(ee, 0, {
+                return once(ee, 0, {
                     timeout: 1,
                 })
                     .catch(err => {
@@ -3413,60 +3468,62 @@ describe('events', function() {
                         expect(error && error.name).toBe('TimeoutError');
                         expect(error && error.message).toInclude(' [0] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #1.4', function(done) {
+            itif(!isEventTarget)('check error message #1.4', function() {
                 let error: DOMException|void = void 0;
 
-                once(ee, Symbol('timeout-message'), {
+                return once(ee, Symbol('timeout-message'), {
                     timeout: 1,
                 })
                     .catch(err => {
                         error = err;
                     })
                     .then(() => {
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error).toBeDefined();
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.name).toBe('TimeoutError');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.message).toInclude(' ["Symbol(timeout-message)"] ');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #2', function(done) {
+            itif(!isEventTarget)('check error message #2', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 0n ], {
+                return once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 0n ], {
                     timeout: 1,
                 })
                     .catch(err => {
                         error = err;
                     })
                     .then(() => {
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error).toBeDefined();
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.name).toBe('TimeoutError');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
-            it('check error message #3', function(done) {
+            it('check error message #3', function() {
                 let error: DOMException|void = void 0;
 
-                once(ee, 'timeout-message', {
+                return once(ee, 'timeout-message', {
                     errorEventName: 'timeout-message-error',
                     timeout: 1,
                 })
@@ -3478,19 +3535,17 @@ describe('events', function() {
                         expect(error && error.name).toBe('TimeoutError');
                         expect(error && error.message).toInclude(' ["timeout-message","timeout-message-error"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #4', function(done) {
+            itif(!isEventTarget)('check error message #4', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
+                return once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
                     errorEventName: Symbol('timeout-message-error'),
                     timeout: 1,
                 })
@@ -3498,12 +3553,14 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error).toBeDefined();
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.name).toBe('TimeoutError');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
+                        // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
-
-                        done();
                     })
                 ;
             });
@@ -3528,7 +3585,7 @@ describe('events', function() {
                     errorEventName: isEventTarget ? 'error' : void 0,
                 });
 
-                expect(st.length).toBe(1);
+                expect(st).toHaveLength(1);
                 expect(ee.listenerCount('test8')).toBe(0);
             }
             {
@@ -3549,7 +3606,7 @@ describe('events', function() {
                     //
                 }
 
-                expect(st.length).toBe(1);
+                expect(st).toHaveLength(1);
                 expect(ee.listenerCount('test8')).toBe(0);
             }
         });
@@ -3587,7 +3644,7 @@ describe('events', function() {
                 }),
             ]);
 
-            expect(st.length).toBe(3);
+            expect(st).toHaveLength(3);
             expect(st.getTimings().map(a => a.description)).toEqual([ 'test9-1', 'test9-2', 'test9-3' ]);
             expect(error).toBeDefined();
             expect(ee.listenerCount('test9-1')).toBe(0);
@@ -3766,3 +3823,14 @@ describe('events', function() {
         });
     });
 });
+
+function expect_toBeDefined<T>(arg: T): asserts arg is NonNullable<T> {
+    expect(arg).toBeDefined();
+    //if (arg == null)  throw new Error("arg is null");
+}
+/*
+function expect_not_toBeDefined<T>(arg: unknown): asserts arg is undefined | null {
+    expect(arg).toBeUndefined();
+    //if (arg == null)  throw new Error("arg is not null");
+}
+*/

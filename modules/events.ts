@@ -391,6 +391,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     // throw new ERR_INVALID_ARG_TYPE()
                     throw new Error(`options.captureRejections should be of type "boolean" but has "${typeof captureRejections}" type`);
                 }
+
                 this._f |= EventEmitterEx_Flags_captureRejections;
             }
             if (listenerWithoutThis) {
@@ -479,21 +480,25 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
                             this.emit(errorMonitor);
+
                             break;
                         case 2:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
                             this.emit(errorMonitor, a1);
+
                             break;
                         case 3:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
                             this.emit(errorMonitor, a1, a2);
+
                             break;
                         case 4:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
                             this.emit(errorMonitor, a1, a2, a3);
+
                             break;
                         // slower
                         default: {
@@ -519,15 +524,19 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 switch (argumentsLength) {
                     case 1:
                         result = func_handler.call(context);
+
                         break;
                     case 2:
                         result = func_handler.call(context, a1);
+
                         break;
                     case 3:
                         result = func_handler.call(context, a1, a2);
+
                         break;
                     case 4:
                         result = func_handler.call(context, a1, a2, a3);
+
                         break;
                     // slower
                     default: {
@@ -568,6 +577,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                                 /*@__NOINLINE__*/
                                 emitNone_array(listeners, context);
                             }
+
                             break;
                         case 2:
                             if (captureRejections) {
@@ -578,6 +588,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                                 /*@__NOINLINE__*/
                                 emitOne_array(listeners, context, a1);
                             }
+
                             break;
                         case 3:
                             if (captureRejections) {
@@ -588,6 +599,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                                 /*@__NOINLINE__*/
                                 emitTwo_array(listeners, context, a1, a2);
                             }
+
                             break;
                         case 4:
                             if (captureRejections) {
@@ -598,6 +610,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                                 /*@__NOINLINE__*/
                                 emitThree_array(listeners, context, a1, a2, a3);
                             }
+
                             break;
                         // slower
                         default: {
@@ -621,6 +634,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         else if (isErrorEvent) {
             // If there is no 'error' event listener then throw.
             const err = arguments[1];// eslint-disable-line prefer-rest-params
+
             /*if (domain) {
                 if (!err) { err = new Error('Uncaught, unspecified "error" event'); }
                 er.domainEmitter = this;
@@ -636,9 +650,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             else {
                 // At least give some kind of context to the user
                 const error = new Error('Uncaught, unspecified "error" event. (' + err + ')');
+
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 error.context = err;
+
                 throw error;
             }
         }
@@ -730,6 +746,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                     if (handler === listener) {
                         isListenerAlreadyExisted = true;
+
                         break;
                     }
                     else if (
@@ -739,6 +756,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         && handler.listener === listener
                     ) {
                         isListenerAlreadyExisted = true;
+
                         break;
                     }
                 }
@@ -886,6 +904,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                 if (handler === listener) {
                     index = i;
+
                     break;
                 }
                 else if (
@@ -903,6 +922,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                     // originalListener = listeners[i].listener;
                     index = i;
+
                     break;
                 }
             }
@@ -1095,6 +1115,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             }
 
                             const onceListener = listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>;
+
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
                             this.emit('removeListener', event, onceListener.listener);
@@ -1241,6 +1262,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         listenerToCheck?: EMD<EventMap>[EventKey],
     ) {
         type _TEventMap = EMD<EventMap>;
+
         const handler = this._events[event];
 
         if (!handler) {
@@ -1290,6 +1312,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      */
     listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
         type _TEventMap = EMD<EventMap>;
+
         const handler = this._events[event];
 
         if (!handler) {
@@ -1324,6 +1347,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      */
     rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey) {
         type _TEventMap = EMD<EventMap>;
+
         const handler = this._events[event];
 
         if (!handler) {
@@ -1556,7 +1580,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (hasTiming) {
-            timing!.time(types);
+            _assertIsDefined(timing);
+
+            timing.time(types);
         }
 
         let promise;
@@ -1581,11 +1607,13 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         }
 
                         if (hasTiming && type !== winnerEventType) {
-                            if (typeof timing!.timeClear === 'function') {
-                                timing!.timeClear(type as string, true);
+                            _assertIsDefined(timing);
+
+                            if (typeof timing.timeClear === 'function') {
+                                timing.timeClear(type as string, true);
                             }
                             else {
-                                timing!.timeEnd(type as string, true);
+                                timing.timeEnd(type as string, true);
                             }
                         }
                     }
@@ -1636,7 +1664,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         winnerEventType = type;
 
                         if (hasTiming) {
-                            timing!.timeEnd(type as string, true);
+                            _assertIsDefined(timing);
+
+                            timing.timeEnd(type as string, true);
                         }
 
                         if (listenersCleanUp) {
@@ -1661,14 +1691,17 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                 const errorListener = (error: unknown) => {
                     if (hasTiming) {
+                        _assertIsDefined(timing);
+
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
-                        if (typeof timing!.timeClear === 'function') {
-                            timing!.timeClear(types, true);
+                        if (typeof timing.timeClear === 'function') {
+                            timing.timeClear(types, true);
                         }
                         else {
-                            timing!.timeEnd(types, true);
+                            timing.timeEnd(types, true);
                         }
+
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1722,7 +1755,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     }
 
                     if (hasTiming) {
-                        timing!.timeEnd(type, true);
+                        _assertIsDefined(timing);
+
+                        timing.timeEnd(type, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1736,12 +1771,14 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 };
                 const errorListener = (error: unknown) => {
                     if (hasTiming) {
+                        _assertIsDefined(timing);
+
                         // В случае ошибки, удаляем все метки времени.
                         // todo: Создавать метку времени для 'error' и закрывать её в случае ошибки. Если ошибки не было - удалять метку времени для 'error' из timing.
                         //   if (typeof timing!.timeClear === 'function') {
                         //       timing!.timeClear(type as string, true);
                         //   } else { timing!.timeEnd(type as string, true); }
-                        timing!.timeEnd(type, true);
+                        timing.timeEnd(type, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1757,6 +1794,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 listenersCleanUp = function() {
                     if (isEventTarget) {
                         (emitter as DOMEventTarget).removeEventListener(type as string, eventListener, eventTargetListenerOptions);
+
                         if (errorEventNameIsDefined && needErrorListener) {
                             // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                             (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
@@ -1764,6 +1802,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     }
                     else {
                         _emitter.removeListener(type as string | symbol, eventListener);
+
                         if (needErrorListener) {
                             _emitter.removeListener(errorEventName, errorListener);
                         }
@@ -1774,6 +1813,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                 if (isEventTarget) {
                     (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
+
                     if (errorEventNameIsDefined && needErrorListener) {
                         // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
                         (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
@@ -1781,12 +1821,14 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
                 else if (usePrependListener) {
                     _emitter.prependListener(type as string | symbol, eventListener);
+
                     if (needErrorListener) {
                         _emitter.prependListener(errorEventName, errorListener);
                     }
                 }
                 else {
                     _emitter.on(type as string | symbol, eventListener);
+
                     if (needErrorListener) {
                         _emitter.on(errorEventName, errorListener);
                     }
@@ -1802,7 +1844,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             const cancelPromise = signal ? new _Promise<void>((resolve, reject) => {
                 abortCallback = function(clearPromiseSymbol) {
                     if (abortCallback) {
-                        signal!.removeEventListener('abort', abortCallback);
+                        _assertIsDefined(signal);
+
+                        signal.removeEventListener('abort', abortCallback);
                     }
 
                     if (clearPromiseSymbol === sCleanAbortPromise) {
@@ -1832,16 +1876,20 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     abortCallback = void 0;
                 };
 
-                signal!.addEventListener('abort', abortCallback);
+                _assertIsDefined(signal);
+
+                signal.addEventListener('abort', abortCallback);
             }) : void 0;
             const timeoutPromise = timeout ? new _Promise<void>((resolve, reject) => {
                 let timeoutId: Timeout | void = setTimeout(() => {
                     if (hasTiming) {
+                        _assertIsDefined(timing);
+
                         // todo: Создавать метку времени для 'timeout' и закрывать её в случае таймаута. Если ошибки не было - удалять метку времени для 'timeout' из timing.
                         //   if (typeof timing!.timeClear === 'function') {
                         //       timing!.timeClear(type as string, true);
                         //   } else { timing!.timeEnd(type as string, true); }
-                        timing!.timeEnd(types, true);
+                        timing.timeEnd(types, true);
                         // cleanup
                         timing = void 0;
                         hasTiming = false;
@@ -1915,7 +1963,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 if (hasTiming) {
-                    timing!.timeEnd(types, true);
+                    _assertIsDefined(timing);
+
+                    timing.timeEnd(types, true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -1939,7 +1989,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 if (hasTiming) {
-                    timing!.timeEnd(types, true);
+                    _assertIsDefined(timing);
+
+                    timing.timeEnd(types, true);
                     // cleanup
                     timing = void 0;
                     hasTiming = false;
@@ -2054,21 +2106,25 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 super.emit(event);
+
                 break;
             case 1:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 super.emit(event, args[0]);
+
                 break;
             case 2:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 super.emit(event, args[0], args[1]);
+
                 break;
             case 3:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
                 super.emit(event, args[0], args[1], args[2]);
+
                 break;
             default:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -2140,20 +2196,22 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             _proxyHandlers[event] = eventProxy;
         }
 
+        _assertIsDefined(eventProxy);
+
         if (prepend) {
             if (once) {
-                (eventEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxy!);
+                (eventEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxy);
             }
             else {
-                (eventEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxy!);
+                (eventEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxy);
             }
         }
         else {
             if (once) {
-                (eventEmitter as EventEmitterEx).once(event as NodeEventName, eventProxy!);
+                (eventEmitter as EventEmitterEx).once(event as NodeEventName, eventProxy);
             }
             else {
-                (eventEmitter as EventEmitterEx).on(event as NodeEventName, eventProxy!);
+                (eventEmitter as EventEmitterEx).on(event as NodeEventName, eventProxy);
             }
         }
 
@@ -2204,6 +2262,8 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
                 continue;
             }
 
+            // fixme: А что ту должно передаваться в _proxyHook, если вызвани removeAllListeners() без аргументов (когда
+            //  нужно удалить все обработчики)?
             const eventEmitter = _proxyHook ? _proxyHook(event!, _eventEmitter as ICompatibleEmitter) : _eventEmitter;
             const proxyHandler = _proxyHandlers[type];
 
@@ -2481,20 +2541,35 @@ function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
 
 const n0 = typeof BigInt !== 'undefined' ? BigInt(0) : void 0;
 
+/*
+function _isDefined<T>(value: T): value is NonNullable<T> {
+    return value !== void 0 && value !== null;
+}
+*/
+function _assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
+    if (value === void 0 || value === null) {
+        throw new Error('value should be defined');
+    }
+}
+
 function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEventName?: EventName) {
     if (!types && types !== 0 && (n0 === void 0 || (types as EventName & bigint) !== n0)) {
         types = [];
     }
 
     if (errorEventName || errorEventName === 0 || (n0 !== void 0 && (errorEventName as EventName & bigint) === n0)) {
+        // noinspection JSDeprecatedSymbols
         if (!Array.isArray(types)) {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             types = [ (types! as EventName), errorEventName! ];
         }
         else {
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             types = [ ...types, errorEventName! ];
         }
     }
 
+    // noinspection JSDeprecatedSymbols
     if (Array.isArray(types)) {
         return JSON.stringify(types.map(value => {
             const type = typeof value;
@@ -2535,6 +2610,7 @@ type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, Event
     listener: Listener,
     target: EventEmitterEx,
 }
+
 const sOnceListenerWrapperId = Symbol('');
 
 /** @private */
@@ -2595,6 +2671,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
 /** @private */
 function emitNone_array(listeners: Function[], self: EventEmitterEx | undefined) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self);
     }
@@ -2608,6 +2685,7 @@ function emitNone_array_catch(
     event: EventName,
 ) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self);
 
@@ -2620,6 +2698,7 @@ function emitNone_array_catch(
 /** @private */
 function emitOne_array(listeners: Function[], self: EventEmitterEx | undefined, arg1: any) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1);
     }
@@ -2634,6 +2713,7 @@ function emitOne_array_catch(
     event: EventName,
 ) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1);
 
@@ -2646,6 +2726,7 @@ function emitOne_array_catch(
 /** @private */
 function emitTwo_array(listeners: Function[], self: EventEmitterEx | undefined, arg1: any, arg2: any) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2);
     }
@@ -2661,6 +2742,7 @@ function emitTwo_array_catch(
     event: EventName,
 ) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2);
 
@@ -2673,6 +2755,7 @@ function emitTwo_array_catch(
 /** @private */
 function emitThree_array(listeners: Function[], self: EventEmitterEx | undefined, arg1: any, arg2: any, arg3: any) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].call(self, arg1, arg2, arg3);
     }
@@ -2689,6 +2772,7 @@ function emitThree_array_catch(
     event: EventName,
 ) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].call(self, arg1, arg2, arg3);
 
@@ -2701,6 +2785,7 @@ function emitThree_array_catch(
 /** @private */
 function emitMany_array(listeners: Function[], self: EventEmitterEx | undefined, args: any[]) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         listeners[i].apply(self, args);
     }
@@ -2715,6 +2800,7 @@ function emitMany_array_catch(
     event: EventName,
 ) {
     const len = listeners.length;
+
     for (let i = 0 ; i < len ; ++i) {
         const result = listeners[i].apply(self, args);
 

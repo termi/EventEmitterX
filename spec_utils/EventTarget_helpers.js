@@ -1,3 +1,5 @@
+// noinspection JSUnusedLocalSymbols
+
 'use strict';
 
 /**
@@ -13,6 +15,7 @@ try {
         getEventListeners: _node_getEventListeners,
     } = require('events');
 
+    // noinspection JSValidateTypes
     node_getEventListeners = _node_getEventListeners;
     has_node_getEventListeners = true;
 }
@@ -54,6 +57,7 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
         maybeEventTarget.prependOnceListener = function() {
             throw new Error('"prependOnceListener" on EventTarget is not supported');
         };
+
         maybeEventTarget.off = off;
         maybeEventTarget.remoteListener = off;
 
@@ -136,6 +140,7 @@ function getEventListeners(emitter, type) {
             const eventTargetImpl = emitter[symbols[0]];
 
             if (eventTargetImpl) {
+                // noinspection JSUnresolvedVariable
                 const listeners = eventTargetImpl._eventListeners || eventTargetImpl.listeners || eventTargetImpl.events || eventTargetImpl._events || emitter._listeners;
                 const handlers = handlersFromListenersObject(listeners, type);
 
@@ -147,6 +152,7 @@ function getEventListeners(emitter, type) {
     }
 
     {
+        // noinspection JSUnresolvedVariable
         const listeners = emitter.listeners || emitter.events || emitter._events || emitter._eventListeners || emitter._listeners;
         const handlers = handlersFromListenersObject(listeners, type);
 
@@ -200,6 +206,7 @@ module.exports.compatibleOnce_for_EventTarget = function(once) {
                 //  will produced: > 'error: 1'
                 throw error["args"][0];
             }
+
             throw error;
         });
     };
