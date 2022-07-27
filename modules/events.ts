@@ -357,7 +357,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         [eventName in keyof EMD<EventMap>]?: (Listener | Listener[]);
     } = Object.create(null);
 
-    _maxListeners = Infinity;
+    _maxListeners = Number.POSITIVE_INFINITY;
 
     private _f = 0;
     private _emitCounter: ICounter | Console | void;
@@ -389,7 +389,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             if (captureRejections) {
                 if (typeof (captureRejections as any) !== 'boolean') {
                     // throw new ERR_INVALID_ARG_TYPE()
-                    throw new Error(`options.captureRejections should be of type "boolean" but has "${typeof captureRejections}" type`);
+                    throw new TypeError(`options.captureRejections should be of type "boolean" but has "${typeof captureRejections}" type`);
                 }
 
                 this._f |= EventEmitterEx_Flags_captureRejections;
@@ -474,6 +474,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             const listenerWithoutThis = _checkBit(_f, EventEmitterEx_Flags_listenerWithoutThis);
 
             if (isErrorEvent) {
+                // eslint-disable-next-line unicorn/no-lonely-if
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
                     switch (argumentsLength) {
                         case 1:
@@ -508,7 +509,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                             // @ts-ignore
-                            this.emit.apply(this, args);// eslint-disable-line prefer-spread
+                            this.emit.apply(this, args);// eslint-disable-line prefer-spread,unicorn/consistent-destructuring
                         }
                     }
                 }
@@ -550,6 +551,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     // We check if result is undefined first because that
                     // is the most common case so we do not pay any perf
                     // penalty
+                    // eslint-disable-next-line unicorn/no-lonely-if
                     if (result !== undefined && result !== null) {
                         const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
 
@@ -562,7 +564,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             else {
                 const array_handler = handler as Function[];
 
-                if (array_handler.length) {
+                if (array_handler.length > 0) {
                     // arrayClone
                     const listeners = array_handler.slice();
 
@@ -824,7 +826,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             }
         }
 
-        if (_maxListeners !== Infinity && _maxListeners <= newLen) {
+        if (_maxListeners !== Number.POSITIVE_INFINITY && _maxListeners <= newLen) {
             // todo: EventEmitterEx.sOnMaxListeners = Symbol('sOnMaxListeners');
             //  emit(EventEmitterEx.sOnMaxListeners, newLen, event, `Maximum event listeners for "${event}" event!`);
             console.warn(`Maximum event listeners for "${String(event)}" event!`);
@@ -1556,6 +1558,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
         {
             if (signal) {
+                // eslint-disable-next-line unicorn/no-lonely-if
                 if (!isAbortSignal(signal)) {
                     return _Promise.reject(new EventsTypeError(`Failed to execute 'once' on emitter: member signal is not of type AbortSignal.`, ERR_INVALID_OPTION_TYPE));
                 }
@@ -1837,7 +1840,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (signal || timeout) {
-            let abortCallback: ((this: AbortSignal | void, ev: typeof sCleanAbortPromise | AbortSignalEventMap["abort"]) => void) | void;
+            let abortCallback: ((this: AbortSignal | void, event_: typeof sCleanAbortPromise | AbortSignalEventMap["abort"]) => void) | void;
             let cleanTimeoutCallback: Function | void;
 
             // Turn an event into a promise, reject it once `abort` is dispatched
@@ -1946,6 +1949,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             }
 
             // Return the fastest promise (don't need to wait for request to finish)
+            // eslint-disable-next-line promise/prefer-await-to-then
             return _Promise.race(promises).then(result => {
                 if (listenersCleanUp) {
                     listenersCleanUp();
@@ -1972,6 +1976,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 return result as any[];
+                // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
             }).catch(error => {
                 if (listenersCleanUp) {
                     listenersCleanUp();
@@ -2192,6 +2197,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             (eventEmitter as EventEmitterEx).removeListener(event as NodeEventName, eventProxy);
         }
         else {
+            // eslint-disable-next-line unicorn/consistent-destructuring
             eventProxy = this._onEventEmitterEvent.bind(this, event);
             _proxyHandlers[event] = eventProxy;
         }
@@ -2236,6 +2242,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             delete _proxyHandlers[event];
 
             if (eventEmitter && proxyHandler) {
+                // eslint-disable-next-line unicorn/no-lonely-if
                 if (proxyHandler) {
                     try {
                         eventEmitter.removeListener(event as NodeEventName, proxyHandler);
@@ -2270,6 +2277,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             delete _proxyHandlers[type];
 
             if (eventEmitter && proxyHandler) {
+                // eslint-disable-next-line unicorn/no-lonely-if
                 if (proxyHandler) {
                     try {
                         eventEmitter.removeListener(type, proxyHandler);
@@ -2359,7 +2367,7 @@ export class TimeoutError extends Error {
 
         if (!this.stack) {
             // es5 environment
-            this.stack = (new Error()).stack;
+            this.stack = (new Error('-get-stack-')).stack;
         }
     }
 

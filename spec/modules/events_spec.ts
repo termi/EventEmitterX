@@ -3824,13 +3824,13 @@ describe('events', function() {
     });
 });
 
-function expect_toBeDefined<T>(arg: T): asserts arg is NonNullable<T> {
-    expect(arg).toBeDefined();
-    //if (arg == null)  throw new Error("arg is null");
+function expect_toBeDefined<T>(argument: T): asserts argument is NonNullable<T> {
+    expect(argument).toBeDefined();
+    //if (argument == null)  throw new Error("argument is null");
 }
 /*
-function expect_not_toBeDefined<T>(arg: unknown): asserts arg is undefined | null {
-    expect(arg).toBeUndefined();
-    //if (arg == null)  throw new Error("arg is not null");
+function expect_not_toBeDefined<T>(argument: unknown): asserts argument is undefined | null {
+    expect(argument).toBeUndefined();
+    //if (argument == null)  throw new Error("argument is not null");
 }
 */
