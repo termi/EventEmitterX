@@ -1,4 +1,3 @@
-/* eslint-disable promise/always-return */
 /**
  * @jest-environment jsdom
  */
@@ -58,6 +57,8 @@ import events, {
     Listener,
     kDestroyingEvent,
     ABORT_ERR,
+
+    once,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import { AbortController, AbortControllersGroup, AbortSignal } from 'termi@abortable';
@@ -965,7 +966,7 @@ describe('events', function() {
 
             it('event name as number', function() {
                 // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-symbols.js
-                const eventNameNumber = 123456789;
+                const eventNameNumber = 123_456_789;
                 let counter = 0;
                 const listener = () => { counter++; };
 
@@ -1565,8 +1566,8 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch (e) {
-                        err = e;
+                    catch (error) {
+                        err = error;
                     }
 
                     {// additional tests
@@ -1602,8 +1603,8 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch (e) {
-                        err = e;
+                    catch (error) {
+                        err = error;
                     }
 
                     {// additional tests
@@ -1648,7 +1649,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch (e) {
+                    catch {
                         // This code should be unreachable
                         {// main tests #2
                             throw new Error('Unreachable code!!!');
@@ -1699,7 +1700,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr);
                     }
-                    catch (e) {
+                    catch {
                         // This code should be unreachable
                         {// main tests #2
                             throw new Error('Unreachable code!!!');
@@ -1762,7 +1763,7 @@ describe('events', function() {
                     try {
                         ee.emit('error', theErr1, theErr2, ...expectedArgs);
                     }
-                    catch (e) {
+                    catch {
                         // This code should be unreachable
                         {// main tests #2
                             throw new Error('Unreachable code!!!');
@@ -1950,7 +1951,7 @@ describe('events', function() {
                                         return Promise.resolve({ value: void 0, done: true });
                                     }
 
-                                    if (eventsPool.length) {
+                                    if (eventsPool.length > 0) {
                                         const eventArgs = eventsPool.shift();
 
                                         return Promise.resolve({
@@ -2138,9 +2139,11 @@ describe('events', function() {
         it.todo('#removeAllListeners() with _proxyHook');
     });
 
+    const _EventEmitterEx_once = once;
+
     describe('events.once', function _EventEmitter_once() {
         let EventEmitter = EventEmitterEx;
-        let { once } = EventEmitterEx;
+        let once = _EventEmitterEx_once;
 
         {
             // eslint-disable-next-line prefer-rest-params
@@ -2276,7 +2279,7 @@ describe('events', function() {
             });
 
             it(`should not reject if 'error' event is main listener type`, function() {
-                const err = new Error();
+                const err = new Error('test');
 
                 const promise = once(ee, 'error', {
                     // EventTarget does not have `error` event semantics like Node
@@ -2295,7 +2298,7 @@ describe('events', function() {
             });
 
             it(`should not reject if 'error' event is main listener type (async/await)`, async function() {
-                const err = new Error();
+                const err = new Error('test');
 
                 setImmediate(() => {
                     ee.emit('error', err, 1, 2, 3);
@@ -2311,7 +2314,7 @@ describe('events', function() {
             });
 
             it(`should not reject if 'error' event is in main listeners types`, function() {
-                const err = new Error();
+                const err = new Error('test');
 
                 const promise = once(ee, [ 'test1', 'test2', 'error' ], {
                     // EventTarget does not have `error` event semantics like Node
@@ -2335,7 +2338,7 @@ describe('events', function() {
             });
 
             it(`should not reject if 'error' event is in main listeners types (async/await)`, async function() {
-                const err = new Error();
+                const err = new Error('test');
 
                 setImmediate(() => {
                     ee.emit('error', err, 1, 2, 3);
@@ -2478,7 +2481,7 @@ describe('events', function() {
             });
 
             it(`should not reject if custom error event is main listener and 'error' event emitted`, async function() {
-                const err = new Error();
+                const err = new Error('test');
                 const customErrorEventName = 'custom_error1-3';
 
                 setImmediate(() => {
@@ -2670,7 +2673,7 @@ describe('events', function() {
                 try {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                     // @ts-ignore
-                    await once(eventTarget, [ 'test-123-qwerty', 321132, 987654321n, Symbol('invalid-argument') ], {
+                    await once(eventTarget, [ 'test-123-qwerty', 321_132, 987_654_321n, Symbol('invalid-argument') ], {
                         timeout: 10,
                     });
                 }
@@ -2777,7 +2780,7 @@ describe('events', function() {
             it.skip('with options.signal should pass signal to compatible addEventListener', async function() {
                 const fakeEventTarget = new FakeEventTarget();
                 const ac = new AbortController();
-                const signal = ac.signal;
+                const { signal } = ac;
                 const type = 'test-options.signal';
 
                 fakeEventTarget.initSupports({ signal: true });
@@ -2818,7 +2821,7 @@ describe('events', function() {
             it.skip('with options.signal should NOT pass signal to incompatible addEventListener', async function() {
                 const fakeEventTarget = new FakeEventTarget();
                 const ac = new AbortController();
-                const signal = ac.signal;
+                const { signal } = ac;
                 const type = 'test-options.signal';
 
                 fakeEventTarget.initSupports({ signal: false });
@@ -2911,6 +2914,7 @@ describe('events', function() {
 
             const actualArgs = await once(ee, 'test-ee-this', {
                 filter() {
+                    // eslint-disable-next-line unicorn/no-this-assignment
                     passedEventEmitter = this;
 
                     return true;
@@ -3568,7 +3572,7 @@ describe('events', function() {
 
         it('with ServerTiming (async/await)', async function() {
             const ee = new EventEmitter();
-            const err = new Error();
+            const err = new Error('test');
 
             compatibleEventEmitter_from_EventTarget(ee);
 
@@ -3602,7 +3606,7 @@ describe('events', function() {
                         errorEventName: isEventTarget ? 'error' : void 0,
                     });
                 }
-                catch (err) {
+                catch {
                     //
                 }
 
@@ -3621,7 +3625,7 @@ describe('events', function() {
             setImmediate(() => {
                 ee.emit('test9-1', 1);
                 ee.emit('test9-2', 2);
-                ee.emit('error', new Error());
+                ee.emit('error', new Error('test'));
             });
 
             await Promise.all([
@@ -3793,6 +3797,7 @@ describe('events', function() {
         });
 
         it('isEventEmitterEx from another context', function() {
+            // eslint-disable-next-line unicorn/no-console-spaces
             console.info(' ---- ', require.resolve('../../modules/events'));
 
             const contextObject = {

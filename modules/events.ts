@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-magic-numbers */
 'use strict';
 /// <reference types="node" />
 
@@ -651,7 +652,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             }
             else {
                 // At least give some kind of context to the user
-                const error = new Error('Uncaught, unspecified "error" event. (' + err + ')');
+                const error = new Error(`Uncaught, unspecified "error" event. (${ err })`);
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
@@ -2309,8 +2310,7 @@ if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
 export type NodeEventEmitter = INodeEventEmitter;
 
 export { errorMonitor, captureRejectionSymbol, ABORT_ERR };
-export const once = EventEmitterEx.once;
-export const getEventListeners = EventEmitterEx.getEventListeners;
+export const { once, getEventListeners } = EventEmitterEx;
 
 /**
  * @private
@@ -2636,7 +2636,9 @@ function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
 
         const maybePromise = this.listener.apply(this.target, args);
 
+        // eslint-disable-next-line promise/prefer-await-to-then
         if (!!maybePromise && typeof maybePromise.catch === 'function') {
+            // eslint-disable-next-line promise/prefer-await-to-callbacks,promise/prefer-await-to-then
             maybePromise.catch(error => {
                 // todo: Передавать эту ошибку в специальный обработчик для асинхронных ошибок eventHandler'ов
                 //  Сюда _emitUnhandledRejectionOrErr ?
@@ -2823,10 +2825,11 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
     // Handle Promises/A+ spec, then could be a getter
     // that throws on second use.
     try {
-        const then = promise.then;
+        const { then } = promise;
 
         if (typeof then === 'function') {
             // Нужно ли тут перехватывать ошибку через catch?
+            // eslint-disable-next-line promise/prefer-await-to-callbacks
             void then.call(promise, undefined, function(err) {
                 // The callback is called with nextTick to avoid a follow-up
                 // rejection from this promise.

@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/no-this-assignment,unicorn/prefer-reflect-apply */
 // noinspection JSUnusedLocalSymbols
 
 'use strict';
@@ -19,7 +20,7 @@ try {
     node_getEventListeners = _node_getEventListeners;
     has_node_getEventListeners = true;
 }
-catch (e) {
+catch (err) {
     // ignore
 }
 
