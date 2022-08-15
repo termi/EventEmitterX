@@ -45,7 +45,7 @@ export interface ICompatibleEmitter {
     removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
     prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
     prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
-    emit: (eventName: string | symbol | any, ...args: any[]) => boolean | any;
+    emit: (eventName: any | string | symbol, ...args: any[]) => any | boolean;
 }
 
 /**
@@ -98,7 +98,7 @@ interface Options {
      *
      * {@link global.console} is valid value for this option.
      */
-    emitCounter?: ICounter | Console;
+    emitCounter?: Console | ICounter;
     /**
      * By default, `EventEmitterEx` calls listeners with a `this` value of the emitter instance.
      * Passing `true` to this parameter will cause to calls listener functions without any `this` value.
@@ -177,7 +177,7 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
 // type EventMapFrom<T> = T extends EventEmitterEx<infer X> ? X : never;
 type EventNamesFrom<T> = T extends EventEmitterEx<infer X> ? keyof X : never;
 // type EventNamesFrom2<T> = EventNamesFrom<T>|EventNamesFrom<T>[];
-type EventNamesFrom3<T> = EventNamesFrom<T> | EventNamesFrom<T>[] | EventName | EventName[];
+type EventNamesFrom3<T> = EventName | EventName[] | EventNamesFrom<T> | EventNamesFrom<T>[];
 
 const ERR_INVALID_ARG_TYPE = 'ERR_INVALID_ARG_TYPE';
 const ERR_INVALID_OPTION_TYPE = 'ERR_INVALID_OPTION_TYPE';
@@ -289,7 +289,7 @@ type EMD<EventMap extends DefaultEventMap = DefaultEventMap> = EventMap & InnerL
 // type EMK<EventMap extends DefaultEventMap=DefaultEventMap, _T= EMD<EventMap>> = _T[keyof _T];
 
 export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMap> {
-    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]> | any[]): boolean;
+    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: any[] | Parameters<EMD<EventMap>[EventKey]>): boolean;
     on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
     once<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
     addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
@@ -361,7 +361,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     _maxListeners = Number.POSITIVE_INFINITY;
 
     private _f = 0;
-    private _emitCounter: ICounter | Console | void;
+    private _emitCounter: Console | ICounter | void;
 
     /* todo: add handleEvent support
     // supportHandleEvent, support DOMEventTarget.handleEvent
@@ -421,7 +421,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         this._emitCounter = void 0;
 
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
+        // @ts-expect-error
         this.emit(kDestroyingEvent);
 
         this.removeAllListeners();
@@ -455,10 +455,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     }
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>): boolean;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const emitCounter = this._emitCounter;
@@ -480,25 +480,25 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     switch (argumentsLength) {
                         case 1:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit(errorMonitor);
 
                             break;
                         case 2:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit(errorMonitor, a1);
 
                             break;
                         case 3:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit(errorMonitor, a1, a2);
 
                             break;
                         case 4:
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit(errorMonitor, a1, a2, a3);
 
                             break;
@@ -509,7 +509,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             args[0] = errorMonitor;
 
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit.apply(this, args);// eslint-disable-line prefer-spread,unicorn/consistent-destructuring
                         }
                     }
@@ -655,7 +655,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 const error = new Error(`Uncaught, unspecified "error" event. (${ err })`);
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 error.context = err;
 
                 throw error;
@@ -718,7 +718,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         if (has_newListener_listener) {
             // todo: Разобраться, почему тут TypeScript ругается, хотя описание для 'newListener' в DefaultEventMap есть.
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             this.emit('newListener', event, listener);
         }
 
@@ -735,7 +735,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 else if (hasAnyOnceListener
                     && (handler[sOnceListenerWrapperId] !== void 0)
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
+                    // @ts-expect-error
                     && handler.listener === listener
                 ) {
                     isListenerAlreadyExisted = true;
@@ -755,7 +755,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     else if (
                         (handler[sOnceListenerWrapperId] !== void 0)
                         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-ignore
+                        // @ts-expect-error
                         && handler.listener === listener
                     ) {
                         isListenerAlreadyExisted = true;
@@ -769,7 +769,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 if (_checkBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener)) {
                     // todo: Добавить 'duplicatedListener' в DefaultEventMap и убрать "@ts-ignore"
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
+                    // @ts-expect-error
                     this.emit('duplicatedListener', event, listener);
                 }
 
@@ -866,7 +866,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
         const hasAnyOnceListener = _onceIds.length > 0;
-        let newListenersCount: void | number = void 0;
+        let newListenersCount: number | void = void 0;
         // let originalListener: void|Function = void 0;
 
         if (typeof handler === 'function') {
@@ -877,7 +877,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             else if (hasAnyOnceListener
                 && (handler[sOnceListenerWrapperId] !== void 0)
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 && handler.listener === listener
             ) {
                 const onceWrapperId = handler[sOnceListenerWrapperId];
@@ -913,7 +913,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 else if (
                     (handler[sOnceListenerWrapperId] !== void 0)
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
+                    // @ts-expect-error
                     && handler.listener === listener
                 ) {
                     const onceWrapperId = handler[sOnceListenerWrapperId];
@@ -1024,12 +1024,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         if (has_removeListener_listener) {
             if (listener[sOnceListenerWrapperId] !== void 0) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 listener = listener.listener || listener;
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             this.emit('removeListener', event, listener);
         }
 
@@ -1120,12 +1120,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             const onceListener = listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>;
 
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit('removeListener', event, onceListener.listener);
                         }
                         else {
                             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-ignore
+                            // @ts-expect-error
                             this.emit('removeListener', event, listener);
                         }
                     }
@@ -1144,12 +1144,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                             if (onceWrapperId !== void 0) {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                                // @ts-ignore
+                                // @ts-expect-error
                                 this.emit('removeListener', event, (listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener);
                             }
                             else {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                                // @ts-ignore
+                                // @ts-expect-error
                                 this.emit('removeListener', event, listener);
                             }
                         }
@@ -1395,7 +1395,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     // todo:
     //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-events-static-geteventlisteners.js
     static getEventListeners(
-        emitter: DOMEventTarget | EventEmitterEx | INodeEventEmitter | ICompatibleEmitter,
+        emitter: DOMEventTarget | EventEmitterEx | ICompatibleEmitter | INodeEventEmitter,
         eventName: EventName,
     ) {
         if (isEventEmitterEx(emitter)) {
@@ -1450,17 +1450,17 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     ): Promise<any[]>;
     static once(
         nodeEmitter: INodeEventEmitter,
-        types: string | symbol | (string | symbol)[],
+        types: (string | symbol)[] | string | symbol,
         options?: StaticOnceOptions<INodeEventEmitter, string | symbol>,
     ): Promise<any[]>;
     static once(
         eventTarget: DOMEventTarget,
-        types: string | string[],
+        types: string[] | string,
         options?: StaticOnceOptionsEventTarget,
     ): Promise<[ Event ]>;
     static once(
         compatibleEmitter: ICompatibleEmitter,
-        types: string | symbol | (string | symbol)[],
+        types: (string | symbol)[] | string | symbol,
         options?: StaticOnceOptions<ICompatibleEmitter, string | symbol>,
     ): Promise<any[]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
@@ -1480,12 +1480,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      * @param {Function=} options.checkFn - deprecated @use {options.filter}
      */
     static once(
-        emitter: DOMEventTarget | EventEmitterEx | INodeEventEmitter | ICompatibleEmitter,
+        emitter: DOMEventTarget | EventEmitterEx | ICompatibleEmitter | INodeEventEmitter,
         types: EventName | EventName[],
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
         options?: StaticOnceOptionsDefault,
     ): Promise<any[] | Event> {
-        const staticOnceOptions = (options || {}) as StaticOnceOptions<INodeEventEmitter | EventEmitterEx, EventName>;
+        const staticOnceOptions = (options || {}) as StaticOnceOptions<EventEmitterEx | INodeEventEmitter, EventName>;
         const _Promise = staticOnceOptions.Promise || Promise;
         let isEventTarget = false;
 
@@ -1497,7 +1497,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             }
         }
 
-        const _emitter = (emitter as INodeEventEmitter | EventEmitterEx);
+        const _emitter = (emitter as EventEmitterEx | INodeEventEmitter);
         const staticOnceEventTargetOptions = isEventTarget && options
             ? options as StaticOnceOptionsEventTarget
             : void 0
@@ -1592,7 +1592,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let promise;
 
         if (Array.isArray(types)) {
-            let winnerEventType: void | (typeof types extends (infer T)[] ? T : typeof types);
+            let winnerEventType: (typeof types extends (infer T)[] ? T : typeof types) | void;
 
             promise = new _Promise<any[]>((resolve, reject) => {
                 const eventListenersByType: [
@@ -1841,7 +1841,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (signal || timeout) {
-            let abortCallback: ((this: AbortSignal | void, event_: typeof sCleanAbortPromise | AbortSignalEventMap["abort"]) => void) | void;
+            let abortCallback: ((this: AbortSignal | void, event_: AbortSignalEventMap["abort"] | typeof sCleanAbortPromise) => void) | void;
             let cleanTimeoutCallback: Function | void;
 
             // Turn an event into a promise, reject it once `abort` is dispatched
@@ -2034,7 +2034,7 @@ export {
     EventEmitterEx,
 };
 
-type EventEmitterProxy_ProxyHook = (type: EventName, eventEmitter: ICompatibleEmitter) => NodeEventEmitter | EventEmitterEx;
+type EventEmitterProxy_ProxyHook = (type: EventName, eventEmitter: ICompatibleEmitter) => EventEmitterEx | NodeEventEmitter;
 
 interface EventEmitterProxy_Options extends Options {
     /** Функция, которая вычисляет нужный экземпляр eventEmitter, который относиться к конкретному событию */
@@ -2043,7 +2043,7 @@ interface EventEmitterProxy_Options extends Options {
 
 export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
     private _proxyHook: EventEmitterProxy_ProxyHook | void;
-    private _eventEmitter: INodeEventEmitter | EventEmitterEx | void;
+    private _eventEmitter: EventEmitterEx | INodeEventEmitter | void;
     // private _eventTarget: DOMEventTarget|void;
     private _proxyHandlers: Partial<Record<EventName, (...args: any[]) => void>> = {};
 
@@ -2061,7 +2061,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
      * @param options
      * @param options.proxyHook -
      */
-    constructor(emitter?: INodeEventEmitter | EventEmitterEx/*|DOMEventTarget*/, options?: EventEmitterProxy_Options) {
+    constructor(emitter?: EventEmitterEx | INodeEventEmitter/* | DOMEventTarget*/, options?: EventEmitterProxy_Options) {
         super(options);
 
         const {
@@ -2079,7 +2079,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             // nothing to do
         }
         else if (_isEventEmitterCompatible(emitter as ICompatibleEmitter)) {
-            this._eventEmitter = emitter as INodeEventEmitter | EventEmitterEx;
+            this._eventEmitter = emitter as EventEmitterEx | INodeEventEmitter;
         }
         /* todo: add EventTarget support
         else if (_isEventTargetCompatible(emitter)) {
@@ -2110,31 +2110,31 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         switch (args.length) {
             case 0:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 super.emit(event);
 
                 break;
             case 1:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 super.emit(event, args[0]);
 
                 break;
             case 2:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 super.emit(event, args[0], args[1]);
 
                 break;
             case 3:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 super.emit(event, args[0], args[1], args[2]);
 
                 break;
             default:
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 super.emit(event, ...args);
         }
     }
@@ -2407,7 +2407,7 @@ function checkListener(listener: Function, supportHandleEvent = false) {
  * @param emitter
  * @private
  */
-function _isEventEmitterCompatible(emitter: EventEmitterEx | INodeEventEmitter | ICompatibleEmitter | IMinimum_CompatibleEmitter_private | Object): emitter is IMinimum_CompatibleEmitter_private {
+function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter | IMinimum_CompatibleEmitter_private | INodeEventEmitter | Object): emitter is IMinimum_CompatibleEmitter_private {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
@@ -2510,7 +2510,7 @@ function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
     }
 
     // assume the feature isn't supported
-    let supportsFeature: true | false = false;
+    let supportsFeature: false | true = false;
     // create options object with a getter to see if its once property is accessed
     // see `Let capture, passive, once, and signal be the result of flattening more options.` at [DOM Spec#addEventListener](https://dom.spec.whatwg.org/#dom-eventtarget-addeventlistener)
     const options = Object.defineProperty({ _v: void 0 }, 'signal', {
@@ -2617,7 +2617,7 @@ type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, Event
     wrapFn: EMD<EventMap>[EventKey],
     listener: Listener,
     target: EventEmitterEx,
-}
+};
 
 const sOnceListenerWrapperId = Symbol('');
 
@@ -2671,7 +2671,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
 
     wrapped[sOnceListenerWrapperId] = id;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     wrapped.listener = listener;
     state.wrapFn = wrapped;
 

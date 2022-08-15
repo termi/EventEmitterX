@@ -34,10 +34,10 @@ const NodeEventTarget = EventTarget;
 // also check AbortController polyfill
 {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     delete globalThis["AbortController"];
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // @ts-expect-error
     delete globalThis["AbortSignal"];
 }
 
@@ -262,7 +262,7 @@ describe('events', function() {
 
                 {
                     const emitCounter = {
-                        count(eventName: EventName) {
+                        count(this: void, eventName: EventName) {
                             counters[eventName]++;
                         },
                     };
@@ -426,7 +426,7 @@ describe('events', function() {
                 let counter = 0;
                 const listener1 = jest.fn(() => { counter++; });
                 const listener2 = jest.fn(() => { counter += 2; });
-                const events_newListener_emitted: (string|number|symbol)[] = [];
+                const events_newListener_emitted: (number | string | symbol)[] = [];
                 const listeners_newListener_emitted: Function[] = [];
 
                 ee.on('newListener', function(event, listener) {
@@ -664,7 +664,7 @@ describe('events', function() {
                 let counter = 0;
                 const listener1 = () => { counter++; };
                 const listener2 = () => { counter += 2; };
-                const events_removeListener_emitted: (string|number|symbol)[] = [];
+                const events_removeListener_emitted: (number | string | symbol)[] = [];
                 const listeners_removeListener_emitted: Function[] = [];
 
                 ee.on('removeListener', function(event, listener) {
@@ -2016,18 +2016,18 @@ describe('events', function() {
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
         class EventEmitterExSubClass extends EventEmitterEx {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             on(...args) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 return super.on(...args);
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
+            // @ts-expect-error
             removeListener(...args) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 return super.removeListener(...args);
             }
         }
@@ -2157,7 +2157,7 @@ describe('events', function() {
             else {
                 // Подменяем конструктор EventEmitter на другой (NodeEventEmitter или NodeEventTarget).
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 EventEmitter = eventEmitterConstructor;
             }
         }
@@ -2516,8 +2516,6 @@ describe('events', function() {
                     ee.emit(customErrorEventName, error);
                 });
 
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
                 const [ r1, r2 ] = await Promise.allSettled([
                     once(ee, 'error', {
                         errorEventName: customErrorEventName,
@@ -2529,11 +2527,11 @@ describe('events', function() {
 
                 expect(r1.status).toBe('rejected');
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 expect(r1.reason).toBe(error);
                 expect(r2.status).toBe('rejected');
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 expect(r2.reason).toBe(error);
             });
         });
@@ -2550,7 +2548,7 @@ describe('events', function() {
             }
             else {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 it.skip = function(){};
             }
 
@@ -2641,7 +2639,7 @@ describe('events', function() {
             }
             else {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 it.skip = function(){};
             }
 
@@ -2651,7 +2649,7 @@ describe('events', function() {
 
                 try {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
+                    // @ts-expect-error
                     await once(eventTarget, Symbol('invalid-argument'), {
                         timeout: 10,
                     });
@@ -2661,9 +2659,9 @@ describe('events', function() {
                 }
 
                 expect_toBeDefined(error);
-                expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
-                expect(error && error.name).toBe('TypeError');
-                expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+                expect(error?.code).toBe('ERR_INVALID_ARG_TYPE');
+                expect(error?.name).toBe('TypeError');
+                expect(error?.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -2672,7 +2670,7 @@ describe('events', function() {
 
                 try {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-ignore
+                    // @ts-expect-error
                     await once(eventTarget, [ 'test-123-qwerty', 321_132, 987_654_321n, Symbol('invalid-argument') ], {
                         timeout: 10,
                     });
@@ -2682,9 +2680,9 @@ describe('events', function() {
                 }
 
                 expect_toBeDefined(error);
-                expect(error && error.code).toBe('ERR_INVALID_ARG_TYPE');
-                expect(error && error.name).toBe('TypeError');
-                expect(error && error.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+                expect(error?.code).toBe('ERR_INVALID_ARG_TYPE');
+                expect(error?.name).toBe('TypeError');
+                expect(error?.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -2702,9 +2700,9 @@ describe('events', function() {
                 }
 
                 expect_toBeDefined(error);
-                expect(error && error.code).toBe('ERR_INVALID_OPTION_TYPE');
-                expect(error && error.name).toBe('TypeError');
-                expect(error && error.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
+                expect(error?.code).toBe('ERR_INVALID_OPTION_TYPE');
+                expect(error?.name).toBe('TypeError');
+                expect(error?.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -3005,9 +3003,9 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(0);
-                        expect(error).toBeDefined();
-                        expect(error && error.code).toBe(ABORT_ERR);
-                        expect(error && error.name).toBe('AbortError');
+                        expect_toBeDefined(error);
+                        expect(error?.code).toBe(ABORT_ERR);
+                        expect(error?.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
@@ -3065,10 +3063,10 @@ describe('events', function() {
                 expect(counter).toBe(0);
                 expect(error1).toBeDefined();
                 expect(error2).toBeDefined();
-                expect(error1 && error1.code).toBe(ABORT_ERR);
-                expect(error1 && error1.name).toBe('AbortError');
-                expect(error2 && error2.code).toBe(ABORT_ERR);
-                expect(error2 && error2.name).toBe('AbortError');
+                expect(error1?.code).toBe(ABORT_ERR);
+                expect(error1?.name).toBe('AbortError');
+                expect(error2?.code).toBe(ABORT_ERR);
+                expect(error2?.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
                 expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3090,9 +3088,9 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(0);
-                        expect(error).toBeDefined();
-                        expect(error && error.code).toBe(ABORT_ERR);
-                        expect(error && error.name).toBe('AbortError');
+                        expect_toBeDefined(error);
+                        expect(error?.code).toBe(ABORT_ERR);
+                        expect(error?.name).toBe('AbortError');
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3192,10 +3190,10 @@ describe('events', function() {
                 expect(counter).toBe(0);
                 expect(error1).toBeDefined();
                 expect(error2).toBeDefined();
-                expect(error1 && error1.code).toBe(ABORT_ERR);
-                expect(error1 && error1.name).toBe('AbortError');
-                expect(error2 && error2.code).toBe(ABORT_ERR);
-                expect(error2 && error2.name).toBe('AbortError');
+                expect(error1?.code).toBe(ABORT_ERR);
+                expect(error1?.name).toBe('AbortError');
+                expect(error2?.code).toBe(ABORT_ERR);
+                expect(error2?.name).toBe('AbortError');
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
                 expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3262,9 +3260,9 @@ describe('events', function() {
                             error = err;
                         })
                         .then(() => {
-                            expect(error).toBeDefined();
-                            expect(error && error.code).toBe(ABORT_ERR);
-                            expect(error && error.name).toBe('AbortError');
+                            expect_toBeDefined(error);
+                            expect(error?.code).toBe(ABORT_ERR);
+                            expect(error?.name).toBe('AbortError');
                             expect(ee.listenerCount('test6')).toBe(0);
                             expect(ee.listenerCount('error')).toBe(0);
                             expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3293,9 +3291,9 @@ describe('events', function() {
                             error = err;
                         })
                         .then(() => {
-                            expect(error).toBeDefined();
-                            expect(error && error.code).toBe(ABORT_ERR);
-                            expect(error && error.name).toBe('AbortError');
+                            expect_toBeDefined(error);
+                            expect(error?.code).toBe(ABORT_ERR);
+                            expect(error?.name).toBe('AbortError');
                             expect(ee.listenerCount('test6')).toBe(0);
                             expect(ee.listenerCount('error')).toBe(0);
                             expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -3332,9 +3330,9 @@ describe('events', function() {
                     .then(() => {
                         expect(st).toHaveLength(1);
                         expect(counter).toBe(0);
-                        expect(error).toBeDefined();
-                        expect(error && error.code).toBe(ABORT_ERR);
-                        expect(error && error.name).toBe('AbortError');
+                        expect_toBeDefined(error);
+                        expect(error?.code).toBe(ABORT_ERR);
+                        expect(error?.name).toBe('AbortError');
                         expect(ee.listenerCount('test10')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
@@ -3365,9 +3363,9 @@ describe('events', function() {
                     .then(() => {
                         expect(st).toHaveLength(0);
                         expect(counter).toBe(0);
-                        expect(error).toBeDefined();
-                        expect(error && error.code).toBe(ABORT_ERR);
-                        expect(error && error.name).toBe('AbortError');
+                        expect_toBeDefined(error);
+                        expect(error?.code).toBe(ABORT_ERR);
+                        expect(error?.name).toBe('AbortError');
                         expect(ee.listenerCount('test10')).toBe(0);
                         expect(ee.listenerCount('test11')).toBe(0);
                         expect(ee.listenerCount('test12')).toBe(0);
@@ -3405,8 +3403,8 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(0);
-                        expect(error).toBeDefined();
-                        expect(error && error.name).toBe('TimeoutError');
+                        expect_toBeDefined(error);
+                        expect(error?.name).toBe('TimeoutError');
                         expect(ee.listenerCount('test7')).toBe(0);
 
                         clearTimeout(timeout);
@@ -3430,9 +3428,9 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(error).toBeDefined();
-                        expect(error && error.name).toBe('TimeoutError');
-                        expect(error && error.message).toInclude(' [1] ');
+                        expect_toBeDefined(error);
+                        expect(error?.name).toBe('TimeoutError');
+                        expect(error?.message).toInclude(' [1] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3442,7 +3440,7 @@ describe('events', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 return once(ee, 0n, {
                     timeout: 1,
                 })
@@ -3450,9 +3448,9 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(error).toBeDefined();
-                        expect(error && error.name).toBe('TimeoutError');
-                        expect(error && error.message).toInclude(' ["0n"] ');
+                        expect_toBeDefined(error);
+                        expect(error?.name).toBe('TimeoutError');
+                        expect(error?.message).toInclude(' ["0n"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3468,9 +3466,9 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(error).toBeDefined();
-                        expect(error && error.name).toBe('TimeoutError');
-                        expect(error && error.message).toInclude(' [0] ');
+                        expect_toBeDefined(error);
+                        expect(error?.name).toBe('TimeoutError');
+                        expect(error?.message).toInclude(' [0] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3488,11 +3486,11 @@ describe('events', function() {
                     })
                     .then(() => {
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error).toBeDefined();
+                        expect_toBeDefined(error);
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.message).toInclude(' ["Symbol(timeout-message)"] ');
+                        expect(error?.message).toInclude(' ["Symbol(timeout-message)"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -3504,7 +3502,7 @@ describe('events', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 return once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 0n ], {
                     timeout: 1,
                 })
@@ -3513,11 +3511,11 @@ describe('events', function() {
                     })
                     .then(() => {
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error).toBeDefined();
+                        expect_toBeDefined(error);
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
+                        expect(error?.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -3535,9 +3533,9 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect(error).toBeDefined();
-                        expect(error && error.name).toBe('TimeoutError');
-                        expect(error && error.message).toInclude(' ["timeout-message","timeout-message-error"] ');
+                        expect_toBeDefined(error);
+                        expect(error?.name).toBe('TimeoutError');
+                        expect(error?.message).toInclude(' ["timeout-message","timeout-message-error"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3548,7 +3546,7 @@ describe('events', function() {
                 let error: DOMException|void = void 0;
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 return once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
                     errorEventName: Symbol('timeout-message-error'),
                     timeout: 1,
@@ -3558,11 +3556,11 @@ describe('events', function() {
                     })
                     .then(() => {
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error).toBeDefined();
+                        expect_toBeDefined(error);
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.name).toBe('TimeoutError');
+                        expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error && error.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
+                        expect(error?.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -3779,7 +3777,7 @@ describe('events', function() {
                 const not_eventEmitterCompatible = { ...eventEmitterCompatible };
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
+                // @ts-expect-error
                 delete not_eventEmitterCompatible.emit;
 
                 expect(isEventEmitterCompatible(not_eventEmitterCompatible)).toBe(false);
