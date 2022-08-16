@@ -457,8 +457,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>): boolean;
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+    // @ts-ignore
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const emitCounter = this._emitCounter;
