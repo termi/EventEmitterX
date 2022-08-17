@@ -710,7 +710,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         const hasAnyOnceListener = _onceIds.length > 0;
         // todo: add handleEvent support
-        const listenerAs_objectWith_handleEvent = false;//supportHandleEvent && typeof listener === 'object';
+        const listenerAs_objectWith_handleEvent = false;// supportHandleEvent && typeof listener === 'object';
         const handler = _events[event];
         const existedHandlerIsFunction = typeof handler === 'function';
         let newLen: number;
