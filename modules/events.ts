@@ -508,8 +508,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                             args[0] = errorMonitor;
 
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore
                             this.emit.apply(this, args);// eslint-disable-line prefer-spread,unicorn/consistent-destructuring
                         }
                     }
