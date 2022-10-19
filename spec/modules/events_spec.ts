@@ -2549,7 +2549,7 @@ describe('events', function() {
             else {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                it.skip = function(){};
+                it.skip = function() {};
             }
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -2640,7 +2640,7 @@ describe('events', function() {
             else {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
-                it.skip = function(){};
+                it.skip = function() {};
             }
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -3829,7 +3829,7 @@ describe('events', function() {
 
 function expect_toBeDefined<T>(argument: T): asserts argument is NonNullable<T> {
     expect(argument).toBeDefined();
-    //if (argument == null)  throw new Error("argument is null");
+    // if (argument == null)  throw new Error("argument is null");
 }
 /*
 function expect_not_toBeDefined<T>(argument: unknown): asserts argument is undefined | null {
