@@ -432,6 +432,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             prepend: boolean,
             once: boolean,
         ) {
+            // todo: this._count(statisticKeys.kAddListenerAfterDestroying)
             // todo: replace console.warn with:
             //  const kAddListenerAfterDestroyingCallback = Symbol('kAddListenerAfterDestroyingCallback');
             //  this[kAddListenerAfterDestroyingCallback]({ event, listener, once, prepend });
@@ -699,7 +700,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         //     console.log(listener);
         // }
 
-        checkListener(listener, /*supportHandleEvent*/false);
+        _checkListener(listener, /*supportHandleEvent*/false);
 
         const {
             _events,
@@ -849,8 +850,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         event: EventKey,
         listener: EMD<EventMap>[EventKey],
     ): this {
-        checkListener(listener);
+        _checkListener(listener);
 
+        // todo: this._count(statisticKeys.kRemoveListener)
         const {
             _events,
             _f,
@@ -1510,8 +1512,15 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             : void 0
         ;
         const usePrependListener = !!staticOnceOptions.prepend;
-        const errorEventNameIsDefined = !!staticOnceOptions.errorEventName;
-        const errorEventName = (staticOnceOptions.errorEventName || 'error') as string | symbol;
+        /**
+         * Is ['errorEventName']{@link StaticOnceOptionsDefault.errorEventName} is defined in [options]{@link StaticOnceOptionsDefault}
+         */
+        const errorEventNameIsDefined = _isDefined(staticOnceOptions.errorEventName);
+        /**
+         * - For node/WEB EventEmitter: 'error' is default value.
+         * - For WEB EventTarget: there is no default value for error event.
+         */
+        const errorEventName = (errorEventNameIsDefined ? staticOnceOptions.errorEventName : 'error') as string | symbol;
         const timeout = staticOnceOptions.timeout || void 0;
         /** @borrows StaticOnceOptionsDefault.filter */
         const filter = (typeof staticOnceOptions.filter === 'function' ? staticOnceOptions.filter : void 0)
@@ -1520,9 +1529,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
         let signal = staticOnceOptions.signal || void 0;
         let timing = staticOnceOptions.timing || void 0;
-        let hasTiming = !!timing;
+        // todo: check `_isTiming(value: ServerTiming | ITiming | Console | unknown): value is ITiming;`
+        let hasTiming = _isDefined(timing);
         const debugInfo = staticOnceOptions.debugInfo || void 0;
-        const hasDebugInfo = !!debugInfo;
+        const hasDebugInfo = _isObject(debugInfo);
         let abortControllersGroup: TAbortControllersGroup | void;
         let listenersCleanUp: Function | void = void 0;
 
@@ -1604,7 +1614,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 listenersCleanUp = function() {
                     for (const [ type, listener ] of eventListenersByType) {
                         if (isEventTarget) {
-                            (emitter as DOMEventTarget).removeEventListener(type as string, listener, eventTargetListenerOptions);
+                            _eventTargetRemoveListener((emitter as DOMEventTarget), type, listener, eventTargetListenerOptions);
                         }
                         else {
                             _emitter.removeListener(type as string | symbol, listener);
@@ -1626,7 +1636,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         if (isEventTarget) {
                             if (errorEventNameIsDefined) {
                                 // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
-                                (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
+                                _eventTargetRemoveListener((emitter as DOMEventTarget), errorEventName, errorListener, eventTargetListenerOptions);
                             }
                         }
                         else {
@@ -1683,7 +1693,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     eventListenersByType.push([ type, eventListener ]);
 
                     if (isEventTarget) {
-                        (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
+                        _eventTargetAddListener((emitter as DOMEventTarget), type, eventListener, eventTargetListenerOptions);
                     }
                     else if (usePrependListener) {
                         _emitter.prependListener(type as string | symbol, eventListener);
@@ -1726,7 +1736,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 if (isEventTarget) {
                     if (errorEventNameIsDefined) {
                         // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
-                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
+                        _eventTargetAddListener((emitter as DOMEventTarget), errorEventName, errorListener, eventTargetListenerOptions);
                     }
                 }
                 else if (usePrependListener) {
@@ -1797,11 +1807,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                 listenersCleanUp = function() {
                     if (isEventTarget) {
-                        (emitter as DOMEventTarget).removeEventListener(type as string, eventListener, eventTargetListenerOptions);
+                        _eventTargetRemoveListener((emitter as DOMEventTarget), type, eventListener, eventTargetListenerOptions);
 
                         if (errorEventNameIsDefined && needErrorListener) {
                             // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
-                            (emitter as DOMEventTarget).removeEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
+                            _eventTargetRemoveListener((emitter as DOMEventTarget), errorEventName, errorListener, eventTargetListenerOptions);
                         }
                     }
                     else {
@@ -1816,11 +1826,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 };
 
                 if (isEventTarget) {
-                    (emitter as DOMEventTarget).addEventListener(type as string, eventListener, eventTargetListenerOptions);
+                    _eventTargetAddListener((emitter as DOMEventTarget), type, eventListener, eventTargetListenerOptions);
 
                     if (errorEventNameIsDefined && needErrorListener) {
                         // EventTarget does not have `error` event semantics like Node, so check if errorEventName is defined
-                        (emitter as DOMEventTarget).addEventListener(errorEventName as string, errorListener, eventTargetListenerOptions);
+                        _eventTargetAddListener((emitter as DOMEventTarget), errorEventName, errorListener, eventTargetListenerOptions);
                     }
                 }
                 else if (usePrependListener) {
@@ -2388,7 +2398,8 @@ export function createTimeoutError(message: string, cause?: any) {
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
 // todo: export function defaultMaxListeners(n: number){}
 
-function checkListener(listener: Function, supportHandleEvent = false) {
+/** @private */
+function _checkListener(listener: Listener/* | EventListenerObject*/, supportHandleEvent = false): asserts listener is Listener/* | EventListenerObject*/ {
     if (typeof listener !== 'function') {
         if (supportHandleEvent) {
             if (typeof listener !== 'object' || !listener) {
@@ -2401,9 +2412,67 @@ function checkListener(listener: Function, supportHandleEvent = false) {
     }
 }
 
+/** @private */
+function _eventTargetAddListener(
+    eventTarget: EventTarget,
+    type: EventName | bigint,
+    handler: EventListenerOrEventListenerObject,
+    options?: EventListenerOptions | boolean,
+) {
+    let _type = type;
+
+    if (typeof _type === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
+        _type = String(_type);
+    }
+
+    eventTarget.addEventListener(_type as string, handler, options);
+}
+
+/** @private */
+function _eventTargetRemoveListener(
+    eventTarget: EventTarget,
+    type: EventName | bigint,
+    handler: EventListenerOrEventListenerObject,
+    options?: EventListenerOptions | boolean,
+) {
+    let _type = type;
+
+    if (typeof _type === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
+        _type = String(_type);
+    }
+
+    eventTarget.removeEventListener(_type as string, handler, options);
+}
+
+const kEventTargetSupportSymbolAsType = Symbol('kEventTargetSupportSymbolAsType');
+
+/** @private */
+function _isDOMEventTargetSupportSymbolAsType(eventTarget: DOMEventTarget) {
+    if (eventTarget[kEventTargetSupportSymbolAsType] !== void 0) {
+        return eventTarget[kEventTargetSupportSymbolAsType];
+    }
+
+    let eventTargetSupportSymbolAsType = false;
+    const listener = () => {};
+
+    try {
+        eventTarget.addEventListener(kEventTargetSupportSymbolAsType as unknown as string, listener);
+        eventTarget.removeEventListener(kEventTargetSupportSymbolAsType as unknown as string, listener);
+
+        eventTargetSupportSymbolAsType = true;
+    }
+    catch {
+        // catched error should be `TypeError: can't convert symbol to string`
+    }
+
+    eventTarget[kEventTargetSupportSymbolAsType] = eventTargetSupportSymbolAsType;
+
+    return eventTargetSupportSymbolAsType;
+}
+
 /**
  * Check only 'on', 'once', 'prependListener' and 'removeListener', but not 'emit'.
- * Reason: we dont use 'emit' method in {@link EventEmitterEx.once}
+ * Reason: we don't use 'emit' method in {@link EventEmitterEx.once}
  * @param emitter
  * @private
  */
@@ -2549,17 +2618,27 @@ function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
 
 const n0 = typeof BigInt !== 'undefined' ? BigInt(0) : void 0;
 
-/*
+/** @private */
+function _isObject<T extends {}>(value: T | unknown): value is NonNullable<T> {
+    return value !== void 0
+        && value !== null
+        && typeof value === 'object'
+    ;
+}
+
+/** @private */
 function _isDefined<T>(value: T): value is NonNullable<T> {
     return value !== void 0 && value !== null;
 }
-*/
+
+/** @private */
 function _assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
     if (value === void 0 || value === null) {
         throw new Error('value should be defined');
     }
 }
 
+/** @private */
 function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEventName?: EventName) {
     if (!types && types !== 0 && (n0 === void 0 || (types as EventName & bigint) !== n0)) {
         types = [];
