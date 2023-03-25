@@ -2297,6 +2297,417 @@ if (EventEmitterSimpleProxy.constructor.name !== tagEventEmitterSimpleProxy) {
     Object.defineProperty(EventEmitterSimpleProxy.constructor, 'name', { value: tagEventEmitterSimpleProxy, configurable: true });
 }
 
+type EventEmitterProxy_SourceProxyHook = (
+    defaultEventEmitter: ICompatibleEmitter | void,
+    eventType: EventName,
+) => ICompatibleEmitter | null | void;
+
+type EventEmitterProxy_TargetProxyHook = (
+    defaultEventEmitter: ICompatibleEmitter | void,
+    eventType: EventName,
+    eventArgs: unknown[] | null,
+) => ICompatibleEmitter | null | void;
+
+interface EventEmitterProxy_Options extends Options {
+    sourceEmitter?: ICompatibleEmitter/* | DOMEventTarget*/;
+    targetEmitter?: ICompatibleEmitter/* | DOMEventTarget*/;
+    /**
+     * Функция, вычисляющая нужный экземпляр eventEmitter, который относиться к конкретному событию для **прослушивания**
+     *  событий (для вызова [emitter.addListener]{@link ICompatibleEmitter.addListener})
+     */
+    getSourceEmitter?: EventEmitterProxy_SourceProxyHook;
+    /**
+     * Функция, вычисляющая нужный экземпляр eventEmitter, который относиться к конкретному событию для **отправки**
+     *  событий (для вызова [emitter.emit]{@link ICompatibleEmitter.emit})
+     */
+    getTargetEmitter?: EventEmitterProxy_TargetProxyHook;
+    /**
+     * Можно ли вызвать {EventEmitterProxy#emit}{@link EventEmitterProxy.emit} для отправки события в `targetEmitter`?
+     *
+     * Default: `false`
+     */
+    allowDirectEmitToTarget?: boolean;
+}
+
+export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
+    private _getSourceEmitter: EventEmitterProxy_SourceProxyHook | void = void 0;
+    private _getTargetEmitter: EventEmitterProxy_TargetProxyHook | void = void 0;
+    private _sourceEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | void;
+    private _targetEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | void;
+    // private _eventTarget: DOMEventTarget|void;
+    private _allowDirectEmitToTarget: Required<EventEmitterProxy_Options["allowDirectEmitToTarget"]>;
+    private _hasProxyHandlers: Partial<Record<EventName, true>> = {};
+    private _antiLoopingInfoMap: Partial<Record<EventName, { args: unknown[] }>> = {};
+    private _knownSubscriptions: [
+        eventType: EventName,
+        eventEmitter: ICompatibleEmitter,
+        proxyEventHandler: (...args: unknown[]) => void,
+    ][] = [];
+
+    // private _isEventTarget = false;
+
+    /**
+     * Этот класс предназначен для того, чтобы подключится к экземпляру EventEmitter, запоминать все подписки на него.
+     *
+     * А при вызове removeAllListeners, удалять все подписки, которые прошли через экземпляр этого класса.
+     *
+     * Например, мы можем создать экземпляр этого класса передав в конструктор userActionMonitor (который кидает события 'mouse_click').
+     *  Передаём этот экземпляр на стороннюю страницу, там подписываются на события 'mouse_click', а когда страница выгружается, при
+     *  вызове removeAllListeners, мы удалим все подписки, которые были сделаны на этой странице, не затрагивая подписки с других страниц
+     */
+    constructor(options?: EventEmitterProxy_Options) {
+        super(options);
+
+        const {
+            getSourceEmitter,
+            getTargetEmitter,
+            sourceEmitter,
+            targetEmitter,
+            allowDirectEmitToTarget = false,
+        } = options || {};
+
+        this.setGetSourceEmitter(getSourceEmitter);
+        this.setGetTargetEmitter(getTargetEmitter);
+
+        this._sourceEmitter = _isEventEmitterCompatible(sourceEmitter) ? sourceEmitter : void 0;
+        this._targetEmitter = isEventEmitterCompatible(targetEmitter) ? targetEmitter : void 0;
+        this._allowDirectEmitToTarget = allowDirectEmitToTarget;
+
+        /* todo: add EventTarget support
+        else if (_isEventTargetCompatible(emitter)) {
+            this._eventTarget = emitter as DOMEventTarget;
+            this._isEventTarget = true;
+        }
+
+         */
+    }
+
+    destructor() {
+        // Внутри есть вызов `this.removeAllListeners()`
+        super.destructor();
+
+        this._sourceEmitter = void 0;
+        this._targetEmitter = void 0;
+        this._getSourceEmitter = void 0;
+        this._getTargetEmitter = void 0;
+    }
+
+    setGetSourceEmitter(getSourceEmitter?: EventEmitterProxy_SourceProxyHook) {
+        if (typeof getSourceEmitter === 'function') {
+            this._getSourceEmitter = getSourceEmitter;
+        }
+        else {
+            this._getSourceEmitter = void 0;
+        }
+    }
+
+    setGetTargetEmitter(getTargetEmitter?: EventEmitterProxy_TargetProxyHook) {
+        if (typeof getTargetEmitter === 'function') {
+            this._getTargetEmitter = getTargetEmitter;
+        }
+        else {
+            this._getTargetEmitter = void 0;
+        }
+    }
+
+    private _detectSourceEmitter(event: EventName) {
+        const defaultSourceEmitter = this._sourceEmitter || void 0;
+        const selectedSourceEmitter = this._getSourceEmitter
+            ? this._getSourceEmitter(defaultSourceEmitter, event)
+            : void 0
+        ;
+
+        if (selectedSourceEmitter === null) {
+            // `null` - специальный результат работы EventEmitterProxy_ProxyHook, который говорит о том, что не нужно
+            //  прослушивать данное событие.
+            return null;
+        }
+
+        const sourceEmitter = selectedSourceEmitter || defaultSourceEmitter;
+
+        if (!sourceEmitter) {
+            // Не найден targetEmitter
+            return;
+        }
+
+        return sourceEmitter;
+    }
+
+    private _detectTargetEmitter(event: EventName, args: unknown[] | null) {
+        const defaultTargetEmitter = this._targetEmitter || void 0;
+        const selectedTargetEmitter = this._getTargetEmitter
+            ? this._getTargetEmitter(defaultTargetEmitter, event, args)
+            : void 0
+        ;
+
+        if (selectedTargetEmitter === null) {
+            // `null` - специальный результат работы EventEmitterProxy_ProxyHook, который говорит о том, что не нужно
+            //  отправлять данное событие.
+            return null;
+        }
+
+        const targetEmitter = selectedTargetEmitter || defaultTargetEmitter;
+
+        if (!targetEmitter) {
+            // Не найден targetEmitter
+            return;
+        }
+
+        return targetEmitter;
+    }
+
+    private _emitToTarget(event: EventName, args: unknown[], targetEmitter: ICompatibleEmitter) {
+        const has_sourceEmitter_subscription = !!this._hasProxyHandlers[event];
+
+        if (has_sourceEmitter_subscription) {
+            /**
+             * Есть подписка на такое же событие у sourceEmitter. Это может привести к "зацикливанию" переадресации
+             *  события, если:
+             *  1. sourceEmitter === targetEmitter
+             *  2. sourceEmitter связан с targetEmitter по ещё одному EventEmitterProxy
+             *
+             * Для исключения циклической пересылки события, выставляем флаг, который будет проверяться в
+             *  {@link EventEmitterProxy._onEventEmitterEvent}. Также, сохраним аргументы, чтобы проверить их соответствие.
+             */
+            const antiLoopingInfo = {
+                args,
+            };
+
+            if (this._antiLoopingInfoMap[event]) {
+                throw new Error(`[EventEmitterProxy][#emit]: potentially multiply synchronously nested emit for event "${String(event)}"`);
+            }
+
+            this._antiLoopingInfoMap[event] = antiLoopingInfo;
+        }
+
+        const targetEmitResult = targetEmitter.emit(event as NodeEventName, ...args);
+
+        if (has_sourceEmitter_subscription) {
+            delete this._antiLoopingInfoMap[event];
+        }
+
+        return targetEmitResult;
+    }
+
+    private _onEventEmitterEvent(sourceEmitter: ICompatibleEmitter, event: EventName, ...args: unknown[]) {
+        const antiLoopingInfo = this._antiLoopingInfoMap[event];
+
+        if (antiLoopingInfo) {
+            // todo: Сравнивать antiLoopingInfo.args == args
+            /**
+             * Получили событие, которое сами же и отправили в {@link EventEmitterProxy.emit}.
+             * Значение {@link EventEmitterProxy._antiLoopingInfoMap} выставляется в функции {@link EventEmitterProxy._emitToTarget}
+             */
+            return;
+        }
+
+        const targetEmitter = this._detectTargetEmitter(event, args);
+
+        if (targetEmitter === null) {
+            return;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error `TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'Parameters  [EventName]>'.`
+        super.emit(event, ...args);
+
+        if (targetEmitter) {
+            if (sourceEmitter === targetEmitter) {
+                // Если отправитель и получатель одинаковые и событие отправил отправитель, то не нужно на него же ещё раз направлять это событие.
+                return;
+            }
+
+            this._emitToTarget(event, args, targetEmitter);
+        }
+    }
+
+/*
+
+    // EventListenerObject["handleEvent"]
+    public handleEvent(evt: Event) {
+        const {type} = evt;
+
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        super.emit(type, evt);
+    }
+*/
+
+    emit<EventKey extends keyof EMD<EventMap> = keyof EMD<EventMap>>(
+        event: EventKey,
+        ...args: Parameters<EMD<EventMap>[EventKey]>
+    ) {
+        if (_isLifecycleEvent(event)) {
+            return super.emit(event, ...args);
+        }
+
+        if (!this._allowDirectEmitToTarget) {
+            throw new Error('[EventEmitterProxy][emit]: emitting events to targetEmitter is not allowed');
+        }
+
+        const targetEmitter = this._detectTargetEmitter(event, args);
+        let targetEmitResult = false;
+
+        if (targetEmitter) {
+            targetEmitResult = this._emitToTarget(event, args, targetEmitter);
+        }
+
+        const localEmitResult = super.emit(event, ...args);
+
+        return targetEmitResult || localEmitResult;
+    }
+
+    emitSelf<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) {
+        return super.emit(event, ...args);
+    }
+
+    protected _addListener<EventKey extends keyof EMD<EventMap> = EventName>(
+        event: EventKey,
+        listener: EMD<EventMap>[EventKey],
+        prepend: boolean,
+        once: boolean,
+    ) {
+        const result = super._addListener(event, listener, prepend, once);
+
+        if (_isLifecycleEvent(event)) {
+            return result;
+        }
+
+        const sourceEmitter = this._detectSourceEmitter(event);
+
+        if (!sourceEmitter) {
+            return result;
+        }
+
+        const {
+            _knownSubscriptions,
+        } = this;
+        const knownSubscription = this._knownSubscriptions.find(([ eventType, eventsEmitter ]) => {
+            return event === eventType
+                && eventsEmitter === sourceEmitter
+            ;
+        });
+        let eventProxyHandler: typeof _knownSubscriptions[number][2];
+
+        if (knownSubscription) {
+            eventProxyHandler = knownSubscription[2];
+
+            // Нам нужно быть уверенным, что обработчик будет подписан на этот type, но только один раз
+            // Если он ещё не был подписан, то removeListener ничего не сделает
+            (sourceEmitter as EventEmitterEx).removeListener(event as NodeEventName, eventProxyHandler);
+        }
+        else {
+            eventProxyHandler = this._onEventEmitterEvent.bind(this, sourceEmitter, event);
+        }
+
+        _assertIsDefined(eventProxyHandler);
+
+        if (prepend) {
+            if (once) {
+                (sourceEmitter as EventEmitterEx).prependOnceListener(event as NodeEventName, eventProxyHandler);
+            }
+            else {
+                (sourceEmitter as EventEmitterEx).prependListener(event as NodeEventName, eventProxyHandler);
+            }
+        }
+        else {
+            if (once) {
+                (sourceEmitter as EventEmitterEx).once(event as NodeEventName, eventProxyHandler);
+            }
+            else {
+                (sourceEmitter as EventEmitterEx).on(event as NodeEventName, eventProxyHandler);
+            }
+        }
+
+        if (!knownSubscription) {
+            this._hasProxyHandlers[event] = true;
+
+            this._knownSubscriptions.push([
+                event,
+                sourceEmitter,
+                eventProxyHandler,
+            ]);
+        }
+
+        return result;
+    }
+
+    private _removeListenerFromTargets(event: EventName | void, targetEmitter: ICompatibleEmitter | void) {
+        const has_event = event !== void 0;
+        const has_targetEmitter = targetEmitter !== void 0;
+        const subscriptionsCounters: Record<EventName, number> = {};
+        const {
+            _knownSubscriptions,
+        } = this;
+
+        for (let i = 0, len = _knownSubscriptions.length ; i < len ; i++) {
+            const knownSubscription = _knownSubscriptions[i];
+            const [
+                eventType,
+                eventEmitter,
+                eventProxyHandler,
+            ] = knownSubscription;
+            let counter = (subscriptionsCounters[eventType] || 0) + 1;
+
+            if ((has_event ? eventType === event : true)
+                && (has_targetEmitter ? targetEmitter === eventEmitter : true)
+            ) {
+                counter--;
+
+                try {
+                    eventEmitter.removeListener(eventType as NodeEventName, eventProxyHandler);
+                }
+                catch {
+                    // ignore
+                }
+
+                _knownSubscriptions.splice(i, 1);
+                i--;
+                len--;
+            }
+
+            subscriptionsCounters[eventType] = counter;
+        }
+
+        for (const eventType of Object.keys(subscriptionsCounters)) {
+            const counter = subscriptionsCounters[eventType];
+
+            if (counter === 0) {
+                // All subscriptions for this eventType was removed
+                delete this._hasProxyHandlers[eventType];
+            }
+        }
+    }
+
+    removeListener<EventKey extends keyof EMD<EventMap> = EventName>(
+        event: EventKey,
+        listener: EMD<EventMap>[EventKey],
+    ) {
+        const result = super.removeListener(event, listener);
+
+        if (this.listenerCount(event) === 0) {
+            this._removeListenerFromTargets(event, void 0);
+        }
+
+        return result;
+    }
+
+    removeAllListeners<EventKey extends keyof EMD<EventMap> = EventName>(event?: EventKey) {
+        this._removeListenerFromTargets(event, void 0);
+
+        return super.removeAllListeners(event);
+    }
+
+    static ABORT_ERR = ABORT_ERR;
+}
+
+const tagEventEmitterProxy = 'EventEmitterProxy';
+
+if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
+    // Fix class name after minification (UglifyJS/Terser or GCC)
+    Object.defineProperty(EventEmitterProxy.constructor, 'name', { value: tagEventEmitterProxy, configurable: true });
+}
+
 export type NodeEventEmitter = INodeEventEmitter;
 
 export { errorMonitor, captureRejectionSymbol, ABORT_ERR };

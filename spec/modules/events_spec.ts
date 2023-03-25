@@ -49,6 +49,7 @@ import { runInNewContext } from 'node:vm';
 import events, {
     EventEmitterEx,
     EventEmitterSimpleProxy,
+    EventEmitterProxy,
     EventName,
     isEventEmitterCompatible,
     isEventTargetCompatible,
@@ -2147,6 +2148,162 @@ describe('events', function() {
         it.todo('#removeAllListeners() with _proxyHook');
     });
 
+    describe('EventEmitterProxy', function() {
+        it('instanceof', function() {
+            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
+            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterEx);
+        });
+
+        it('destructor', function() {
+            const emitter = new EventEmitterEx();
+            const proxy = new EventEmitterProxy({
+                sourceEmitter: emitter,
+            });
+
+            proxy.on('test1', () => {});
+            proxy.on('test2', () => {});
+            emitter.on('test3', () => {});
+
+            let wasDestroyed = false;
+
+            proxy.on(kDestroyingEvent, () => { wasDestroyed = true; });
+
+            expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
+                .toBe(2)
+            ;
+            expect(getEventListeners(emitter, 'test1')).toHaveLength(1);
+            expect(getEventListeners(emitter, 'test2')).toHaveLength(1);
+
+            proxy.destructor();
+
+            expect(getEventListeners(proxy, 'test1').length + getEventListeners(proxy, 'test2').length)
+                .toBe(0)
+            ;
+            expect(getEventListeners(emitter, 'test1')).toHaveLength(0);
+            expect(getEventListeners(emitter, 'test2')).toHaveLength(0);
+            expect(getEventListeners(emitter, 'test3')).toHaveLength(1);
+            expect(wasDestroyed).toBe(true);
+        });
+
+        it('example', function() {
+            const emitter = new EventEmitterEx();
+            const proxy = new EventEmitterProxy({
+                sourceEmitter: emitter,
+                targetEmitter: emitter,
+            });
+            let counter1 = 0;
+            const handler1 = () => {
+                counter1++;
+            };
+            let counter2 = 0;
+            const handler2 = () => {
+                counter2++;
+            };
+
+            emitter.on('test', handler1);
+            proxy.on('test', handler2);
+
+            // emit on emitter, handle on proxy and emitter
+            emitter.emit('test');
+
+            // on emitter, it should be proxyHandler and `() => { counter1++; }` handler
+            expect(emitter.listenerCount('test')).toBe(2);
+            expect(emitter.hasListener('test', handler1)).toBe(true);
+            // on proxy, it should be `() => { counter2++; }` handler
+            expect(proxy.listenerCount('test')).toBe(1);
+            expect(proxy.hasListener('test', handler2)).toBe(true);
+
+            // remove all listeners on proxy and remove only proxy handlers from emitter
+            proxy.removeAllListeners();
+
+            expect(emitter.listenerCount('test')).toBe(1);
+            expect(proxy.listenerCount('test')).toBe(0);
+
+            expect(counter1).toBe(1);
+            expect(counter2).toBe(1);
+
+            {
+                counter1 = 0;
+                counter2 = 0;
+
+                proxy.on('test', handler2);
+                emitter.emit('test');
+
+                // destructor() will unlink emitter from proxy
+                proxy.destructor();
+                emitter.emit('test');
+
+                expect(counter1).toBe(2);
+                expect(counter2).toBe(1);
+            }
+        });
+
+        it('options.allowDirectEmitToTarget', function() {
+            const emitter = new EventEmitterEx();
+            const proxy = new EventEmitterProxy({
+                sourceEmitter: emitter,
+                targetEmitter: emitter,
+                allowDirectEmitToTarget: true,
+            });
+            let emitter_counter = 0;
+            const emitter_handler = () => {
+                emitter_counter++;
+            };
+            let proxy_counter = 0;
+            const proxy_handler = () => {
+                proxy_counter++;
+            };
+
+            emitter.on('test', emitter_handler);
+            proxy.on('test', proxy_handler);
+
+            // emit on proxy, handle on proxy and emitter
+            proxy.emit('test');
+
+            // on emitter, it should be proxyHandler and `() => { counter1++; }` handler
+            expect(emitter.listenerCount('test')).toBe(2);
+            expect(emitter.hasListener('test', emitter_handler)).toBe(true);
+            // on proxy, it should be `() => { counter2++; }` handler
+            expect(proxy.listenerCount('test')).toBe(1);
+            expect(proxy.hasListener('test', proxy_handler)).toBe(true);
+
+            // remove all listeners on proxy and remove only proxy handlers from emitter
+            proxy.removeAllListeners();
+
+            expect(emitter.listenerCount('test')).toBe(1);
+            expect(proxy.listenerCount('test')).toBe(0);
+
+            expect(emitter_counter).toBe(1);
+            expect(proxy_counter).toBe(1);
+        });
+
+        it('two-way #emit', function() {
+            const ee = new EventEmitterEx();
+            const proxy = new EventEmitterProxy({
+                sourceEmitter: ee,
+                targetEmitter: ee,
+                allowDirectEmitToTarget: true,
+            });
+            let counter1 = 0;
+            let counter2 = 0;
+
+            ee.on('test', () => { counter1++; });
+            proxy.on('test', () => { counter2++; });
+
+            // emit on emitter, handle on proxy and emitter
+            ee.emit('test');
+            // also emit on proxy and emitter, handle on proxy and emitter
+            proxy.emit('test');
+
+            expect(counter1).toBe(2);
+            expect(counter2).toBe(2);
+        });
+
+        it.todo('#removeAllListeners(void 0)');
+        it.todo('#removeAllListeners(eventName)');
+        it.todo('#removeAllListeners() with _proxyHook');
+    });
+
     const _EventEmitterEx_once = once;
 
     describe('events.once', function _EventEmitter_once() {
@@ -3797,7 +3954,11 @@ describe('events', function() {
 
             expect(isEventEmitterEx(eventEmitterEx)).toBe(true);
 
-            const eventEmitterProxy = new EventEmitterSimpleProxy({ emitter: eventEmitterEx });
+            const eventEmitterSimpleProxy = new EventEmitterSimpleProxy({ emitter: eventEmitterEx });
+
+            expect(isEventEmitterEx(eventEmitterSimpleProxy)).toBe(true);
+
+            const eventEmitterProxy = new EventEmitterProxy({ targetEmitter: eventEmitterEx });
 
             expect(isEventEmitterEx(eventEmitterProxy)).toBe(true);
         });
