@@ -48,7 +48,7 @@ import {
 import { runInNewContext } from 'node:vm';
 import events, {
     EventEmitterEx,
-    EventEmitterProxy,
+    EventEmitterSimpleProxy,
     EventName,
     isEventEmitterCompatible,
     isEventTargetCompatible,
@@ -2015,17 +2015,13 @@ describe('events', function() {
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
         class EventEmitterExSubClass extends EventEmitterEx {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            on(...args) {
+            on(...args: unknown[]) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 return super.on(...args);
             }
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            removeListener(...args) {
+            removeListener(...args: unknown[]) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 return super.removeListener(...args);
@@ -2035,15 +2031,19 @@ describe('events', function() {
         describe('EventEmitter subclass', checkEventEmitter.bind(null, EventEmitterExSubClass));
     }
 
-    describe('EventEmitterProxy', function() {
+    describe('EventEmitterSimpleProxy', function() {
         it('instanceof', function() {
-            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
-            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterEx);
+            const emitter = new EventEmitterEx();
+
+            expect(new EventEmitterSimpleProxy({ emitter })).toBeInstanceOf(EventEmitterSimpleProxy);
+            expect(new EventEmitterSimpleProxy({ emitter })).toBeInstanceOf(EventEmitterEx);
         });
 
         it('destructor', function() {
             const emitter = new EventEmitterEx();
-            const proxy = new EventEmitterProxy(emitter);
+            const proxy = new EventEmitterSimpleProxy({
+                emitter,
+            });
 
             proxy.on('test1', () => {});
             proxy.on('test2', () => {});
@@ -2070,13 +2070,19 @@ describe('events', function() {
             expect(wasDestroyed).toBe(true);
         });
 
-        it('simple example', function() {
+        it('example', function() {
             const emitter = new EventEmitterEx();
-            const proxy = new EventEmitterProxy(emitter);
+            const proxy = new EventEmitterSimpleProxy({
+                emitter,
+            });
             let counter1 = 0;
-            const handler1 = () => { counter1++; };
+            const handler1 = () => {
+                counter1++;
+            };
             let counter2 = 0;
-            const handler2 = () => { counter2++; };
+            const handler2 = () => {
+                counter2++;
+            };
 
             emitter.on('test', handler1);
             proxy.on('test', handler2);
@@ -2116,18 +2122,20 @@ describe('events', function() {
             }
         });
 
-        it('#emit', function() {
-            const ee = new EventEmitterEx();
-            const proxy = new EventEmitterProxy(ee);
+        it('two-way #emit', function() {
+            const emitter = new EventEmitterEx();
+            const proxy = new EventEmitterSimpleProxy({
+                emitter,
+            });
             let counter1 = 0;
             let counter2 = 0;
 
-            ee.on('test', () => { counter1++; });
+            emitter.on('test', () => { counter1++; });
             proxy.on('test', () => { counter2++; });
 
             // emit on emitter, handle on proxy and emitter
-            ee.emit('test');
-            // also emit on emitter (not on proxy), handle on proxy and emitter
+            emitter.emit('test');
+            // also emit on proxy and emitter, handle on proxy and emitter
             proxy.emit('test');
 
             expect(counter1).toBe(2);
@@ -3789,7 +3797,7 @@ describe('events', function() {
 
             expect(isEventEmitterEx(eventEmitterEx)).toBe(true);
 
-            const eventEmitterProxy = new EventEmitterProxy(eventEmitterEx);
+            const eventEmitterProxy = new EventEmitterSimpleProxy({ emitter: eventEmitterEx });
 
             expect(isEventEmitterEx(eventEmitterProxy)).toBe(true);
         });
