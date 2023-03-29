@@ -25,6 +25,9 @@ import {
     AbortControllersGroup,
     AbortSignal,
 } from 'termi@abortable';
+import {
+    eventsAsyncIterator,
+} from "./EventEmitterEx/eventsAsyncIterator";
 
 type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
@@ -1397,9 +1400,6 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     }
 
     // todo:
-    //   static on(emitter: EventEmitter|DOMEventTarget, event: string): AsyncIterableIterator<any>;
-    //     - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-event-on-async-iterator.js
-    //     - [Asynchronous Iterators for JavaScript](https://github.com/tc39/proposal-async-iteration)
     //   captureRejectionSymbol: Symbol(nodejs.rejection),
     //   captureRejections: [Getter/Setter],
     //   defaultMaxListeners: [Getter/Setter],
@@ -1454,6 +1454,15 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
         throw error;
     }
+
+    /**
+     * Returns an `AsyncIterator` that iterates `event` events.
+     *
+     * @see [Node.js documentation / Events / events.on(emitter, eventName): AsyncIterator]{@link https://nodejs.org/api/events.html#eventsonemitter-eventname-options}
+     * @see [nodejs / Pull requests / lib: performance improvement on readline async iterator]{@link https://github.com/nodejs/node/pull/41276}
+     * @see [Asynchronous Iterators for JavaScript]{@link https://github.com/tc39/proposal-async-iteration}
+     */
+    static on = eventsAsyncIterator;
 
     // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
     static once<EE extends EventEmitterEx = EventEmitterEx>(

@@ -109,20 +109,22 @@ function iteratorToStream(iterator) { return new ReadableStream({ async pull(con
  */
 
 /**
- * todo: Move to events.ts? [29.03.2023] когда этот код в отдельном файле - его проще тестировать.
- *  Возможно, текущий файл переименовать в `eventsAsyncIterator.ts`, и функцию `iteratorToWebReadableStream` (и другие) вынести из данного файла.
- *
  * todo: Перенести последние изменения из 'nodejs events.on' сюда (https://github.com/nodejs/node/blob/71951a0e86da9253d7c422fa2520ee9143e557fa/lib/events.js#L1016):
  *  - использование FixedQueue
  *  - options.[highWatermark, lowWatermark]
  *  - поддержка Stream#resume и Stream#pause
  *  - поддержка символов: kWatermarkData (`Symbol.for('nodejs.watermarkData')`), kFirstEventParam
  *
+ * `static on(emitter: EventEmitter|DOMEventTarget, event: string): AsyncIterableIterator<any>;`
+ *
+ * - tests: https://github.com/nodejs/node/blob/master/test/parallel/test-event-on-async-iterator.js
+ *
  * Returns an `AsyncIterator` that iterates `event` events.
  *
  * @see [Node.js documentation / Events / events.on(emitter, eventName): AsyncIterator]{@link https://nodejs.org/api/events.html#eventsonemitter-eventname-options}
  * @see [nodejs / Pull requests / lib: performance improvement on readline async iterator]{@link https://github.com/nodejs/node/pull/41276}
  * @see [faster-readline-iterator]{@link https://github.com/Farenheith/faster-readline-iterator}
+ * @see [Asynchronous Iterators for JavaScript]{@link https://github.com/tc39/proposal-async-iteration}
  */
 export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
     emitter: EventEmitter | EventEmitterEx | EventTarget,

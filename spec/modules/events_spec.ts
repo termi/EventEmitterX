@@ -2306,6 +2306,7 @@ describe('events', function() {
 
     const _EventEmitterEx_once = once;
 
+    // tags: EventEmitter.once, EventEmitterEx.once, static once
     describe('events.once', function _EventEmitter_once() {
         let EventEmitter = EventEmitterEx;
         let once = _EventEmitterEx_once;
@@ -3817,6 +3818,99 @@ describe('events', function() {
             expect(ee.listenerCount('test9-1')).toBe(0);
             expect(ee.listenerCount('test9-2')).toBe(0);
             expect(ee.listenerCount('error')).toBe(0);
+        });
+    });
+
+    // tags: EventEmitter.on, EventEmitterEx.on, static on
+    describe('events.on', function() {// more tests in test file for cftools/modules/EventEmitterEx/eventsAsyncIterator.ts
+        it('simple case', async function() {
+            const emitter = new EventEmitterEx();
+            const values: string[] = [];
+
+            setImmediate(() => {
+                emitter.emit('-invalid-', '-invalid-test1');
+                emitter.emit('value', 'test1');
+                emitter.emit('value', 'test2');
+                emitter.emit('value', 'test3');
+                emitter.emit('value', '-invalid-test2');
+            });
+
+            for await (const [ value ] of EventEmitterEx.on(emitter, 'value')) {
+                values.push(value as string);
+
+                if (values.length > 2) {
+                    break;
+                }
+            }
+
+            expect(values).toEqual([
+                'test1',
+                'test2',
+                'test3',
+            ]);
+        });
+
+        it('aborted by AbortSignal', async function() {
+            const emitter = new EventEmitterEx();
+            const ac = new AbortController();
+            const values: string[] = [];
+
+            setImmediate(() => {
+                emitter.emit('-invalid-', '-invalid-test1');
+                emitter.emit('value', 'test1');
+                emitter.emit('value', 'test2');
+                emitter.emit('value', 'test3');
+
+                ac.abort();
+
+                emitter.emit('value', '-invalid-test2');
+            });
+
+            try {
+                for await (const [ value ] of EventEmitterEx.on(emitter, 'value', {
+                    signal: ac.signal,
+                })) {
+                    values.push(value as string);
+                }
+            }
+            catch {
+                // ignore
+            }
+
+            expect(values).toEqual([
+                'test1',
+                'test2',
+                'test3',
+            ]);
+        });
+
+        it('stop by stopEventName', async function() {
+            const emitter = new EventEmitterEx();
+            const stopEventName = Symbol('stop-iterator');
+            const values: string[] = [];
+
+            setImmediate(() => {
+                emitter.emit('-invalid-', '-invalid-test1');
+                emitter.emit('value', 'test1');
+                emitter.emit('value', 'test2');
+                emitter.emit('value', 'test3');
+
+                emitter.emit(stopEventName);
+
+                emitter.emit('value', '-invalid-test2');
+            });
+
+            for await (const [ value ] of EventEmitterEx.on(emitter, 'value', {
+                stopEventName,
+            })) {
+                values.push(value as string);
+            }
+
+            expect(values).toEqual([
+                'test1',
+                'test2',
+                'test3',
+            ]);
         });
     });
 
