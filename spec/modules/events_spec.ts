@@ -174,11 +174,27 @@ describe('events', function() {
 
                 ee.destructor();
 
+                const console_warn = console.warn;
+                const console_warn_mock = jest.fn(() => {});
+
+                console.warn = console_warn_mock;
+
                 ee.on('foo', () => {});
                 ee.addListener('foo', () => {});
                 ee.once('foo', () => {});
                 ee.prependListener('foo', () => {});
                 ee.prependOnceListener('foo', () => {});
+
+                expect(console_warn_mock).toHaveBeenCalledTimes(5);
+                expect(console_warn_mock.mock.calls.map((a: [ string ][]) => ([ a[0] ]))).toEqual([
+                    [ 'Attempt to add listener on destroyed emitter' ],
+                    [ 'Attempt to add listener on destroyed emitter' ],
+                    [ 'Attempt to add listener on destroyed emitter' ],
+                    [ 'Attempt to add listener on destroyed emitter' ],
+                    [ 'Attempt to add listener on destroyed emitter' ],
+                ]);
+
+                console.warn = console_warn;
 
                 expect(ee.listenerCount('foo')).toBe(0);
             });
@@ -296,7 +312,7 @@ describe('events', function() {
                 const anonymous_testSymbol1 = Symbol();
                 const anonymous_testSymbol2 = Symbol();
                 const console_count = console.count;
-                const console_count_mock = jest.fn(console_count);
+                const console_count_mock = jest.fn(() => {});
 
                 console.count = console_count_mock;
 
@@ -337,6 +353,7 @@ describe('events', function() {
                 {
                     const logger = new LoggerCap({
                         addTime: false,
+                        useConsole: false,
                     });
                     const ee = new EventEmitter({
                         emitCounter: logger,
@@ -4059,8 +4076,7 @@ describe('events', function() {
 
         it('isEventEmitterEx from another context', function() {
             // eslint-disable-next-line unicorn/no-console-spaces
-            console.info(' ---- ', require.resolve('../../modules/events'));
-
+            // console.info(' ---- ', require.resolve('../../modules/events'));
             const contextObject = {
                 events_module_path: require.resolve('../../modules/events'),
                 __filename,

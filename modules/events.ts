@@ -581,7 +581,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 const array_handler = handler as Function[];
 
                 if (array_handler.length > 0) {
-                    // arrayClone
+                    // todo: use arrayClone from https://github.com/nodejs/node/blob/9b104be502a497a20748b106ad01b2fbf22a6e4e/lib/events.js#L880
                     const listeners = array_handler.slice();
 
                     switch (argumentsLength) {
