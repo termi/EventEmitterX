@@ -2828,7 +2828,7 @@ describe('events', function() {
 
             // eslint-disable-next-line jest/no-disabled-tests
             it.skip('should throw if "types" argument is Symbol', async function() {
-                let error: (Error & { code: number | string }) | null = null;
+                let error: null | Error & { code: number | string } = null;
 
                 try {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -2838,7 +2838,7 @@ describe('events', function() {
                     });
                 }
                 catch (err) {
-                    error = err;
+                    error = err as (Error & { code: number | string });
                 }
 
                 expect_toBeDefined(error);
@@ -2849,7 +2849,7 @@ describe('events', function() {
 
             // eslint-disable-next-line jest/no-disabled-tests
             it.skip('should throw if one of array "types" argument is Symbol', async function() {
-                let error: (Error & { code: number | string }) | null = null;
+                let error: null | Error & { code: number | string } = null;
 
                 try {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -2859,7 +2859,7 @@ describe('events', function() {
                     });
                 }
                 catch (err) {
-                    error = err;
+                    error = err as (Error & { code: number | string });
                 }
 
                 expect_toBeDefined(error);
@@ -2870,7 +2870,7 @@ describe('events', function() {
 
             // eslint-disable-next-line jest/no-disabled-tests
             it.skip('should throw if "options.errorEventName" is Symbol', async function() {
-                let error: (Error & { code: number | string }) | null = null;
+                let error: null | Error & { code: number | string } = null;
 
                 try {
                     await once(eventTarget, Math.random().toString(36), {
@@ -2879,7 +2879,7 @@ describe('events', function() {
                     });
                 }
                 catch (err) {
-                    error = err;
+                    error = err as (Error & { code: number | string });
                 }
 
                 expect_toBeDefined(error);
@@ -3227,11 +3227,11 @@ describe('events', function() {
                     counter++;
                 }
                 catch (err) {
-                    if (isTestError(err)) {
+                    if (isTestError(err as DOMException)) {
                         throw err;
                     }
 
-                    error1 = err;
+                    error1 = err as DOMException;
                 }
                 // at this line ac1 and ac2 already Aborted
                 try {
@@ -3240,7 +3240,7 @@ describe('events', function() {
                     counter++;
                 }
                 catch (err) {
-                    error2 = err;
+                    error2 = err as DOMException;
                 }
 
                 expect(counter).toBe(0);
@@ -3348,11 +3348,11 @@ describe('events', function() {
                     counter++;
                 }
                 catch (err) {
-                    if (isTestError(err)) {
+                    if (isTestError(err as DOMException)) {
                         throw err;
                     }
 
-                    error1 = err;
+                    error1 = err as DOMException;
                 }
                 // at this line ac1 and ac2 already Aborted
                 try {
@@ -3361,11 +3361,11 @@ describe('events', function() {
                     counter++;
                 }
                 catch (err) {
-                    if (isTestError(err)) {
+                    if (isTestError(err as DOMException)) {
                         throw err;
                     }
 
-                    error2 = err;
+                    error2 = err as DOMException;
                 }
 
                 acg.close();
@@ -3410,11 +3410,11 @@ describe('events', function() {
                     counter++;
                 }
                 catch (err) {
-                    if (isTestError(err)) {
+                    if (isTestError(err as DOMException)) {
                         throw err;
                     }
 
-                    error = err;
+                    error = err as DOMException;
                 }
 
                 acg.close();

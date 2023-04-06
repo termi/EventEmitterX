@@ -3118,7 +3118,7 @@ function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
         // eslint-disable-next-line promise/prefer-await-to-then
         if (!!maybePromise && typeof maybePromise.catch === 'function') {
             // eslint-disable-next-line promise/prefer-await-to-callbacks,promise/prefer-await-to-then
-            maybePromise.catch(error => {
+            maybePromise.catch((error: Error | unknown) => {
                 // todo: Передавать эту ошибку в специальный обработчик для асинхронных ошибок eventHandler'ов
                 //  Сюда _emitUnhandledRejectionOrErr ?
                 console.error(error);
@@ -3309,7 +3309,7 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
         if (typeof then === 'function') {
             // Нужно ли тут перехватывать ошибку через catch?
             // eslint-disable-next-line promise/prefer-await-to-callbacks
-            void then.call(promise, undefined, function(err) {
+            void then.call(promise, undefined, function(err: Error | unknown) {
                 // The callback is called with nextTick to avoid a follow-up
                 // rejection from this promise.
                 setImmediate(_emitUnhandledRejectionOrErr, that, err, type, args);
@@ -3322,7 +3322,7 @@ function _addCatch(that: EventEmitterEx, promise: PromiseLike<any>, type: EventN
 }
 
 /** @private */
-function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventName, args: any[]) {
+function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: Error | unknown, type: EventName, args: any[]) {
     const captureRejectionHandler = ee[captureRejectionSymbol];
 
     if (typeof captureRejectionHandler === 'function') {
@@ -3339,7 +3339,7 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterEx, err: any, type: EventN
         // and the exception is handled.
         try {
             ee[kCapture] = false;
-            ee.emit('error', err);
+            ee.emit('error', err as Error);
         }
         finally {
             ee[kCapture] = prev;
