@@ -46,8 +46,21 @@ function _getAsyncIteratorPrototype() {
 
 // const AsyncIteratorPrototype = Object.getPrototypeOf(Object.getPrototypeOf(async function*() {}).prototype);
 
-type EventsAsyncIterator_Options = {
+type _ComputeValue_onAfterComputeValueCallback<T extends unknown[] = unknown[]> = (this: EventsAsyncIterator<T>) => Promise<void> | void;
+
+type EventsAsyncIterator_Options<T extends unknown[] = unknown[]> = {
     signal?: AbortSignal,
+    /**
+     * Не вызывается при добавлении значения через EventsAsyncIterator.return
+     *
+     * todo: Добавить computeValueOnReturn ?
+     */
+    computeValue?: (this: EventsAsyncIterator<T>, eventName: EventName, eventArgs: T, addOnAfterComputeValue: (callback: _ComputeValue_onAfterComputeValueCallback<T>) => void) =>
+        | T// eslint-disable-line callforce/sort-type-constituents
+        | (T extends readonly (infer U)[] ? U : never)
+        | Promise<T>
+        | Promise<(T extends readonly (infer U)[] ? U : never)>
+    ,
     // todo: `filter(this: EventsAsyncIterator, eventName: EventName, ...args)` to filter events
     /**
      * todo: make compatible with nodejs `events.on#options.close` (https://github.com/nodejs/node/blob/71951a0e86da9253d7c422fa2520ee9143e557fa/lib/events.js#L1010)
@@ -126,10 +139,10 @@ function iteratorToStream(iterator) { return new ReadableStream({ async pull(con
  * @see [faster-readline-iterator]{@link https://github.com/Farenheith/faster-readline-iterator}
  * @see [Asynchronous Iterators for JavaScript]{@link https://github.com/tc39/proposal-async-iteration}
  */
-export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
+export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = void>(
     emitter: EventEmitter | EventEmitterEx | EventTarget,
     event: EventName,
-    options: EventsAsyncIterator_Options = {},
+    options: EventsAsyncIterator_Options<T> = {},
 ): EventsAsyncIterator<T> {
     // todo: validateAbortSignal(signal, 'options.signal');
     // if (signal?.aborted)
@@ -141,10 +154,12 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
 
     const {
         signal,
+        computeValue,
         stopEventName,
         errorEventName = 'error',
         isDebug = false,
     } = options;
+    const isComputeValue = typeof computeValue === 'function';
     const isEventTarget = _isEventTargetCompatible(emitter);
     /**
      * Из-за того, что iteratorErrorToReject может иметь значение `undefined` после произошедшей ошибки,
@@ -158,7 +173,10 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
     /**
      * @see [nodejs / internal/fixed_queue]{@link https://github.com/nodejs/node/blob/main/lib/internal/fixed_queue.js}
      */
-    const unconsumedEvents: T[] = [];
+    const unconsumedEvents: {
+        eventName: EventName,
+        eventArgs: T,
+    }[] = [];
     /**
      * @see [nodejs / internal/fixed_queue]{@link https://github.com/nodejs/node/blob/main/lib/internal/fixed_queue.js}
      */
@@ -166,7 +184,62 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
         resolve: ((value: IteratorReturnResult<undefined> | IteratorYieldResult<T> | PromiseLike<IteratorYieldResult<T>>) => void),
         reject: ((reason?: any) => void),
     }[] = [];
-    const _onEvent = (...eventArgs: unknown[]) => {
+
+    type ReturnType_computeValueStep1 = {
+        value: T,
+        step1Result: {
+            onAfterComputeValueCallbacks: _ComputeValue_onAfterComputeValueCallback[],
+        },
+    };
+
+    const _computeValueStep1 = async (value: T, eventName: EventName): Promise<ReturnType_computeValueStep1> => {
+        const onAfterComputeValueCallbacks: _ComputeValue_onAfterComputeValueCallback[] = [];
+
+        if (isComputeValue) {
+            // eslint-disable-next-line promise/prefer-await-to-callbacks
+            const addOnAfterComputeValue = (callback: _ComputeValue_onAfterComputeValueCallback) => {
+                onAfterComputeValueCallbacks.push(callback);
+            };
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore
+            value = await computeValue.call(iterator, eventName, value, addOnAfterComputeValue) as T;
+        }
+
+        return {
+            value,
+            step1Result: {
+                onAfterComputeValueCallbacks,
+            },
+        };
+    };
+    const _computeValueStep2 = async (step1Result: ReturnType_computeValueStep1["step1Result"] | void) => {
+        if (!step1Result) {
+            return;
+        }
+
+        const {
+            onAfterComputeValueCallbacks,
+        } = step1Result;
+
+        if (!Array.isArray(onAfterComputeValueCallbacks) || onAfterComputeValueCallbacks.length === 0) {
+            return;
+        }
+
+        for (const callback of onAfterComputeValueCallbacks) {
+            if (typeof callback === 'function') {
+                try {
+                    await callback.call(iterator);
+                }
+                catch (error) {
+                    iterator.throw(error);
+
+                    break;
+                }
+            }
+        }
+    };
+    const __onEvent = (...eventArgs: unknown[]) => {
         if (finishedState) {
             return;
         }
@@ -175,8 +248,10 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
             const promise = unconsumedPromises.shift();
 
             if (promise) {
+                const value = eventArgs as T;
+
                 promise.resolve({
-                    value: eventArgs as unknown as T,
+                    value,
                     done: false,
                 } as IteratorYieldResult<T>);
 
@@ -184,8 +259,59 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
             }
         }
 
-        unconsumedEvents.push(eventArgs as unknown as T);
+        unconsumedEvents.push({
+            eventName: event,
+            eventArgs: eventArgs as unknown as T,
+        });
     };
+    const __onEventWithComputeValueAsync = async (...eventArgs: unknown[]) => {
+        if (finishedState) {
+            return;
+        }
+
+        if (unconsumedPromises.length > 0) {
+            const promise = unconsumedPromises.shift();
+
+            if (promise) {
+                try {
+                    let value = eventArgs as T;
+                    let computeValueStep1Result: ReturnType_computeValueStep1["step1Result"] | void = void 0;
+
+                    if (isComputeValue) {
+                        // noinspection UnnecessaryLocalVariableJS
+                        const eventName = event;
+                        const {
+                            value: _value,
+                            step1Result,
+                        } = await _computeValueStep1(value, eventName);
+
+                        value = _value;
+                        computeValueStep1Result = step1Result;
+                    }
+
+                    promise.resolve({
+                        value,
+                        done: false,
+                    } as IteratorYieldResult<T>);
+
+                    if (isComputeValue && computeValueStep1Result) {
+                        await _computeValueStep2(computeValueStep1Result);
+                    }
+                }
+                catch (error) {
+                    iterator.throw(error);
+                }
+
+                return;
+            }
+        }
+
+        unconsumedEvents.push({
+            eventName: event,
+            eventArgs: eventArgs as unknown as T,
+        });
+    };
+    const _onEvent = isComputeValue ? __onEventWithComputeValueAsync : __onEvent;
     const terminateIterator = (reason: _ITERATOR_STOP_REASON) => {
         finishedState = reason;
 
@@ -351,19 +477,47 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
         signal.addEventListener('abort', _onAbort, { once: true });
     }
 
-    return Object.setPrototypeOf({
+    const iterator = Object.setPrototypeOf({
         [Symbol.asyncIterator]() {
             return this;
         },
-        next() {
+        async next() {
             // First, we consume all unread events
             if (unconsumedEvents.length > 0) {
-                const eventArgs = unconsumedEvents.shift();
+                const unconsumedEvent = unconsumedEvents.shift();
 
-                return Promise.resolve({
-                    value: eventArgs,
-                    done: false,
-                } as IteratorYieldResult<T>);
+                if (unconsumedEvent) {
+                    const { eventName, eventArgs } = unconsumedEvent;
+                    let value = eventArgs as T;
+                    let computeValueStep1Result: ReturnType_computeValueStep1["step1Result"] | void = void 0;
+
+                    if (isComputeValue) {
+                        const {
+                            value: _value,
+                            step1Result,
+                        } = await _computeValueStep1(value, eventName);
+
+                        value = _value;
+                        computeValueStep1Result = step1Result;
+                    }
+
+                    const promise = Promise.resolve({
+                        value: value,
+                        done: false,
+                    } as IteratorYieldResult<T>);
+
+                    if (isComputeValue && computeValueStep1Result) {
+                        await _computeValueStep2(computeValueStep1Result);
+                    }
+
+                    return promise;
+                }
+                else {
+                    // Invalid state unconsumedEvents should contain only `{ eventName, eventArgs }` objects
+                    if (isDebug) {
+                        throw new Error('Invalid state');
+                    }
+                }
             }
 
             // Then we error, if an error happened
@@ -404,15 +558,15 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
                 has_iteratorErrorToReject = false;
                 iteratorErrorToReject = void 0;
 
-                return Promise.reject(error);
+                throw error;
             }
 
             // If the iterator is finished, resolve to done
             if (finishedState) {
-                return Promise.resolve({
+                return {
                     value: void 0,
                     done: true,
-                } as IteratorReturnResult<undefined>);
+                } as IteratorReturnResult<undefined>;
             }
 
             // Wait until an event happens
@@ -468,6 +622,8 @@ export function eventsAsyncIterator<T=(unknown[]), TReturn = void>(
             };
         },
     }, _getAsyncIteratorPrototype());
+
+    return iterator;
 }
 
 // todo: implement addAbortSignal (https://nodejs.org/api/stream.html#streamaddabortsignalsignal-stream)
