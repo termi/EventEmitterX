@@ -319,6 +319,7 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     eventNames(): NodeEventName[];
     listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
 }
+// noinspection JSUnusedGlobalSymbols
 /** cast type of any event emitter to typed event emitter */
 export declare function asTypedEventEmitter<EventMap extends DefaultEventMap, X extends INodeEventEmitter>(x: X): IEventEmitter<EventMap>;
 
@@ -2717,6 +2718,7 @@ if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
     Object.defineProperty(EventEmitterProxy.constructor, 'name', { value: tagEventEmitterProxy, configurable: true });
 }
 
+// noinspection JSUnusedGlobalSymbols
 export type NodeEventEmitter = INodeEventEmitter;
 
 export { errorMonitor, captureRejectionSymbol, ABORT_ERR };
