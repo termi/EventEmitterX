@@ -2722,7 +2722,7 @@ if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
 export type NodeEventEmitter = INodeEventEmitter;
 
 export { errorMonitor, captureRejectionSymbol, ABORT_ERR };
-export const { once, getEventListeners } = EventEmitterEx;
+export const { once, on, getEventListeners } = EventEmitterEx;
 
 /**
  * @private
