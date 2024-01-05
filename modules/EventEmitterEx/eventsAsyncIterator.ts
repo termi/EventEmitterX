@@ -582,7 +582,7 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
                 done: true,
             } as IteratorReturnResult<TReturn>);
         },
-        throw(err: Error) {
+        throw(err: Error | unknown) {
             if (!err || !(err instanceof Error)) {
                 throw new TypeError('eventsAsyncIterator#throw(): Invalid argument', { cause: err });
             }
