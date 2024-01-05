@@ -21,7 +21,6 @@ import type {
 import {
     createAbortError,
     isAbortSignal,
-    isAbortError,
     AbortControllersGroup,
     AbortSignal,
 } from 'termi@abortable';
@@ -107,6 +106,7 @@ interface Options {
      * Passing `true` to this parameter will cause to calls listener functions without any `this` value.
      */
     listenerWithoutThis?: boolean;
+    isDebugTraceListeners?: boolean;
 }
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
@@ -146,6 +146,7 @@ interface StaticOnceOptionsDefault {
     checkFn?: Function;
     /** Promise constructor to use */
     Promise?: PromiseConstructor;
+    isEnrichAbortStack?: boolean;
     // [key: string]: any;
     debugInfo?: Object;
 }
@@ -362,6 +363,7 @@ const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
 const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
 const EventEmitterEx_Flags_has_duplicatedListener_listener = 1 << 16;
 const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 21;
+const EventEmitterEx_Flags_emitCounter_isDebugTraceListeners = 1 << 25;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
@@ -395,6 +397,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 captureRejections,
                 emitCounter,
                 listenerWithoutThis,
+                isDebugTraceListeners,
             } = options;
 
             if (maxListeners !== void 0) {
@@ -428,6 +431,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 ) {
                     this._f |= EventEmitterEx_Flags_emitCounter_isConsole;
                 }
+            }
+            if (isDebugTraceListeners) {
+                this._f |= EventEmitterEx_Flags_emitCounter_isDebugTraceListeners;
             }
         }
     }
@@ -725,6 +731,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             _onceIds,
         } = this;
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+        const isDebugTraceListeners = _checkBit(_f, EventEmitterEx_Flags_emitCounter_isDebugTraceListeners);
         const hasAnyOnceListener = _onceIds.length > 0;
         // todo: add handleEvent support
         const listenerAs_objectWith_handleEvent = false;// supportHandleEvent && typeof listener === 'object';
@@ -812,6 +819,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
         if (once) {
             listener = _onceWrap<EMD<EventMap>, EventKey>(this, event, listener);
+        }
+
+        if (isDebugTraceListeners) {
+            listener["__debugTrace"] = String(new Error('-get-debug-trace-').stack || '').split('\n');
         }
 
         if (!handler) {
@@ -1553,6 +1564,12 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         let timing = staticOnceOptions.timing || void 0;
         // todo: check `_isTiming(value: ServerTiming | ITiming | Console | unknown): value is ITiming;`
         let hasTiming = _isDefined(timing);
+        const isEnrichAbortStack = !!staticOnceOptions.isEnrichAbortStack;
+        // note: Тут можно улучшить получение стека, например фильтровать всё что из node_modules
+        const enrichAbortStackBy = isEnrichAbortStack
+            ? new Error('-enrichAbortStackBy-').stack
+            : void 0
+        ;
         const debugInfo = staticOnceOptions.debugInfo || void 0;
         const hasDebugInfo = _isObject(debugInfo);
         let abortControllersGroup: TAbortControllersGroup | void;
@@ -1900,13 +1917,17 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         }
 
                         const signalReason = signal?.reason;
-                        const abortError = isAbortError(signalReason)
-                            ? signalReason
-                            // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
-                            : createAbortError(ABORT_ERR, signalReason)
-                        ;
+                        // Тут всегда должна создаваться новая AbortError (НЕ DOMException),
+                        //  даже если `isAbortError(signalReason) === true`, а "signalReason" - это DOMException ABORT_ERR
                         // todo: Вызывать ErrorTools.createAbortError
                         // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
+                        const abortError = createAbortError(ABORT_ERR, signalReason);
+
+                        if (enrichAbortStackBy) {
+                            // подмешиваем в "abortError.stack" стек созданные выше, по время вызова `static once`.
+                            abortError.stack += `\n    (emulated async stack) (EventEmitterEx.once(emitter, "${String(types)}", { signal })) [isEnrichAbortStack==true]`;
+                            abortError.stack += enrichAbortStackBy;
+                        }
 
                         reject(abortError);
                     }
