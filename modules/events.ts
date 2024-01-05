@@ -128,6 +128,7 @@ interface StaticOnceOptionsDefault {
     /** the timeout in ms for resolving the promise before it is rejected with an
      * error [TimeoutError]{@link TimeoutError}: {name: 'TimeoutError', message: 'timeout', code: 'ETIMEDOUT'} */
     timeout?: number;
+    // todo: Если в EventsAsyncIterator_Options, свойство будет называться 'error' (для совместимости с nodejs), то и тут оно должно называться 'error'.
     /** Custom error event name. Default error event name is 'error'. */
     errorEventName?: EventName;
     /**
@@ -1904,6 +1905,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
                             : createAbortError(ABORT_ERR, signalReason)
                         ;
+                        // todo: Вызывать ErrorTools.createAbortError
+                        // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
 
                         reject(abortError);
                     }

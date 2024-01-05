@@ -145,8 +145,9 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
     options: EventsAsyncIterator_Options<T> = {},
 ): EventsAsyncIterator<T> {
     // todo: validateAbortSignal(signal, 'options.signal');
+    //todo: Нужно добавить, для совместимости с nodejs events.on, а также потому что это логично.
     // if (signal?.aborted)
-    //     throw new AbortError(undefined, { cause: signal?.reason });
+    //     throw ErrorTools.createAbortError(undefined, { cause: signal.reason });
 
     if (event === void 0 || event === null) {
         throw new TypeError(`eventsAsyncIterator: Invalid "event" argument. Received ${event}`);
@@ -386,9 +387,9 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
             // todo: А точно тут не нужно подставлять значение, если unconsumedEvents - не пустой?
             //  [23.12.2022] РЕЗОЛЮЦИЯ:
             //   1. Логически, должно быть:
-            //     - если unconsumedPromises - не пустой, то unconsumedEvents - путой
-            //     - если unconsumedEvents - не пустой, то unconsumedPromises - путой
-            //   2. Точно также сдеално в nodejs / events.on: https://github.com/nodejs/node/blob/71951a0e86da9253d7c422fa2520ee9143e557fa/lib/events.js#L1161
+            //     - если unconsumedPromises - не пустой, то unconsumedEvents - пустой
+            //     - если unconsumedEvents - не пустой, то unconsumedPromises - пустой
+            //   2. Точно также сделано в nodejs / events.on: https://github.com/nodejs/node/blob/71951a0e86da9253d7c422fa2520ee9143e557fa/lib/events.js#L1161
             if (isDebug) {
                 if (unconsumedEvents.length > 0) {
                     console.warn('eventsAsyncIterator: logical error: unconsumedEvents should be empty array');
