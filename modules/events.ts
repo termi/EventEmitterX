@@ -144,6 +144,11 @@ interface StaticOnceOptionsDefault {
      * @deprecated @use {@link filter}
      */
     checkFn?: Function;
+    /**
+     * Callback before Promise resolved. If ended up with exception, promise will be rejected.
+     */
+    onDone?: (this: any, emitEventName: any, event: any) => void;
+    // todo: onError?
     /** Promise constructor to use */
     Promise?: PromiseConstructor;
     isEnrichAbortStack?: boolean;
@@ -157,6 +162,8 @@ interface StaticOnceOptions<EE, E> extends StaticOnceOptionsDefault {
     /** @inheritdoc
      * @deprecated */
     checkFn?: (this: EE, emitEventName: E, ...amitArgs: any[]) => boolean;
+    /** @inheritdoc */
+    onDone?: (this: EE, emitEventName: E, ...amitArgs: any[]) => void;
 }
 
 interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
@@ -177,6 +184,8 @@ interface StaticOnceOptionsEventTarget extends StaticOnceOptionsDefault {
     /** @inheritdoc
      * @deprecated */
     checkFn?: (this: DOMEventTarget, emitEventName: string, event: Event) => boolean;
+    /** @inheritdoc */
+    onDone?: (this: DOMEventTarget, emitEventName: string, event: Event) => void;
 }
 
 // type EventMapFrom<T> = T extends EventEmitterEx<infer X> ? X : never;
@@ -1559,6 +1568,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const filter = (typeof staticOnceOptions.filter === 'function' ? staticOnceOptions.filter : void 0)
             || (typeof staticOnceOptions.checkFn === 'function' ? staticOnceOptions.checkFn : void 0)
         ;
+        const onDone = typeof staticOnceOptions.onDone === 'function' ? staticOnceOptions.onDone : void 0;
         const abortControllers = (staticOnceOptions as StaticOnceOptionsDefault).abortControllers || void 0;
         let signal = staticOnceOptions.signal || void 0;
         let timing = staticOnceOptions.timing || void 0;
@@ -1703,11 +1713,25 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     }
 
                     const eventListener = (...args: unknown[]) => {
+                        const callbacksArgs = (filter || onDone)
+                            ? [ type, ...args ] as [ emitEventName: EventName, ...amitArgs: any[] ]
+                            : void 0
+                        ;
+
                         if (filter) {
                             try {
-                                if (!filter.apply(_emitter, [ type, ...args ])) {
+                                if (!filter.apply(_emitter, callbacksArgs as NonNullable<typeof callbacksArgs>)) {
                                     return;
                                 }
+                            }
+                            catch (err) {
+                                reject(err);
+                            }
+                        }
+
+                        if (onDone) {
+                            try {
+                                onDone.apply(_emitter, callbacksArgs as NonNullable<typeof callbacksArgs>);
                             }
                             catch (err) {
                                 reject(err);
@@ -1796,11 +1820,25 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
             promise = new _Promise<any[]>((resolve, reject) => {
                 const eventListener = (...args: unknown[]) => {
+                    const callbacksArgs = (filter || onDone)
+                        ? [ type, ...args ] as [ emitEventName: EventName, ...amitArgs: any[] ]
+                        : void 0
+                    ;
+
                     if (filter) {
                         try {
-                            if (!filter.apply(_emitter, [ type, ...args ])) {
+                            if (!filter.apply(_emitter, callbacksArgs as NonNullable<typeof callbacksArgs>)) {
                                 return;
                             }
+                        }
+                        catch (err) {
+                            reject(err);
+                        }
+                    }
+
+                    if (onDone) {
+                        try {
+                            onDone.apply(_emitter, callbacksArgs as NonNullable<typeof callbacksArgs>);
                         }
                         catch (err) {
                             reject(err);
