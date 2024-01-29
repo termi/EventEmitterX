@@ -62,10 +62,18 @@ import events, {
     once,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
+import { TIME } from '../../utils/time';
 import { AbortController, AbortControllersGroup, AbortSignal } from 'termi@abortable';
 import LoggerCap from '../../utils/LoggerCap';
 import { FakeEventTarget } from "../../spec_utils/FakeEventTarget";
 import { Deferred } from "../../spec_utils/Deferred";
+import {
+    advanceTimersByTime,
+    // advanceTimersByTimeAsync,
+    // clearAllTimers,
+    useFakeTimers,
+    useRealTimers,
+} from '../../spec_utils/fakeTimers';
 
 const {
     compatibleEventEmitter_from_EventTarget,
@@ -3596,11 +3604,19 @@ describe('events', function() {
         });
 
         describe('with timeout', function() {
+            beforeAll(() => {
+                useFakeTimers();
+            });
+
+            afterAll(() => {
+                useRealTimers();
+            });
+
             // https://stackoverflow.com/a/60438234
             // do not using it.skip to avoid marking tests as "skipped" after running
             const itif = (condition: boolean) => condition ? it : () => {}/*it.skip*/;
 
-            it('simple', function() {
+            it('simple', async function() {
                 let error: DOMException|void = void 0;
                 let counter = 0;
 
@@ -3627,11 +3643,17 @@ describe('events', function() {
                     ee.emit('test7', ...[ 1, 2, 3 ]);
                 }, 100);
 
-                return promise;
+                advanceTimersByTime(TIME.SECONDS);
+
+                await promise;
             });
 
             it('check error message #1.1', function() {
                 let error: DOMException|void = void 0;
+
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
 
                 return once(ee, 1, {
                     timeout: 1,
@@ -3650,6 +3672,10 @@ describe('events', function() {
 
             it('check error message #1.2', function() {
                 let error: DOMException|void = void 0;
+
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
@@ -3671,6 +3697,10 @@ describe('events', function() {
             it('check error message #1.3', function() {
                 let error: DOMException|void = void 0;
 
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
+
                 return once(ee, 0, {
                     timeout: 1,
                 })
@@ -3689,6 +3719,10 @@ describe('events', function() {
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
             itif(!isEventTarget)('check error message #1.4', function() {
                 let error: DOMException|void = void 0;
+
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
 
                 return once(ee, Symbol('timeout-message'), {
                     timeout: 1,
@@ -3712,6 +3746,10 @@ describe('events', function() {
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
             itif(!isEventTarget)('check error message #2', function() {
                 let error: DOMException|void = void 0;
+
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
@@ -3737,6 +3775,10 @@ describe('events', function() {
             it('check error message #3', function() {
                 let error: DOMException|void = void 0;
 
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
+
                 return once(ee, 'timeout-message', {
                     errorEventName: 'timeout-message-error',
                     timeout: 1,
@@ -3756,6 +3798,10 @@ describe('events', function() {
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
             itif(!isEventTarget)('check error message #4', function() {
                 let error: DOMException|void = void 0;
+
+                queueMicrotask(() => {
+                    advanceTimersByTime(TIME.SECONDS);
+                });
 
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
