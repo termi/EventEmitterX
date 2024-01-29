@@ -394,8 +394,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
     // supportHandleEvent, support DOMEventTarget.handleEvent
     private _she = false;
     */
-    // list of local id's for once listeners
-    _onceIds: number[] = [];
+    /**
+     * Private list of local once listeners.
+     * @private
+     */
+    __onceWrappers = new Set();
 
     constructor(options?: Options) {
         if (options) {
@@ -473,6 +476,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         };
     }
 
+    [Symbol.dispose]() {
+        this.destructor();
+    }
+
     get [kCapture]() {
         return _checkBit(this._f, EventEmitterEx_Flags_captureRejections);
     }
@@ -536,7 +543,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             break;
                         // slower
                         default: {
-                            const args = [ ...arguments ];// eslint-disable-line prefer-rest-params
+                            const args = _argumentsClone2(arguments, 0);// eslint-disable-line prefer-rest-params
 
                             args[0] = errorMonitor;
 
@@ -574,7 +581,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         break;
                     // slower
                     default: {
-                        const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
+                        const args = _argumentsClone2(arguments, 1);// eslint-disable-line prefer-rest-params
 
                         result = func_handler.apply(context, args);
                     }
@@ -586,7 +593,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     // penalty
                     // eslint-disable-next-line unicorn/no-lonely-if
                     if (result !== undefined && result !== null) {
-                        const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
+                        const args = _argumentsClone2(arguments, 1);// eslint-disable-line prefer-rest-params
 
                         _addCatch(this, result, event, args);
                     }
@@ -595,12 +602,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 hasEnyListener = true;
             }
             else {
-                const array_handler = handler as Function[];
+                // Do not clone listeners here: we do it in removeListener and prependListener.
+                const listeners = handler as Function[];
 
-                if (array_handler.length > 0) {
-                    // todo: use arrayClone from https://github.com/nodejs/node/blob/9b104be502a497a20748b106ad01b2fbf22a6e4e/lib/events.js#L880
-                    const listeners = array_handler.slice();
-
+                if (listeners.length > 0) {
                     switch (argumentsLength) {
                         // fast cases
                         case 1:
@@ -649,7 +654,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                             break;
                         // slower
                         default: {
-                            const [ , ...args ] = arguments;// eslint-disable-line prefer-rest-params
+                            const args = _argumentsClone2(arguments, 1);// eslint-disable-line prefer-rest-params
 
                             if (captureRejections) {
                                 /*@__NOINLINE__*/
@@ -737,11 +742,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             _events,
             _maxListeners,
             _f,
-            _onceIds,
+            __onceWrappers,
         } = this;
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         const isDebugTraceListeners = _checkBit(_f, EventEmitterEx_Flags_emitCounter_isDebugTraceListeners);
-        const hasAnyOnceListener = _onceIds.length > 0;
+        const hasAnyOnceListener = __onceWrappers.size > 0;
         // todo: add handleEvent support
         const listenerAs_objectWith_handleEvent = false;// supportHandleEvent && typeof listener === 'object';
         const handler = _events[event];
@@ -766,10 +771,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                     isListenerAlreadyExisted = true;
                 }
                 else if (hasAnyOnceListener
-                    && (handler[sOnceListenerWrapperId] !== void 0)
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    && handler.listener === listener
+                    && handler[kOnceListenerWrappedHandler] === listener
                 ) {
                     isListenerAlreadyExisted = true;
                 }
@@ -785,11 +787,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
                         break;
                     }
-                    else if (
-                        (handler[sOnceListenerWrapperId] !== void 0)
-                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                        // @ts-expect-error
-                        && handler.listener === listener
+                    else if (hasAnyOnceListener
+                        && handler[kOnceListenerWrappedHandler] === listener
                     ) {
                         isListenerAlreadyExisted = true;
 
@@ -857,7 +856,11 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else {
             if (prepend) {
-                newLen = (handler as Listener[]).unshift(listener);
+                const newArray = _arrayClone3(handler, listener);
+
+                newLen = newArray.length;
+
+                _events[event] = newArray;
             }
             else {
                 newLen = (handler as Listener[]).push(listener);
@@ -892,7 +895,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const {
             _events,
             _f,
-            _onceIds,
+            __onceWrappers,
         } = this;
         // const listenerOncePerEventType = _checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType);
         const handler = _events[event];
@@ -903,7 +906,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
         let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
-        const hasAnyOnceListener = _onceIds.length > 0;
+        const hasAnyOnceListener = __onceWrappers.size > 0;
         let newListenersCount: number | void = void 0;
         // let originalListener: void|Function = void 0;
 
@@ -913,17 +916,9 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 newListenersCount = 0;
             }
             else if (hasAnyOnceListener
-                && (handler[sOnceListenerWrapperId] !== void 0)
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                && handler.listener === listener
+                && handler[kOnceListenerWrappedHandler] === listener
             ) {
-                const onceWrapperId = handler[sOnceListenerWrapperId];
-                const idIndex = _onceIds.indexOf(onceWrapperId);
-
-                if (idIndex !== -1) {
-                    _onceIds.splice(idIndex, 1);
-                }
+                __onceWrappers.delete(handler);
 
                 delete _events[event];
                 newListenersCount = 0;
@@ -933,94 +928,52 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 return this;
             }
         }
-        else if (hasAnyOnceListener) {
-            // remove only first link to once listener
+        else {// remove only first link to listener
             const listeners = handler as Listener[];
             let index = -1;
 
             newListenersCount = listeners.length;
 
-            for (let i = listeners.length ; i-- > 0 ;) {
-                const handler = listeners[i];
+            if (hasAnyOnceListener) {
+                for (let i = listeners.length ; i-- > 0 ;) {
+                    const handler = listeners[i];
 
-                if (handler === listener) {
-                    index = i;
+                    if (handler === listener) {
+                        index = i;
 
-                    break;
-                }
-                else if (
-                    (handler[sOnceListenerWrapperId] !== void 0)
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
-                    && handler.listener === listener
-                ) {
-                    const onceWrapperId = handler[sOnceListenerWrapperId];
-                    const idIndex = _onceIds.indexOf(onceWrapperId);
-
-                    if (idIndex !== -1) {
-                        _onceIds.splice(idIndex, 1);
+                        break;
                     }
+                    else if (handler[kOnceListenerWrappedHandler] === listener) {
+                        __onceWrappers.delete(handler);
 
-                    // originalListener = listeners[i].listener;
-                    index = i;
+                        index = i;
 
-                    break;
-                }
-            }
-
-            if (index !== -1) {
-                newListenersCount--;
-
-                if (newListenersCount === 0) {
-                    listeners.length = 0;
-                    // if (--this._eventsCount === 0) {
-                    // this._events = Object.create(null);
-                    // return this;
-                    // } else { delete _events[event]; }
-                    delete _events[event];
-                }
-                else {
-                    if (index === 0) {
-                        listeners.shift();
-                    }
-                    else {
-                        listeners.splice(index, 1);
-                    }
-
-                    if (newListenersCount === 1) {
-                        _events[event] = listeners[0];
+                        break;
                     }
                 }
             }
             else {
-                // Listener is not found, exit function
-                return this;
+                index = listeners.indexOf(listener);
             }
-        }
-        else {
-            // remove only first link to listener
-            const listeners = (handler as Listener[]);
-            const index = listeners.indexOf(listener);
-
-            newListenersCount = listeners.length;
 
             if (index !== -1) {
                 newListenersCount--;
 
                 if (newListenersCount === 0) {
-                    listeners.length = 0;
+                    // if (--this._eventsCount === 0) {
+                    // this._events = Object.create(null);
+                    // }
                     delete _events[event];
+                }
+                else if (newListenersCount === 1 && index < 2) {
+                    _events[event] = listeners[index === 0 ? 1 : 0];
                 }
                 else {
                     if (index === 0) {
-                        listeners.shift();
+                        _events[event] = _arrayClone2(listeners, 1);
                     }
                     else {
-                        listeners.splice(index, 1);
-                    }
-
-                    if (newListenersCount === 1) {
-                        _events[event] = listeners[0];
+                        _events[event] = listeners.toSpliced(index, 1);
                     }
                 }
             }
@@ -1060,10 +1013,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (has_removeListener_listener) {
-            if (listener[sOnceListenerWrapperId] !== void 0) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                listener = listener.listener || listener;
+            if (listener[kOnceListenerWrappedHandler] !== void 0) {
+                listener = listener[kOnceListenerWrappedHandler] || listener;
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1114,12 +1065,13 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         const {
             _f,
             _events,
-            _onceIds,
+            __onceWrappers,
         } = this;
+        const removeSpecificEvent = event !== void 0;
         const has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
         if (has_removeListener_listener && event !== 'removeListener') {
-            if (!event) {
+            if (!removeSpecificEvent) {
                 // Emit removeListener for all listeners on all events
                 for (const key of Object.keys(_events)) {
                     if (key === 'removeListener') {
@@ -1130,60 +1082,28 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 this.removeAllListeners('removeListener');
-
-                _onceIds.length = 0;
-                this._events = Object.create(null);
-                this._f = _unsetBit(_f,
-                    EventEmitterEx_Flags_has_error_listener
-                    | EventEmitterEx_Flags_has_newListener_listener
-                    | EventEmitterEx_Flags_has_removeListener_listener
-                    | EventEmitterEx_Flags_has_errorMonitor_listener,
-                );
             }
             else {
-                if (_onceIds.length > 0) {
+                if (__onceWrappers.size > 0) {
                     const handler = _events[event];
 
-                    if (typeof handler === 'function') {
-                        const listener = handler as Listener;
-                        const onceWrapperId = listener[sOnceListenerWrapperId];
-
-                        if (onceWrapperId !== void 0) {
-                            const idIndex = _onceIds.indexOf(onceWrapperId);
-
-                            if (idIndex !== -1) {
-                                _onceIds.splice(idIndex, 1);
-                            }
-
-                            const onceListener = listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>;
-
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
-                            this.emit('removeListener', event, onceListener.listener);
-                        }
-                        else {
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
-                            this.emit('removeListener', event, listener);
-                        }
-                    }
-                    else {
-                        const listeners = (handler as Listener[]);
+                    {
+                        const listeners = typeof handler === 'function'
+                            ? [ handler as Listener ]
+                            // copy handler's due of 'removeListener' handler
+                            : _arrayClone1(handler as Listener[])
+                        ;
 
                         for (let i = listeners.length ; i-- > 0 ;) {
                             const listener = listeners[i];
+                            const onceListener = listener[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
 
-                            const onceWrapperId = listener[sOnceListenerWrapperId];
-                            const idIndex = _onceIds.indexOf(onceWrapperId);
+                            if (onceListener !== void 0) {
+                                __onceWrappers.delete(listener);
 
-                            if (idIndex !== -1) {
-                                _onceIds.splice(idIndex, 1);
-                            }
-
-                            if (onceWrapperId !== void 0) {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                                 // @ts-expect-error
-                                this.emit('removeListener', event, (listener as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener);
+                                this.emit('removeListener', event, onceListener);
                             }
                             else {
                                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1195,51 +1115,16 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
 
                 delete _events[event];
-
-                if (event === 'error') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
-                }
-                else if (event === errorMonitor) {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
-                }
-                else if (event === 'newListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
-                }
-                else if (event === 'removeListener') {
-                    if (has_removeListener_listener) {
-                        this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
-                    }
-                }
-                else if (event === 'duplicatedListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
-                }
             }
         }
-        else {
-            // Not listening for removeListener, no need to emit
-            if (!event) {
-                _onceIds.length = 0;
-                this._events = Object.create(null);
-                this._f = _unsetBit(_f,
-                    EventEmitterEx_Flags_has_error_listener
-                    | EventEmitterEx_Flags_has_newListener_listener
-                    | EventEmitterEx_Flags_has_removeListener_listener
-                    | EventEmitterEx_Flags_has_errorMonitor_listener,
-                );
-            }
-            else {
-                if (_onceIds.length > 0) {
+        else {// Not listening for removeListener, no need to emit
+            if (removeSpecificEvent) {
+                if (__onceWrappers.size > 0) {
                     const handler = _events[event];
 
                     if (typeof handler === 'function') {
-                        const onceWrapperId = handler[sOnceListenerWrapperId];
-
-                        if (onceWrapperId !== void 0) {
-                            const idIndex = _onceIds.indexOf(onceWrapperId);
-
-                            if (idIndex !== -1) {
-                                _onceIds.splice(idIndex, 1);
-                            }
+                        if (handler[kOnceListenerWrappedHandler] !== void 0) {
+                            __onceWrappers.delete(handler);
                         }
                     }
                     else {
@@ -1248,36 +1133,46 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         for (let i = listeners.length ; i-- > 0 ;) {
                             const handler = listeners[i];
 
-                            const onceWrapperId = handler[sOnceListenerWrapperId];
-                            const idIndex = _onceIds.indexOf(onceWrapperId);
-
-                            if (idIndex !== -1) {
-                                _onceIds.splice(idIndex, 1);
+                            if (handler[kOnceListenerWrappedHandler] !== void 0) {
+                                __onceWrappers.delete(handler);
                             }
                         }
                     }
                 }
 
                 delete _events[event];
+            }
+        }
 
-                if (event === 'error') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
-                }
-                else if (event === errorMonitor) {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
-                }
-                else if (event === 'newListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
-                }
-                else if (event === 'removeListener') {
-                    if (has_removeListener_listener) {
-                        this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
-                    }
-                }
-                else if (event === 'duplicatedListener') {
-                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
+        if (removeSpecificEvent) {
+            if (event === 'error') {
+                this._f = _unsetBit(_f, EventEmitterEx_Flags_has_error_listener);
+            }
+            else if (event === errorMonitor) {
+                this._f = _unsetBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener);
+            }
+            else if (event === 'newListener') {
+                this._f = _unsetBit(_f, EventEmitterEx_Flags_has_newListener_listener);
+            }
+            else if (event === 'removeListener') {
+                if (has_removeListener_listener) {
+                    this._f = _unsetBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
                 }
             }
+            else if (event === 'duplicatedListener') {
+                this._f = _unsetBit(_f, EventEmitterEx_Flags_has_duplicatedListener_listener);
+            }
+        }
+        else {
+            __onceWrappers.clear();
+            this._events = Object.create(null);
+            this._f = _unsetBit(_f,
+                EventEmitterEx_Flags_has_error_listener
+                | EventEmitterEx_Flags_has_errorMonitor_listener
+                | EventEmitterEx_Flags_has_newListener_listener
+                | EventEmitterEx_Flags_has_removeListener_listener
+                | EventEmitterEx_Flags_has_duplicatedListener_listener
+            );
         }
 
         return this;
@@ -1313,14 +1208,19 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             return true;
         }
 
-        const hasAnyOnceListener = this._onceIds.length > 0;
+        const hasAnyOnceListener = this.__onceWrappers.size > 0;
 
         if (typeof handler === 'function') {
-            if (!hasAnyOnceListener || !handler[sOnceListenerWrapperId]) {
+            const onceListener = hasAnyOnceListener
+                ? handler[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined)
+                : void 0
+            ;
+
+            if (onceListener === void 0) {
                 return listenerToCheck === handler;
             }
 
-            return listenerToCheck === (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey];
+            return listenerToCheck === onceListener;
         }
 
         if (!hasAnyOnceListener) {
@@ -1332,8 +1232,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else {
             for (const _handler of (handler as Function[])) {
-                if (_handler[sOnceListenerWrapperId]) {
-                    if (listenerToCheck === (_handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey]) {
+                const onceListener = _handler[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
+
+                if (onceListener !== void 0) {
+                    if (listenerToCheck === onceListener as _TEventMap[EventKey]) {
                         return true;
                     }
                 }
@@ -1360,14 +1262,19 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
             return [];
         }
 
-        const hasAnyOnceListener = this._onceIds.length > 0;
+        const hasAnyOnceListener = this.__onceWrappers.size > 0;
 
         if (typeof handler === 'function') {
-            if (!hasAnyOnceListener || !handler[sOnceListenerWrapperId]) {
+            const onceListener = hasAnyOnceListener
+                ? handler[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined)
+                : void 0
+            ;
+
+            if (onceListener === void 0) {
                 return [ handler as _TEventMap[EventKey] ];
             }
 
-            return [ (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey] ];
+            return [ onceListener as _TEventMap[EventKey] ];
         }
 
         if (!hasAnyOnceListener) {
@@ -1375,8 +1282,10 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         return handler.map<_TEventMap[EventKey]>(handler => {
-            if (handler[sOnceListenerWrapperId]) {
-                return (handler as unknown as OnceListenerState<EMD<EventMap>, EventKey>).listener as _TEventMap[EventKey];
+            const onceListener = handler[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
+
+            if (onceListener !== void 0) {
+                return onceListener as _TEventMap[EventKey];
             }
 
             return handler as _TEventMap[EventKey];
@@ -3154,25 +3063,22 @@ function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEven
 }
 
 type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EMD<EventMap> = EventName> = {
-    id: number,
     type: EventKey,
     fired: boolean,
-    wrapFn: EMD<EventMap>[EventKey],
+    wrapped: EMD<EventMap>[EventKey],
     listener: Listener,
     target: EventEmitterEx,
 };
 
-const sOnceListenerWrapperId = Symbol('');
+const kOnceListenerWrappedHandler = Symbol('kOnceListenerWrappedHandler');
 
 /** @private */
 function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
-    const idIndex = this.target._onceIds.indexOf(this.id);
+    // `this.wrapped` is `_onceWrapper.bind(state)`
+    this.target.__onceWrappers.delete(this.wrapped);
 
-    if (idIndex !== -1) {
-        this.target._onceIds.splice(idIndex, 1);
-    }
-
-    this.target.removeListener(this.type, this.wrapFn);
+    // note: Можно проверять, что этот once-listener был уже удалён в случае, если удаление происходило в одном из предыдущих обработчиков этого же события.
+    this.target.removeListener(this.type, this.wrapped);
 
     if (!this.fired) {
         this.fired = true;
@@ -3191,32 +3097,25 @@ function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
     }
 }
 
-let _onceListenerIdCounter = 0;
-
 /** @private */
 function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName>(
     target: EventEmitterEx,
     type: EventKey,
     listener: EMD<EventMap>[EventKey],
 ) {
-    const id = ++_onceListenerIdCounter;
     const state: OnceListenerState<EMD<EventMap>, EventKey> = {
-        id,
         type,
         fired: false,
-        wrapFn: void 0 as any as EMD<EventMap>[EventKey],
+        wrapped: void 0 as any as EMD<EventMap>[EventKey],
         listener,
         target,
     };
     const wrapped = _onceWrapper.bind(state) as EMD<EventMap>[EventKey];
 
-    target._onceIds.push(state.id);
+    state.wrapped = wrapped;
+    target.__onceWrappers.add(wrapped);
 
-    wrapped[sOnceListenerWrapperId] = id;
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
-    wrapped.listener = listener;
-    state.wrapFn = wrapped;
+    wrapped[kOnceListenerWrappedHandler] = listener;
 
     return wrapped as EMD<EventMap>[EventKey];
 }
@@ -3482,4 +3381,124 @@ function _checkBit(mask: number, bit: number): boolean {
 /** @private */
 function _unsetBit(mask: number, bit: number): number {
     return mask & ~bit;
+}
+
+/**
+ * @private
+ */
+function _arrayClone1<T>(array: T[]) {
+    // At least since V8 8.3, this implementation is faster than the previous
+    // which always used a simple for-loop
+    switch (array.length) {
+        case 1:
+            return [ array[0] ];
+        case 2:
+            return [ array[0], array[1] ];
+        case 3:
+            return [ array[0], array[1], array[2] ];
+        case 4:
+            return [ array[0], array[1], array[2], array[3] ];
+        case 5:
+            return [ array[0], array[1], array[2], array[3], array[4] ];
+        case 6:
+            return [ array[0], array[1], array[2], array[3], array[4], array[5] ];
+    }
+
+    return array.slice();
+}
+
+/**
+ * @private
+ */
+function _arrayClone2<T>(array: T[], fromIndex = 0) {
+    // At least since V8 8.3, this implementation is faster than the previous
+    // which always used a simple for-loop
+    switch (array.length - fromIndex) {
+        case 1:
+            return [ array[fromIndex] ];
+        case 2:
+            return [ array[fromIndex], array[1 + fromIndex] ];
+        case 3:
+            return [ array[fromIndex], array[1 + fromIndex], array[2 + fromIndex] ];
+        case 4:
+            return [ array[fromIndex], array[1 + fromIndex], array[2 + fromIndex], array[3 + fromIndex] ];
+        case 5:
+            return [
+                array[fromIndex], array[1 + fromIndex], array[2 + fromIndex], array[3 + fromIndex], array[4 + fromIndex],
+            ];
+        case 6:
+            return [
+                array[fromIndex],
+                array[1 + fromIndex],
+                array[2 + fromIndex],
+                array[3 + fromIndex],
+                array[4 + fromIndex],
+                array[5 + fromIndex],
+            ];
+    }
+
+    return array.slice(fromIndex);
+}
+
+/**
+ * @private
+ */
+function _arrayClone3<T>(array: T[], newFirst: T) {
+    // At least since V8 8.3, this implementation is faster than the previous
+    // which always used a simple for-loop
+    switch (array.length) {
+        case 1:
+            return [ newFirst, array[0] ];
+        case 2:
+            return [ newFirst, array[0], array[1] ];
+        case 3:
+            return [ newFirst, array[0], array[1], array[2] ];
+        case 4:
+            return [ newFirst, array[0], array[1], array[2], array[3] ];
+        case 5:
+            return [ newFirst, array[0], array[1], array[2], array[3], array[4] ];
+        case 6:
+            return [ newFirst, array[0], array[1], array[2], array[3], array[4], array[5] ];
+    }
+
+    const newArray = array.slice();
+
+    newArray.unshift(newFirst);
+
+    return newArray;
+}
+
+/**
+ * @private
+ */
+function _argumentsClone2(_arguments: IArguments, fromIndex = 0) {
+    // At least since V8 8.3, this implementation is faster than the previous
+    // which always used a simple for-loop
+    switch (_arguments.length - fromIndex) {
+        case 5:
+            return [
+                _arguments[fromIndex], _arguments[1 + fromIndex], _arguments[2 + fromIndex], _arguments[3 + fromIndex], _arguments[4 + fromIndex],
+            ];
+        case 6:
+            return [
+                _arguments[fromIndex],
+                _arguments[1 + fromIndex],
+                _arguments[2 + fromIndex],
+                _arguments[3 + fromIndex],
+                _arguments[4 + fromIndex],
+                _arguments[5 + fromIndex],
+            ];
+        case 7:
+            return [
+                _arguments[fromIndex],
+                _arguments[1 + fromIndex],
+                _arguments[2 + fromIndex],
+                _arguments[3 + fromIndex],
+                _arguments[4 + fromIndex],
+                _arguments[5 + fromIndex],
+                _arguments[6 + fromIndex],
+            ];
+    }
+
+    return Array.prototype.slice.call(_arguments, fromIndex);
 }

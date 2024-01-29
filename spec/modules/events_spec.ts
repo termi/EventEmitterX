@@ -33,11 +33,11 @@ const NodeEventTarget = EventTarget;
 // Удаляем AbortController/AbortSignal после require(jsdom), чтобы не использовались версии из jsdom
 // also check AbortController polyfill
 {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+    // @ts-ignore
     delete globalThis["AbortController"];
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+    // @ts-ignore
     delete globalThis["AbortSignal"];
 }
 
@@ -1190,14 +1190,11 @@ describe('events', function() {
                 ee.emit('test3');
                 ee.emit('test3');
                 ee.emit('test3');
-
-                expect(counter1).toBe(1);
-                expect(counter2).toBe(2);
-                expect(counter3).toBe(3);
-
                 ee.removeListener('test1', listener1);
                 ee.removeListener('test2', listener2);
                 ee.removeListener('test3', listener3);
+
+                expect([ counter1, counter2, counter3 ]).toEqual([ 1, 2, 3 ]);
                 expect(ee.listenerCount('test1')).toBe(0);
                 expect(ee.listenerCount('test2')).toBe(0);
                 expect(ee.listenerCount('test3')).toBe(0);
@@ -1245,9 +1242,7 @@ describe('events', function() {
                 ee.removeListener('test3', listener3);
                 ee.emit('test3');
 
-                expect(counter1).toBe(1);
-                expect(counter2).toBe(2);
-                expect(counter3).toBe(3);
+                expect([ counter1, counter2, counter3 ]).toEqual([ 1, 2, 3 ]);
                 expect(ee.listenerCount('test1')).toBe(0);
                 expect(ee.listenerCount('test2')).toBe(0);
                 expect(ee.listenerCount('test3')).toBe(0);
@@ -1263,10 +1258,9 @@ describe('events', function() {
                     ee.on('test', listener);
                     ee.emit('test');
                     ee.emit('test');
+                    ee.removeListener('test', listener);
 
                     expect(counter).toBe(2);
-
-                    ee.removeListener('test', listener);
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
@@ -1279,10 +1273,9 @@ describe('events', function() {
                     ee.on('test', listener);
                     ee.emit('test');
                     ee.emit('test');
+                    ee.removeAllListeners('test');
 
                     expect(counter).toBe(6);
-
-                    ee.removeAllListeners('test');
                     expect(ee.listenerCount('test')).toBe(0);
                 });
             });
@@ -1303,14 +1296,11 @@ describe('events', function() {
 
                     ee.on('test', listener1);
                     ee.emit('test');
-
-                    expect(counter1).toBe(1);
-                    expect(counter2).toBe(0);
-                    expect(counter3).toBe(0);
-
                     ee.removeListener('test', listener1);
                     ee.removeListener('test', listener2);
                     ee.removeListener('test', listener3);
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 1, 0, 0 ]);
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
@@ -1331,12 +1321,57 @@ describe('events', function() {
                     ee.on('test', listener1);
                     ee.on('test', listener1);
                     ee.emit('test');
-
-                    expect(counter1).toBe(3);
-                    expect(counter2).toBe(0);
-                    expect(counter3).toBe(0);
-
                     ee.removeAllListeners('test');
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 3, 0, 0 ]);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+            });
+
+            describe('should not call handler added by prependListener in current called handler', function() {
+                it('single listener', function() {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.prependListener('test', listener2);
+                        ee.prependOnceListener('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.emit('test');
+                    ee.removeListener('test', listener1);
+                    ee.removeListener('test', listener2);
+                    ee.removeListener('test', listener3);
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 1, 0, 0 ]);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('multiply listeners', function() {
+                    let counter1 = 0;
+                    let counter2 = 0;
+                    let counter3 = 0;
+                    const listener1 = () => {
+                        counter1++;
+
+                        ee.prependListener('test', listener2);
+                        ee.prependOnceListener('test', listener3);
+                    };
+                    const listener2 = () => { counter2++; };
+                    const listener3 = () => { counter3++; };
+
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.on('test', listener1);
+                    ee.emit('test');
+                    ee.removeAllListeners('test');
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 3, 0, 0 ]);
                     expect(ee.listenerCount('test')).toBe(0);
                 });
             });
@@ -1359,12 +1394,9 @@ describe('events', function() {
                     ee.on('test', listener2);
                     ee.once('test', listener3);
                     ee.emit('test');
-
-                    expect(counter1).toBe(1);
-                    expect(counter2).toBe(1);
-                    expect(counter3).toBe(1);
-
                     ee.removeListener('test', listener1);
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 1, 1, 1 ]);
                     expect(ee.listenerCount('test')).toBe(0);
                 });
 
@@ -1389,12 +1421,9 @@ describe('events', function() {
                     ee.once('test', listener3);
                     ee.once('test', listener3);
                     ee.emit('test');
-
-                    expect(counter1).toBe(3);
-                    expect(counter2).toBe(2);
-                    expect(counter3).toBe(2);
-
                     ee.removeAllListeners('test');
+
+                    expect([ counter1, counter2, counter3 ]).toEqual([ 3, 2, 2 ]);
                     expect(ee.listenerCount('test')).toBe(0);
                 });
             });
@@ -2433,7 +2462,7 @@ describe('events', function() {
 
             it(`should reject with error on 'error' event (async/await)`, async function() {
                 const expectedError = new Error('REJECT PROMISE');
-                let error = null;
+                let error: unknown = null;
 
                 setImmediate(() => {
                     expect(ee.listenerCount('test4')).toBe(1);
@@ -2566,7 +2595,7 @@ describe('events', function() {
             it(`should reject with error on custom error event (async/await)`, async function() {
                 const expectedError = new Error('REJECT PROMISE');
                 const customErrorEventName = 'custom_error2';
-                let error = null;
+                let error: unknown = null;
 
                 setImmediate(() => {
                     ee.emit(customErrorEventName, expectedError);
