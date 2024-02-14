@@ -76,7 +76,7 @@ export declare type DefaultEventMap = {
     [event in EventName]: Listener;
 };
 
-interface ICounter {
+export interface ICounter {
     /**
      * Will be called on every [EventEmitterEx#emit]{@link EventEmitterEx.emit} call
      *
