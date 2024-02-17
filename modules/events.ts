@@ -1395,6 +1395,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      */
     static on = eventsAsyncIterator;
 
+    static staticOnceEnrichAbortStack: boolean = false;
+
     // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
     static once<EE extends EventEmitterEx = EventEmitterEx>(
         emitter: EventEmitterEx,
@@ -1484,9 +1486,8 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         // todo: check `_isTiming(value: ServerTiming | ITiming | Console | unknown): value is ITiming;`
         let hasTiming = _isDefined(timing);
         const isEnrichAbortStack = !!staticOnceOptions.isEnrichAbortStack;
-        // note: Тут можно улучшить получение стека, например фильтровать всё что из node_modules
-        const enrichAbortStackBy = isEnrichAbortStack
-            ? new Error('-enrichAbortStackBy-').stack
+        const enrichAbortStackBy = (isEnrichAbortStack || EventEmitterEx.staticOnceEnrichAbortStack)
+            ? _sanitizeEnrichedAbortErrorStack(new Error('-enrichAbortStackBy-')).stack
             : void 0
         ;
         const debugInfo = staticOnceOptions.debugInfo || void 0;
@@ -2035,6 +2036,38 @@ export {
     EventEmitterEx as EventEmitter,
     EventEmitterEx,
 };
+
+function _sanitizeEnrichedAbortErrorStack(abortError: Error) {
+    const { stack = '' } = abortError;
+
+    if (!abortError["originalStack"]) {
+        abortError["originalStack"] = abortError;
+    }
+
+    abortError.stack = stack.split(/\n/).filter(stackLine => {
+        if (/[/\\]AbortController\./.test(stackLine)) {
+            return false;
+        }
+        if (/[/\\]events\./.test(stackLine)) {
+            return false;
+        }
+
+        if (/[/\\]node_modules[/\\]/.test(stackLine)) {
+            if (stackLine.includes('jest-circus')) {
+                return false;
+            }
+        }
+
+        // noinspection RedundantIfStatementJS
+        if (stackLine.trim() === 'at new Promise (<anonymous>)') {
+            return false;
+        }
+
+        return true;
+    }).join('\n');
+
+    return abortError;
+}
 
 interface EventEmitterSimpleProxy_Options extends Options {
     emitter: EventEmitterEx | INodeEventEmitter/* | DOMEventTarget*/;
