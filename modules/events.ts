@@ -830,6 +830,15 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
 
         if (isDebugTraceListeners) {
+            // note: https://stackoverflow.com/a/42860910
+            // if (isIE || isEdge || isPhantom) { // Untested in Edge
+            //     try { // Stack not yet defined until thrown per https://learn.microsoft.com/en-us/scripting/javascript/reference/stack-property-error-javascript
+            //         throw err;
+            //     } catch (e) {
+            //         err = e;
+            //     }
+            //     stackPos = isPhantom ? 1 : 2;
+            // }
             listener["__debugTrace"] = String(new Error('-get-debug-trace-').stack || '').split('\n');
         }
 
@@ -1395,7 +1404,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      */
     static on = eventsAsyncIterator;
 
-    static staticOnceEnrichAbortStack: boolean = false;
+    static staticOnceEnrichAbortStack = false;
 
     // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
     static once<EE extends EventEmitterEx = EventEmitterEx>(
