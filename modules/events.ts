@@ -780,7 +780,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 const listeners = (handler as Function[]);
 
                 for (let i = listeners.length ; i-- > 0 ;) {
-                    const handler = listeners[i];
+                    const handler = listeners[i] as Function;
 
                     if (handler === listener) {
                         isListenerAlreadyExisted = true;
@@ -865,7 +865,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
         }
         else {
             if (prepend) {
-                const newArray = _arrayClone3(handler, listener);
+                const newArray = _arrayClone3(handler, listener) as Listener[];
 
                 newLen = newArray.length;
 
@@ -945,7 +945,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
 
             if (hasAnyOnceListener) {
                 for (let i = listeners.length ; i-- > 0 ;) {
-                    const handler = listeners[i];
+                    const handler = listeners[i] as Listener;
 
                     if (handler === listener) {
                         index = i;
@@ -979,7 +979,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 }
                 else {
                     if (index === 0) {
-                        _events[event] = _arrayClone2(listeners, 1);
+                        _events[event] = _arrayClone2(listeners, 1) as Listener[];
                     }
                     else {
                         _events[event] = listeners.toSpliced(index, 1);
@@ -1104,7 +1104,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         ;
 
                         for (let i = listeners.length ; i-- > 0 ;) {
-                            const listener = listeners[i];
+                            const listener = listeners[i] as Listener;
                             const onceListener = listener[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
 
                             if (onceListener !== void 0) {
@@ -1140,7 +1140,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                         const listeners = (handler as Function[]);
 
                         for (let i = listeners.length ; i-- > 0 ;) {
-                            const handler = listeners[i];
+                            const handler = listeners[i] as Listener;
 
                             if (handler[kOnceListenerWrappedHandler] !== void 0) {
                                 __onceWrappers.delete(handler);
@@ -2664,7 +2664,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         } = this;
 
         for (let i = 0, len = _knownSubscriptions.length ; i < len ; i++) {
-            const knownSubscription = _knownSubscriptions[i];
+            const knownSubscription = _knownSubscriptions[i] as NonNullable<typeof _knownSubscriptions[0]>;
             const [
                 eventType,
                 eventEmitter,
@@ -3167,7 +3167,7 @@ function emitNone_array(listeners: Function[], self: EventEmitterEx | undefined)
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        listeners[i].call(self);
+        (listeners[i] as NonNullable<typeof listeners[0]>).call(self);
     }
 }
 
@@ -3181,7 +3181,7 @@ function emitNone_array_catch(
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        const result = listeners[i].call(self);
+        const result = (listeners[i] as NonNullable<typeof listeners[0]>).call(self);
 
         if (result !== undefined && result !== null) {
             _addCatch(this, result, event, []);
@@ -3194,7 +3194,7 @@ function emitOne_array(listeners: Function[], self: EventEmitterEx | undefined, 
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        listeners[i].call(self, arg1);
+        (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1);
     }
 }
 
@@ -3209,7 +3209,7 @@ function emitOne_array_catch(
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        const result = listeners[i].call(self, arg1);
+        const result = (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1);
 
         if (result !== undefined && result !== null) {
             _addCatch(this, result, event, [ arg1 ]);
@@ -3222,7 +3222,7 @@ function emitTwo_array(listeners: Function[], self: EventEmitterEx | undefined, 
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        listeners[i].call(self, arg1, arg2);
+        (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1, arg2);
     }
 }
 
@@ -3238,7 +3238,7 @@ function emitTwo_array_catch(
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        const result = listeners[i].call(self, arg1, arg2);
+        const result = (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1, arg2);
 
         if (result !== undefined && result !== null) {
             _addCatch(this, result, event, [ arg1, arg2 ]);
@@ -3251,7 +3251,7 @@ function emitThree_array(listeners: Function[], self: EventEmitterEx | undefined
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        listeners[i].call(self, arg1, arg2, arg3);
+        (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1, arg2, arg3);
     }
 }
 
@@ -3268,7 +3268,7 @@ function emitThree_array_catch(
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        const result = listeners[i].call(self, arg1, arg2, arg3);
+        const result = (listeners[i] as NonNullable<typeof listeners[0]>).call(self, arg1, arg2, arg3);
 
         if (result !== undefined && result !== null) {
             _addCatch(this, result, event, [ arg1, arg2, arg3 ]);
@@ -3281,7 +3281,7 @@ function emitMany_array(listeners: Function[], self: EventEmitterEx | undefined,
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        listeners[i].apply(self, args);
+        (listeners[i] as NonNullable<typeof listeners[0]>).apply(self, args);
     }
 }
 
@@ -3296,7 +3296,7 @@ function emitMany_array_catch(
     const len = listeners.length;
 
     for (let i = 0 ; i < len ; ++i) {
-        const result = listeners[i].apply(self, args);
+        const result = (listeners[i] as NonNullable<typeof listeners[0]>).apply(self, args);
 
         if (result !== undefined && result !== null) {
             _addCatch(this, result, event, args);
