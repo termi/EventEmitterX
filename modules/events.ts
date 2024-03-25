@@ -83,7 +83,7 @@ export interface ICounter {
      * @see {Console.count}
      * @see [MDN console.count()]{@link https://developer.mozilla.org/en-US/docs/Web/API/Console/count}
      */
-    count: (eventName: EventName) => void;
+    count: (eventName: EventName, wasListener: boolean) => void;
 }
 
 interface Options {
@@ -704,7 +704,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
                 (emitCounter as Console).count(String(event));
             }
             else {
-                (emitCounter as ICounter).count(event);
+                (emitCounter as ICounter).count(event, hasEnyListener);
             }
         }
 

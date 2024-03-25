@@ -304,13 +304,75 @@ describe('events', function() {
 
                     expect(emitCounter_count).toHaveBeenCalledTimes(5);
                     expect(emitCounter_count.mock.calls).toEqual([
-                        [ event1 ],
-                        [ event2 ],
-                        [ event2 ],
-                        [ numericEventType ],
-                        [ testSymbol ],
+                        [ event1, false ],
+                        [ event2, false ],
+                        [ event2, false ],
+                        [ numericEventType, false ],
+                        [ testSymbol, false ],
                     ]);
                 }
+            });
+
+            it('should call `emitCounter.count(eventName, hasEnyListener)` for every `EventEmitterEx#emit`', function() {
+                const event1 = 'test-event1';
+                const event2 = 'test-event2';
+                const numericEventType = 123;
+                const testSymbol = Symbol('testSymbol');
+                const counters: {
+                    [key: number | string | symbol]: {
+                        withListener: number,
+                        withoutListener: number,
+                    },
+                } = {
+                    [event1]: {
+                        withListener: 0,
+                        withoutListener: 0,
+                    },
+                    [event2]: {
+                        withListener: 0,
+                        withoutListener: 0,
+                    },
+                    [numericEventType]: {
+                        withListener: 0,
+                        withoutListener: 0,
+                    },
+                    [testSymbol]: {
+                        withListener: 0,
+                        withoutListener: 0,
+                    },
+                };
+
+                const ee = new EventEmitter({
+                    emitCounter: {
+                        count(eventName: EventName, hasEnyListener) {
+                            const counter = counters[eventName];
+
+                            if (counter) {
+                                if (hasEnyListener) {
+                                    counter.withListener++;
+                                }
+                                else {
+                                    counter.withoutListener++;
+                                }
+                            }
+                        },
+                    },
+                });
+
+                ee.on(event1, () => {});
+                ee.on(testSymbol, () => {});
+
+                ee.emit(event1);
+                ee.emit(testSymbol);
+                ee.emit(event2);
+                ee.emit(event2);
+                ee.emit(numericEventType);
+
+                expect(counters[event1]?.withListener).toBe(1);
+                expect(counters[testSymbol]?.withListener).toBe(1);
+
+                expect(counters[event2]?.withoutListener).toBe(2);
+                expect(counters[numericEventType]?.withoutListener).toBe(1);
             });
 
             it('options.emitCounter as global.console', function() {
@@ -3078,7 +3140,8 @@ describe('events', function() {
             it.skip = itSkip;
         });
 
-        it('with options.filter', function() {
+        // todo: Написать простой очевидный пример использования
+        it('with options.filter - simple example', function() {
             const expectedError = null;
             let error: Error | string | null = null;
             const expectedArgs = [
@@ -3090,6 +3153,55 @@ describe('events', function() {
 
             const promise = Promise.all([
                 once(ee, 'test5', { filter: (type, ...args) => args[1] === 9 })
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch((err: Error | string) => (
+                        error = err
+                    )),
+                once(ee, 'test5', { filter: (type, ...args) => args[1] === 5 })
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch((err: Error | string) => (
+                        error = err
+                    )),
+                once(ee, 'test5', { filter: (type, ...args) => args[1] === 1 })
+                    .then(actualArgs => argsArray.push(actualArgs as any[]))
+                    .catch((err: Error | string) => (
+                        error = err
+                    )),
+            ]).then(() => {
+                expect(error).toBe(expectedError);
+                expect(argsArray).toEqual(expectedArgs);
+                expect(ee.listenerCount('test5')).toBe(0);
+                expect(ee.listenerCount('error')).toBe(0);
+            });
+
+            expect(listenerCount(ee, 'test5')).toBe(3);
+
+            ee.emit('test5', ...[ 'test', 0, {} ]);
+            ee.emit('test5', ...[ 'test', 1, {} ]);
+            ee.emit('test5', ...[ 'test', 3, {} ]);
+            ee.emit('test5', ...[ 'test', 5, {} ]);
+            ee.emit('test5', ...[ 'test', 7, {} ]);
+            ee.emit('test5', ...[ 'test', 9, {} ]);
+
+            return promise;
+        });
+
+        it('with options.filter', function() {
+            const expectedError = null;
+            let error: Error | string | null = null;
+            const expectedArgs = [
+                [ 'test', 1, {} ],
+                [ 'test', 5, {} ],
+                [ 'test', 9, {} ],
+            ];
+            const argsArray: any[] = [];
+
+            const promise = Promise.all([
+                once(ee, 'test5', {
+                    filter(type, ...args) {
+                        return args[1] === 9;
+                    },
+                })
                     .then(actualArgs => argsArray.push(actualArgs as any[]))
                     .catch((err: Error | string) => (
                         error = err
