@@ -86,7 +86,7 @@ export interface ICounter {
     count: (eventName: EventName, wasListener: boolean) => void;
 }
 
-interface Options {
+interface _ConstructorOptions {
     maxListeners?: number;
     // listener can be registered at most once per event type
     listenerOncePerEventType?: boolean;
@@ -376,7 +376,7 @@ const EventEmitterEx_Flags_emitCounter_isDebugTraceListeners = 1 << 25;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
-export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     public readonly isEventEmitterEx = true;
     public readonly isEventEmitter = true;
     protected readonly [kIsEventEmitterEx] = true;
@@ -400,7 +400,7 @@ export default class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEv
      */
     __onceWrappers = new Set();
 
-    constructor(options?: Options) {
+    constructor(options?: _ConstructorOptions) {
         if (options) {
             const {
                 maxListeners,
@@ -2041,9 +2041,13 @@ if (EventEmitterEx.constructor.name !== tagEventEmitterEx) {
     Object.defineProperty(EventEmitterEx.constructor, 'name', { value: tagEventEmitterEx, configurable: true });
 }
 
+export namespace EventEmitterEx {
+    export type ConstructorOptions = _ConstructorOptions;
+}
+
 export {
     EventEmitterEx as EventEmitter,
-    EventEmitterEx,
+    EventEmitterEx as default,
 };
 
 function _sanitizeEnrichedAbortErrorStack(abortError: Error) {
@@ -2078,7 +2082,7 @@ function _sanitizeEnrichedAbortErrorStack(abortError: Error) {
     return abortError;
 }
 
-interface EventEmitterSimpleProxy_Options extends Options {
+interface EventEmitterSimpleProxy_Options extends _ConstructorOptions {
     emitter: EventEmitterEx | INodeEventEmitter/* | DOMEventTarget*/;
 }
 
@@ -2331,7 +2335,7 @@ type EventEmitterProxy_TargetProxyHook = (
     eventArgs: unknown[] | null,
 ) => ICompatibleEmitter | null | void;
 
-interface EventEmitterProxy_Options extends Options {
+interface EventEmitterProxy_Options extends _ConstructorOptions {
     sourceEmitter?: ICompatibleEmitter/* | DOMEventTarget*/;
     targetEmitter?: ICompatibleEmitter/* | DOMEventTarget*/;
     /**
