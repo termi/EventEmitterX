@@ -5,8 +5,6 @@
 /* globals describe, xdescribe, it, xit, expect */
 'use strict';
 
-import 'jest-extended';
-
 require('termi@polyfills');
 
 const NativeAbortController = globalThis.AbortController;
@@ -148,7 +146,8 @@ describe('events', function() {
             it('instanceof', function() {
                 expect(new EventEmitterEx()).toBeInstanceOf(EventEmitterEx);
                 expect(new EventEmitter()).toBeInstanceOf(EventEmitter);
-                expect(new events()).toBeInstanceOf(events);
+                // noinspection JSPotentiallyInvalidConstructorUsage
+                expect(new events()).toBeInstanceOf(EventEmitterEx);
             });
         });
 
@@ -2016,7 +2015,7 @@ describe('events', function() {
                     // eslint-disable-next-line jest/no-conditional-expect
                     expect(error).toBeDefined();
                     // eslint-disable-next-line jest/no-conditional-expect
-                    expect(error.message).toInclude('test');
+                    expect(error.message).toContain('test');
                 });
 
                 expect(isThrow).toBe(true);
@@ -2943,7 +2942,7 @@ describe('events', function() {
                 expect_toBeDefined(error);
                 expect(error?.code).toBe('ERR_INVALID_ARG_TYPE');
                 expect(error?.name).toBe('TypeError');
-                expect(error?.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+                expect(error?.message).toContain(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -2964,7 +2963,7 @@ describe('events', function() {
                 expect_toBeDefined(error);
                 expect(error?.code).toBe('ERR_INVALID_ARG_TYPE');
                 expect(error?.name).toBe('TypeError');
-                expect(error?.message).toInclude(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
+                expect(error?.message).toContain(`The "symbol" value type of "types" argument is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -2984,7 +2983,7 @@ describe('events', function() {
                 expect_toBeDefined(error);
                 expect(error?.code).toBe('ERR_INVALID_OPTION_TYPE');
                 expect(error?.name).toBe('TypeError');
-                expect(error?.message).toInclude(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
+                expect(error?.message).toContain(`The "symbol" value type of "errorEventName" option is not supported for EventTarget emitter`);
             });
 
             // eslint-disable-next-line jest/no-disabled-tests
@@ -3776,7 +3775,7 @@ describe('events', function() {
                     .then(() => {
                         expect_toBeDefined(error);
                         expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toInclude(' [1] ');
+                        expect(error?.message).toContain(' [1] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3800,7 +3799,7 @@ describe('events', function() {
                     .then(() => {
                         expect_toBeDefined(error);
                         expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toInclude(' ["0n"] ');
+                        expect(error?.message).toContain(' ["0n"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3822,7 +3821,7 @@ describe('events', function() {
                     .then(() => {
                         expect_toBeDefined(error);
                         expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toInclude(' [0] ');
+                        expect(error?.message).toContain(' [0] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3848,7 +3847,7 @@ describe('events', function() {
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.message).toInclude(' ["Symbol(timeout-message)"] ');
+                        expect(error?.message).toContain(' ["Symbol(timeout-message)"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -3877,7 +3876,7 @@ describe('events', function() {
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
+                        expect(error?.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -3901,7 +3900,7 @@ describe('events', function() {
                     .then(() => {
                         expect_toBeDefined(error);
                         expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toInclude(' ["timeout-message","timeout-message-error"] ');
+                        expect(error?.message).toContain(' ["timeout-message","timeout-message-error"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
@@ -3930,7 +3929,7 @@ describe('events', function() {
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.message).toInclude(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
+                        expect(error?.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
@@ -4131,11 +4130,11 @@ describe('events', function() {
                     expect(typeof lister).toBe('function');
                 });
                 ee.on('newListener', (name, lister) => {
-                    expect(typeof name).toBeOneOf([ 'string', 'number', 'symbol' ]);
+                    expect([ 'string', 'number', 'symbol' ]).toContain(typeof name);
                     expect(typeof lister).toBe('function');
                 });
                 ee.on('error', (error) => {
-                    expect(error instanceof Error).toBe(true);
+                    expect((error as unknown) instanceof Error).toBe(true);
                 });
                 /*
                 ee.on(EventEmitterEx.errorMonitor, (error) => {
