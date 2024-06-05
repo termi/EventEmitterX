@@ -377,7 +377,9 @@ const EventEmitterEx_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+    // noinspection JSUnusedGlobalSymbols
     public readonly isEventEmitterEx = true;
+    // noinspection JSUnusedGlobalSymbols
     public readonly isEventEmitter = true;
     protected readonly [kIsEventEmitterEx] = true;
 
@@ -1407,6 +1409,12 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     static staticOnceEnrichAbortStack = false;
 
     // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
+    /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
+     *
+     * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
+     *
+     * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
+     */
     static once<EE extends EventEmitterEx = EventEmitterEx>(
         emitter: EventEmitterEx,
         types: EventNamesFrom3<EE>,
@@ -1432,16 +1440,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * This method is intentionally generic and works with the web platform EventTarget interface, which has no special 'error' event semantics and does not listen to the 'error' event.
      *
      * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
-     *
-     * @param emitter
-     * @param types
-     * @param {StaticOnceOptions=} options
-     * @param {AbortSignal=} options.signal - {@link https://nodejs.org/api/globals.html#globals_class_abortsignal AbortSignal}
-     * @param {(AbortController|void)[]=} options.abortControllers
-     * @param {ServerTiming=} options.timing - todo: Принимать в качестве timing, в том числе, ConsoleLike-объекты и оборачивать их в совместимый с ServerTiming враппер.
-     * @param {number=} options.timeout
-     * @param {Function=} options.filter
-     * @param {Function=} options.checkFn - deprecated @use {options.filter}
      */
     static once(
         emitter: DOMEventTarget | EventEmitterEx | ICompatibleEmitter | INodeEventEmitter,
