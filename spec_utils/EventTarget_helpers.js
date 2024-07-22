@@ -134,7 +134,7 @@ function getEventListeners(emitter, type) {
     }
 
     {
-        let symbols = Object.getOwnPropertySymbols(emitter).filter(a => a["description"] === 'impl');
+        const symbols = Object.getOwnPropertySymbols(emitter).filter(a => a["description"] === 'impl');
 
         if (symbols.length > 0) {
             // implementation from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
