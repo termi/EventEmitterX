@@ -32,34 +32,34 @@ type Timeout = ReturnType<typeof setTimeout>;
 type DOMEventTarget = EventTarget;
 type INodeEventEmitter = NodeJS.EventEmitter;
 
-// https://stackoverflow.com/a/50014868
-type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
-
 /**
  * Это публичный минимально совместимый с кодом {@link EventEmitterEx.once} emitter, отличающийся от EventEmitter:
  * * для ICompatibleEmitter нужны только некоторые методы из всех методов EventEmitter
  * * методы ICompatibleEmitter **могут** не возвращать this
  */
 export interface ICompatibleEmitter {
-    on: ReplaceReturnType<INodeEventEmitter["on"], any>;
-    addListener: ReplaceReturnType<INodeEventEmitter["addListener"], any>;
-    once: ReplaceReturnType<INodeEventEmitter["once"], any>;
-    removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
-    prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
-    prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
+    on(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    once(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    removeListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    prependListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    prependOnceListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+
+    addListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
     emit: (eventName: any | string | symbol, ...args: any[]) => any | boolean;
 }
 
 /**
- * Это приватный минимально совместимый emitter
- * @private
+ Это минимально совместимый с кодом {@link EventEmitterEx.once} emitter, отличающийся от EventEmitter:
+ * 1. для IMinimumCompatibleEmitter нужны только некоторые методы из всех методов EventEmitter
+ * 2. для IMinimumCompatibleEmitter может отсутствовать метод `emit`
+ * 3. методы IMinimumCompatibleEmitter **могут** не возвращать this
  */
-interface IMinimum_CompatibleEmitter_private {
-    on: ReplaceReturnType<INodeEventEmitter["on"], any>;
-    once: ReplaceReturnType<INodeEventEmitter["once"], any>;
-    removeListener: ReplaceReturnType<INodeEventEmitter["removeListener"], any>;
-    prependListener: ReplaceReturnType<INodeEventEmitter["prependListener"], any>;
-    prependOnceListener: ReplaceReturnType<INodeEventEmitter["prependOnceListener"], any>;
+export interface IMinimumCompatibleEmitter {
+    on(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    once(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    removeListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    prependListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
+    prependOnceListener(eventName: number | string | symbol, listener: (...args: any[]) => void): any;
 }
 
 // type NodeEventEmitter = EventEmitter;
@@ -375,6 +375,7 @@ const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 21;
 const EventEmitterEx_Flags_emitCounter_isDebugTraceListeners = 1 << 25;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
 
+// todo: rename to EventEmitterX
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
     // noinspection JSUnusedGlobalSymbols
@@ -383,6 +384,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     public readonly isEventEmitter = true;
     protected readonly [kIsEventEmitterEx] = true;
 
+    // todo: Использовать Map/WeakMap? Возможно, через класс-наследник.
     private _events: {
         [eventName in keyof EMD<EventMap>]?: (Listener | Listener[]);
     } = Object.create(null);
@@ -1335,7 +1337,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     }
 
     eventNames(): NodeEventName[] {
-        // todo: return number key as number
+        // todo:
+        //  1. return number key as number
+        //  2. return Symbol's keys: `[ ...Object.keys(this._events), ...Object.getOwnPropertySymbols(this._events) ]`
         return Object.keys(this._events);
     }
 
@@ -1420,6 +1424,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     static staticOnceEnrichAbortStack = false;
 
+    // todo: Вынести `static once` в отдельный файл: eventAwaitFor (это нужно сделать с сохранением истории, поэтому
+    //  нужно сделать два бранча - в отдном переименовать этот файлы в eventAwaitFor.ts и оставить только код `static once`,
+    //  а в другом переименовать этот файл в EventEmitterX и удалить сесь код `static once`. Таким образом, после merge
+    //  история сохраниться).
     // note: consider to rename 'type' -> 'eventName', 'types' -> 'eventNames'
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
@@ -1443,9 +1451,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         options?: StaticOnceOptionsEventTarget,
     ): Promise<[ Event ]>;
     static once(
-        compatibleEmitter: ICompatibleEmitter,
+        compatibleEmitter: IMinimumCompatibleEmitter,
         types: (string | symbol)[] | string | symbol,
-        options?: StaticOnceOptions<ICompatibleEmitter, string | symbol>,
+        options?: StaticOnceOptions<IMinimumCompatibleEmitter, string | symbol>,
     ): Promise<any[]>;
     /** Creates a Promise that is fulfilled when the EventEmitter emits the given event or that is rejected if the EventEmitter emits 'error' while waiting. The Promise will resolve with an array of all the arguments emitted to the given event.
      *
@@ -1454,7 +1462,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
      */
     static once(
-        emitter: DOMEventTarget | EventEmitterEx | ICompatibleEmitter | INodeEventEmitter,
+        emitter: DOMEventTarget | EventEmitterEx | IMinimumCompatibleEmitter | INodeEventEmitter,
         types: EventName | EventName[],
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
         options?: StaticOnceOptionsDefault,
@@ -2905,7 +2913,7 @@ function _isDOMEventTargetSupportSymbolAsType(eventTarget: DOMEventTarget) {
  * @param emitter
  * @private
  */
-function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter | IMinimum_CompatibleEmitter_private | INodeEventEmitter | Object | null | void): emitter is IMinimum_CompatibleEmitter_private {
+function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter | IMinimumCompatibleEmitter | INodeEventEmitter | Object | null | void): emitter is IMinimumCompatibleEmitter {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
