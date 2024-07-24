@@ -746,168 +746,6 @@ describe('events', function() {
                 expect(ee.off('foo', () => {})).toBe(ee);
             });
 
-            // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-listeners.js
-            it('should call "removeListener" for each removed listeners', function() {
-                let counter = 0;
-                const listener1 = () => { counter++; };
-                const listener2 = () => { counter += 2; };
-                const events_removeListener_emitted: (number | string | symbol)[] = [];
-                const listeners_removeListener_emitted: Function[] = [];
-
-                ee.on('removeListener', function(event, listener) {
-                    // Don't track newListener listeners.
-                    if (event === 'removeListener') {
-                        return;
-                    }
-
-                    events_removeListener_emitted.push(event);
-                    listeners_removeListener_emitted.push(listener);
-                });
-
-                const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
-                    {// additional tests
-                        expect(name).toBe('hello_on');
-                        expect(listener).toBe(listener1);
-
-                        // 'removeListener' should call after `listener` is removed from known listeners list
-                        expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
-                    }
-                });
-
-                ee.once('removeListener', onceRemoveListener);
-
-                {// #1
-                    ee.on('hello_on', listener1);
-                    ee.emit('hello_on');
-                    ee.removeListener('hello_on', listener1);
-                }
-                {// #2
-                    ee.addListener('hello_addListener', listener1);
-                    ee.emit('hello_addListener');
-                    ee.off('hello_addListener', listener1);
-                }
-                {// #3. Listener added by once, should be auto-removed
-                    ee.once('hello_once', listener2);
-                    ee.emit('hello_once');
-                }
-
-                {// main tests
-                    expect(counter).toBe(4);
-
-                    expect(onceRemoveListener).toHaveBeenCalledTimes(1);
-                    expect(onceRemoveListener).toHaveBeenCalledWith('hello_on', listener1);
-
-                    expect(events_removeListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once' ]);
-                    expect(listeners_removeListener_emitted).toEqual([ listener1, listener1, listener2 ]);
-                }
-
-                {// finale check
-                    ee.removeAllListeners('removeListener');
-                    expect(ee.listenerCount('removeListener')).toBe(0);
-
-                    expect(ee.listenerCount('hello_on')).toBe(0);
-                    expect(ee.listenerCount('hello_addListener')).toBe(0);
-                    expect(ee.listenerCount('hello_once')).toBe(0);
-                }
-            });
-
-            it('"removeListener" event with multiply listeners', function() {
-                const listener = () => { /* nothing to do here */ };
-                const eventName = 'test123';
-                let removeListenerCounter = 0;
-
-                const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
-                    removeListenerCounter--;
-
-                    {// additional tests
-                        expect(name).toBe(eventName);
-                        expect(lis).toBe(listener);
-                    }
-                    {// main tests #1
-                        const expectedListeners = (new Array(removeListenerCounter)).fill(listener);
-
-                        expect(this.listeners(eventName)).toEqual(expectedListeners);
-                    }
-                });
-
-                {// prepare
-                    ee.on(eventName, listener);
-                    ee.addListener(eventName, listener);
-                    ee.once(eventName, listener);
-                    ee.prependListener(eventName, listener);
-                    ee.prependOnceListener(eventName, listener);
-                    removeListenerCounter = 5;
-                }
-
-                {// main tests #2
-                    expect(ee.listeners(eventName)).toEqual([ listener, listener, listener, listener, listener ]);
-                }
-
-                {// logic
-                    ee.once('removeListener', onceRemoveListener);
-                    ee.removeListener(eventName, listener);
-
-                    ee.once('removeListener', onceRemoveListener);
-                    ee.removeListener(eventName, listener);
-
-                    ee.once('removeListener', onceRemoveListener);
-                    ee.removeListener(eventName, listener);
-
-                    ee.on('removeListener', onceRemoveListener);
-                    ee.removeListener(eventName, listener);
-                    ee.removeListener(eventName, listener);
-                }
-
-                {// main tests #3
-                    expect(onceRemoveListener).toHaveBeenCalledTimes(5);
-                    expect(onceRemoveListener.mock.calls).toEqual([
-                        [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
-                        [ eventName, listener ], [ eventName, listener ],
-                    ]);
-                }
-
-                {// cleanup
-                    ee.removeListener('removeListener', onceRemoveListener);
-                    expect(ee.listenerCount('removeListener')).toBe(0);
-
-                    ee.removeAllListeners(eventName);
-                    expect(ee.listenerCount(eventName)).toBe(0);
-                }
-            });
-
-            it('call removeListener() in "removeListener" event', function() {
-                let counter = 0;
-                const listener1 = () => { counter += 1; };
-                const listener2 = () => { counter += 2; };
-                const eventName = 'test12345';
-
-                const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
-                    if (lis === listener1) {
-                        this.removeListener(eventName, listener2);
-                    }
-                });
-
-                ee.on(eventName, listener1);
-                ee.on(eventName, listener2);
-
-                ee.once('removeListener', onceRemoveListener);
-
-                ee.removeListener(eventName, listener1);
-                ee.emit(eventName);
-
-                {// main tests
-                    expect(counter).toBe(0);
-
-                    expect(onceRemoveListener).toHaveBeenCalledTimes(1);
-                    expect(onceRemoveListener).toHaveBeenCalledWith(eventName, listener1);
-                }
-
-                {// finale check
-                    expect(ee.listenerCount('removeListener')).toBe(0);
-                    expect(ee.listenerCount(eventName)).toBe(0);
-                }
-            });
-
             it('call removeListener() in handler', function() {
                 let counter = 0;
                 const eventName = 'test12345';
@@ -940,6 +778,494 @@ describe('events', function() {
                     ee.removeListener(eventName, listener1);
                     expect(ee.listenerCount(eventName)).toBe(0);
                 }
+            });
+
+            describe('"removeListener" event', function() {
+                it('common case with simple listener', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    let removed_eventName: EventName | undefined;
+                    let removed_listener: typeof listener | undefined;
+
+                    ee.on('test', listener);
+                    ee.emit('test', 1, 2, 3);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName = eventName;
+                        removed_listener = listener;
+                    });
+
+                    ee.removeListener('test', listener);
+
+                    expect(removed_eventName).toBe('test');
+                    expect(removed_listener).toBe(listener);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('common case with once listener', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    let removed_eventName: EventName | undefined;
+                    let removed_listener: typeof listener | undefined;
+
+                    ee.once('test', listener);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName = eventName;
+                        removed_listener = listener;
+                    });
+
+                    ee.removeListener('test', listener);
+
+                    expect(removed_eventName).toBe('test');
+                    expect(removed_listener).toBe(listener);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('common case with multi listeners', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    const removed_eventName: EventName[] = [];
+                    const removed_listener: (typeof listener)[] = [];
+
+                    ee.on('test', listener);
+                    ee.once('test', listener);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName.push(eventName);
+                        removed_listener.push(listener);
+                    });
+
+                    ee.removeListener('test', listener);
+                    ee.removeListener('test', listener);
+
+                    expect(removed_eventName).toEqual([ 'test', 'test' ]);
+                    expect(removed_listener).toEqual([ listener, listener ]);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-listeners.js
+                it('should call "removeListener" for each removed listeners', function() {
+                    let counter = 0;
+                    const listener1 = () => { counter++; };
+                    const listener2 = () => { counter += 2; };
+                    const events_removeListener_emitted: (number | string | symbol)[] = [];
+                    const listeners_removeListener_emitted: Function[] = [];
+
+                    ee.on('removeListener', function(event, listener) {
+                        // Don't track newListener listeners.
+                        if (event === 'removeListener') {
+                            return;
+                        }
+
+                        events_removeListener_emitted.push(event);
+                        listeners_removeListener_emitted.push(listener);
+                    });
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
+                        {// additional tests
+                            expect(name).toBe('hello_on');
+                            expect(listener).toBe(listener1);
+
+                            // 'removeListener' should call after `listener` is removed from known listeners list
+                            expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
+                        }
+                    });
+
+                    ee.once('removeListener', onceRemoveListener);
+
+                    {// #1
+                        ee.on('hello_on', listener1);
+                        ee.emit('hello_on');
+                        ee.removeListener('hello_on', listener1);
+                    }
+                    {// #2
+                        ee.addListener('hello_addListener', listener1);
+                        ee.emit('hello_addListener');
+                        ee.off('hello_addListener', listener1);
+                    }
+                    {// #3. Listener added by once, should be auto-removed
+                        ee.once('hello_once', listener2);
+                        ee.emit('hello_once');
+                    }
+
+                    {// main tests
+                        expect(counter).toBe(4);
+
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                        expect(onceRemoveListener).toHaveBeenCalledWith('hello_on', listener1);
+
+                        expect(events_removeListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once' ]);
+                        expect(listeners_removeListener_emitted).toEqual([ listener1, listener1, listener2 ]);
+                    }
+
+                    {// finale check
+                        ee.removeAllListeners('removeListener');
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+
+                        expect(ee.listenerCount('hello_on')).toBe(0);
+                        expect(ee.listenerCount('hello_addListener')).toBe(0);
+                        expect(ee.listenerCount('hello_once')).toBe(0);
+                    }
+                });
+
+                it('"removeListener" event with multiply listeners', function() {
+                    const listener = () => { /* nothing to do here */ };
+                    const eventName = 'test123';
+                    let removeListenerCounter = 0;
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                        removeListenerCounter--;
+
+                        {// additional tests
+                            expect(name).toBe(eventName);
+                            expect(lis).toBe(listener);
+                        }
+                        {// main tests #1
+                            const expectedListeners = (new Array(removeListenerCounter)).fill(listener);
+
+                            expect(this.listeners(eventName)).toEqual(expectedListeners);
+                        }
+                    });
+
+                    {// prepare
+                        ee.on(eventName, listener);
+                        ee.addListener(eventName, listener);
+                        ee.once(eventName, listener);
+                        ee.prependListener(eventName, listener);
+                        ee.prependOnceListener(eventName, listener);
+                        removeListenerCounter = 5;
+                    }
+
+                    {// main tests #2
+                        expect(ee.listeners(eventName)).toEqual([ listener, listener, listener, listener, listener ]);
+                    }
+
+                    {// logic
+                        ee.once('removeListener', onceRemoveListener);
+                        ee.removeListener(eventName, listener);
+
+                        ee.once('removeListener', onceRemoveListener);
+                        ee.removeListener(eventName, listener);
+
+                        ee.once('removeListener', onceRemoveListener);
+                        ee.removeListener(eventName, listener);
+
+                        ee.on('removeListener', onceRemoveListener);
+                        ee.removeListener(eventName, listener);
+                        ee.removeListener(eventName, listener);
+                    }
+
+                    {// main tests #3
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(5);
+                        expect(onceRemoveListener.mock.calls).toEqual([
+                            [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
+                            [ eventName, listener ], [ eventName, listener ],
+                        ]);
+                    }
+
+                    {// cleanup
+                        ee.removeListener('removeListener', onceRemoveListener);
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+
+                        ee.removeAllListeners(eventName);
+                        expect(ee.listenerCount(eventName)).toBe(0);
+                    }
+                });
+
+                it('call removeListener() in "removeListener" event', function() {
+                    let counter = 0;
+                    const listener1 = () => { counter += 1; };
+                    const listener2 = () => { counter += 2; };
+                    const eventName = 'test12345';
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                        if (lis === listener1) {
+                            this.removeListener(eventName, listener2);
+                        }
+                    });
+
+                    ee.on(eventName, listener1);
+                    ee.on(eventName, listener2);
+
+                    ee.once('removeListener', onceRemoveListener);
+
+                    ee.removeListener(eventName, listener1);
+                    ee.emit(eventName);
+
+                    {// main tests
+                        expect(counter).toBe(0);
+
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                        expect(onceRemoveListener).toHaveBeenCalledWith(eventName, listener1);
+                    }
+
+                    {// finale check
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+                        expect(ee.listenerCount(eventName)).toBe(0);
+                    }
+                });
+            });
+        });
+
+        describe('#removeAllListeners', function() {
+            it('should returns this', function() {
+                const ee = new EventEmitter();
+
+                expect(ee.removeAllListeners('foo')).toBe(ee);
+            });
+
+            it('call removeAllListeners() in handler', function() {
+                let counter = 0;
+                const eventName = 'test12345';
+                const listener1 = jest.fn(function(this: EventEmitterEx) {
+                    this.removeAllListeners(eventName);
+                });
+                const listener2 = () => { counter += 1; };
+
+                ee.on(eventName, listener1);
+                ee.on(eventName, listener2);
+
+                // listener2 will still be called although it is removed by listener1.
+                // This is so because the internal listener array at time of emit
+                // was [listener1,listener2]
+                ee.emit(eventName);
+
+                expect(counter).toBe(1);
+                expect(ee.listenerCount(eventName)).toBe(0);
+
+                expect(listener1).toHaveBeenCalledTimes(1);
+            });
+
+            describe('"removeListener" event', function() {
+                it('common case with simple listener', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    let removed_eventName: EventName | undefined;
+                    let removed_listener: typeof listener | undefined;
+
+                    ee.on('test', listener);
+                    ee.emit('test', 1, 2, 3);
+                    ee.on('test2', listener);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName = eventName;
+                        removed_listener = listener;
+                    });
+
+                    ee.removeAllListeners('test');
+
+                    expect(removed_eventName).toBe('test');
+                    expect(removed_listener).toBe(listener);
+                    expect(ee.listenerCount('test')).toBe(0);
+                    expect(ee.listenerCount('test2')).toBe(1);
+
+                    // cleanup
+                    ee.removeAllListeners();
+                });
+
+                it('common case with once listener', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    let removed_eventName: EventName | undefined;
+                    let removed_listener: typeof listener | undefined;
+
+                    ee.once('test', listener);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName = eventName;
+                        removed_listener = listener;
+                    });
+
+                    ee.removeAllListeners();
+
+                    expect(removed_eventName).toBe('test');
+                    expect(removed_listener).toBe(listener);
+                    expect(ee.listenerCount('test')).toBe(0);
+                });
+
+                it('common case with multi listeners', function() {
+                    const ee = new EventEmitter();
+                    const listener = (...args: unknown[]) => {
+                        void args;
+                    };
+                    const removed_eventName: EventName[] = [];
+                    const removed_listener: (typeof listener)[] = [];
+
+                    ee.on('test', listener);
+                    ee.once('test', listener);
+                    ee.on('test2', listener);
+
+                    ee.on('removeListener', function(eventName, listener) {
+                        removed_eventName.push(eventName);
+                        removed_listener.push(listener);
+                    });
+
+                    ee.removeAllListeners();
+
+                    expect(removed_eventName).toEqual([ 'test', 'test', 'test2' ]);
+                    expect(removed_listener).toEqual([ listener, listener, listener ]);
+                    expect(ee.listenerCount('test')).toBe(0);
+                    expect(ee.listenerCount('test2')).toBe(0);
+                });
+
+                // https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-remove-listeners.js
+                it('should call "removeListener" for each removed listeners', function() {
+                    let counter = 0;
+                    const listener1 = () => { counter++; };
+                    const listener2 = () => { counter += 2; };
+                    const events_removeListener_emitted: (number | string | symbol)[] = [];
+                    const listeners_removeListener_emitted: Function[] = [];
+
+                    ee.on('removeListener', function(event, listener) {
+                        // Don't track newListener listeners.
+                        if (event === 'removeListener') {
+                            return;
+                        }
+
+                        events_removeListener_emitted.push(event);
+                        listeners_removeListener_emitted.push(listener);
+                    });
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
+                        {// additional tests
+                            expect(name).toBe('hello_on');
+                            expect(listener).toBe(listener1);
+
+                            // 'removeListener' should call after `listener` is removed from known listeners list
+                            expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
+                        }
+                    });
+
+                    ee.once('removeListener', onceRemoveListener);
+
+                    {// #1
+                        ee.on('hello_on', listener1);
+                        ee.emit('hello_on');
+                        ee.removeAllListeners('hello_on');
+                    }
+                    {// #2
+                        ee.addListener('hello_addListener', listener1);
+                        ee.emit('hello_addListener');
+                        ee.removeAllListeners('hello_addListener');
+                    }
+                    {// #3. Listener added by once, should be auto-removed
+                        ee.once('hello_once', listener2);
+                        ee.emit('hello_once');
+                    }
+
+                    {// main tests
+                        expect(counter).toBe(4);
+
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                        expect(onceRemoveListener).toHaveBeenCalledWith('hello_on', listener1);
+
+                        expect(events_removeListener_emitted).toEqual([ 'hello_on', 'hello_addListener', 'hello_once' ]);
+                        expect(listeners_removeListener_emitted).toEqual([ listener1, listener1, listener2 ]);
+                    }
+
+                    {// finale check
+                        ee.removeAllListeners('removeListener');
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+
+                        expect(ee.listenerCount('hello_on')).toBe(0);
+                        expect(ee.listenerCount('hello_addListener')).toBe(0);
+                        expect(ee.listenerCount('hello_once')).toBe(0);
+                    }
+                });
+
+                it('"removeListener" event with multiply listeners', function() {
+                    const listener = () => { /* nothing to do here */ };
+                    const eventName = 'test123';
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                        {// additional tests
+                            expect(name).toBe(eventName);
+                            expect(lis).toBe(listener);
+                        }
+                        {// main tests #1
+                            expect(this.listeners(eventName)).toEqual([]);
+                        }
+                    });
+
+                    {// prepare
+                        ee.on(eventName, listener);
+                        ee.addListener(eventName, listener);
+                        ee.once(eventName, listener);
+                        ee.prependListener(eventName, listener);
+                        ee.prependOnceListener(eventName, listener);
+                    }
+
+                    {// main tests #2
+                        expect(ee.listeners(eventName)).toEqual([ listener, listener, listener, listener, listener ]);
+                    }
+
+                    {// logic
+                        ee.on('removeListener', onceRemoveListener);
+
+                        ee.removeAllListeners(eventName);
+
+                        ee.removeListener('removeListener', onceRemoveListener);
+                    }
+
+                    {// main tests #3
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(5);
+                        expect(onceRemoveListener.mock.calls).toEqual([
+                            [ eventName, listener ], [ eventName, listener ], [ eventName, listener ],
+                            [ eventName, listener ], [ eventName, listener ],
+                        ]);
+                    }
+
+                    {// cleanup
+                        ee.removeAllListeners();
+
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+                        expect(ee.listenerCount(eventName)).toBe(0);
+                    }
+                });
+
+                it('call removeAllListeners() in "removeListener" event', function() {
+                    let counter = 0;
+                    const listener1 = () => { counter += 1; };
+                    const listener2 = () => { counter += 2; };
+                    const eventName = 'test12345';
+
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                        if (lis === listener1) {
+                            this.removeAllListeners(eventName);
+                        }
+                    });
+
+                    ee.on(eventName, listener1);
+                    ee.on(eventName, listener2);
+
+                    ee.once('removeListener', onceRemoveListener);
+
+                    ee.removeListener(eventName, listener1);
+                    ee.emit(eventName);
+
+                    {// main tests
+                        expect(counter).toBe(0);
+
+                        expect(onceRemoveListener).toHaveBeenCalledTimes(1);
+                        expect(onceRemoveListener).toHaveBeenCalledWith(eventName, listener1);
+                    }
+
+                    {// finale check
+                        expect(ee.listenerCount('removeListener')).toBe(0);
+                        expect(ee.listenerCount(eventName)).toBe(0);
+                    }
+                });
             });
         });
 

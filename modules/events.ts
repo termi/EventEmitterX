@@ -952,6 +952,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     if (handler === listener) {
                         index = i;
 
+                        // note: Даже если режим "listenerOncePerEventType" выключен и в listeners может быть несколько
+                        //  одинаковых listener, которые мы в данный момент удаляем, то УДАЛИТЬСЯ ТОЛЬКО ПЕРВЫЙ С КОНЦА.
+                        //  Так работает EventEmitter в nodejs. Можно ввести специальный режим, когда доходить до конца
+                        //  listeners и удалять все копии listener.
                         break;
                     }
                     else if (handler[kOnceListenerWrappedHandler] === listener) {
@@ -959,6 +963,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                         index = i;
 
+                        // note: Даже если режим "listenerOncePerEventType" выключен и в listeners может быть несколько
+                        //  одинаковых listener, которые мы в данный момент удаляем, то УДАЛИТЬСЯ ТОЛЬКО ПЕРВЫЙ С КОНЦА.
+                        //  Так работает EventEmitter в nodejs. Можно ввести специальный режим, когда доходить до конца
+                        //  listeners и удалять все копии listener.
                         break;
                     }
                 }
@@ -1095,37 +1103,39 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 this.removeAllListeners('removeListener');
             }
             else {
-                if (__onceWrappers.size > 0) {
-                    const handler = _events[event];
+                const hasOnceListeners = __onceWrappers.size > 0;
+                // current handler(s)
+                const handler = _events[event];
 
-                    {
-                        const listeners = typeof handler === 'function'
-                            ? [ handler as Listener ]
-                            // copy handler's due of 'removeListener' handler
-                            : _arrayClone1(handler as Listener[])
-                        ;
+                // first remove current handler(s)
+                delete _events[event];
 
-                        for (let i = listeners.length ; i-- > 0 ;) {
-                            const listener = listeners[i] as Listener;
-                            const onceListener = listener[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
+                const listeners = typeof handler === 'function'
+                    ? [ handler as Listener ]
+                    // copy handler's due of 'removeListener' handler
+                    : _arrayClone1(handler as Listener[])
+                ;
 
-                            if (onceListener !== void 0) {
-                                __onceWrappers.delete(listener);
+                for (let i = listeners.length ; i-- > 0 ;) {
+                    const listener = listeners[i] as Listener;
+                    const onceListener = hasOnceListeners
+                        ? listener[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined)
+                        : void 0
+                    ;
 
-                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                                // @ts-expect-error
-                                this.emit('removeListener', event, onceListener);
-                            }
-                            else {
-                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                                // @ts-expect-error
-                                this.emit('removeListener', event, listener);
-                            }
-                        }
+                    if (onceListener !== void 0) {
+                        __onceWrappers.delete(listener);
+
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-expect-error ignore: `TS2345: Argument of type '[EventKey, EMD [EventKey]]' is not assignable to parameter of type 'Parameters  ["removeListener"]>'.`
+                        this.emit('removeListener', event, onceListener);
+                    }
+                    else {
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                        // @ts-expect-error ignore: `TS2345: Argument of type '[EventKey, Listener]' is not assignable to parameter of type 'Parameters  ["removeListener"]>'.`
+                        this.emit('removeListener', event, listener);
                     }
                 }
-
-                delete _events[event];
             }
         }
         else {// Not listening for removeListener, no need to emit
@@ -1175,7 +1185,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             }
         }
         else {
+            // remove all once wrappers
             __onceWrappers.clear();
+            // remove all handlers
             this._events = Object.create(null);
             this._f = _unsetBit(_f,
                 EventEmitterEx_Flags_has_error_listener
