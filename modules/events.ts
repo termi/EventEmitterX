@@ -124,6 +124,7 @@ interface StaticOnceOptionsDefault {
      * @see [MDN AbortController]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortController}
      */
     abortControllers?: (AbortController | void)[];
+    // todo: Подумать о переименовании в timings (так в NoSQL)
     timing?: ServerTiming;
     /** the timeout in ms for resolving the promise before it is rejected with an
      * error [TimeoutError]{@link TimeoutError}: {name: 'TimeoutError', message: 'timeout', code: 'ETIMEDOUT'} */
