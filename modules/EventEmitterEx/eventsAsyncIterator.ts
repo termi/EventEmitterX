@@ -4,7 +4,7 @@
 
 import type { EventEmitter } from 'node:events';
 
-import type { EventEmitterEx, EventName } from "../events";
+import type { EventEmitterEx, EventName, IMinimumCompatibleEmitter } from "../events";
 
 import { createAbortError } from 'termi@abortable';
 
@@ -65,7 +65,7 @@ type EventsAsyncIterator_Options<T extends unknown[] = unknown[]> = {
     /**
      * todo: make compatible with nodejs `events.on#options.close` (https://github.com/nodejs/node/blob/71951a0e86da9253d7c422fa2520ee9143e557fa/lib/events.js#L1010)
      *  1. make it array
-     *  2. rename to 'close'
+     *  2. rename to 'close' as in [nodejs.events.on.options](https://nodejs.org/api/events.html#eventsonemitter-eventname-options)
      *  3. add to 'closeEventFilter(this: EventsAsyncIterator, eventName: EventName, ...args)'
      */
     stopEventName?: EventName | null,
@@ -78,9 +78,12 @@ type EventsAsyncIterator_Options<T extends unknown[] = unknown[]> = {
     errorEventName?: EventName | null,
     /**
      * @see [MDN / ReadableStream / queuingStrategy.highWaterMark]{@link https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream/ReadableStream#highwatermark}
+     * @see [NodeJS / api / events / on.options / (highWaterMark, lowWaterMark)]{@link https://nodejs.org/api/events.html#eventsonemitter-eventname-options}
      */
     // todo: add highWaterMark?: number, также добавить поддержку свойства "highWatermark" - для совместимости с `nodejs events.on` (только если в nodejs не переименуют свойство в highWaterMark)
+    //  Default: `Number.MAX_SAFE_INTEGER` The high watermark. The emitter is paused every time the size of events being buffered is higher than it. Supported only on emitters implementing `pause()` and `resume()` methods.
     // todo: add lowWaterMark?: number, также добавить поддержку свойства "lowWatermark" - для совместимости с `nodejs events.on` (только если в nodejs не переименуют свойство в lowWaterMark)
+    //  Default: `1` The low watermark. The emitter is resumed every time the size of events being buffered is lower than it. Supported only on emitters implementing `pause()` and `resume()` methods.
     isDebug?: boolean,
 };
 
@@ -140,9 +143,9 @@ function iteratorToStream(iterator) { return new ReadableStream({ async pull(con
  * @see [Asynchronous Iterators for JavaScript]{@link https://github.com/tc39/proposal-async-iteration}
  */
 export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = void>(
-    emitter: EventEmitter | EventEmitterEx | EventTarget,
+    emitter: eventsAsyncIterator.CompatibleEmitter,
     event: EventName,
-    options: EventsAsyncIterator_Options<T> = {},
+    options: eventsAsyncIterator.Options<T> = {},
 ): EventsAsyncIterator<T> {
     // todo: validateAbortSignal(signal, 'options.signal');
     //todo: Нужно добавить, для совместимости с nodejs events.on, а также потому что это логично.
@@ -454,6 +457,15 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
     };
 
     if (isEventTarget) {
+        //todo: Рассмотреть возможность, следить за удалением элемента и закрывать итератор:
+        // function onElementRemoved(element, callback) {// [How can I check if an element exists in the visible DOM?](https://stackoverflow.com/questions/5629684/how-can-i-check-if-an-element-exists-in-the-visible-dom)
+        //   new MutationObserver(function(mutations) {
+        //     if(!document.body.contains(element)) {
+        //       callback();
+        //       this.disconnect();
+        //     }
+        //   }).observe(element.parentElement, {childList: true});
+        // }
         _eventTargetAddListener(emitter, event, _onEvent);
 
         if (stopEventName !== void 0 && stopEventName !== null) {
@@ -464,6 +476,9 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
         }
     }
     else {
+        // todo: Если это EventEmitterX, то передавать параметр option.{ onRemoved: _onStop } чтобы итератор
+        //  останавливался если из emitter был удалён его обработчик.
+        // todo: Если это EventEmitter, то подписываться на событие 'removeListener' и сравнивать с _onEvent.
         emitter.on(event as string | symbol, _onEvent);
 
         if (stopEventName !== void 0 && stopEventName !== null) {
@@ -625,6 +640,11 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
     }, _getAsyncIteratorPrototype());
 
     return iterator;
+}
+
+export namespace eventsAsyncIterator {
+    export type CompatibleEmitter = EventEmitter | EventEmitterEx | EventTarget | IMinimumCompatibleEmitter;
+    export type Options<T extends unknown[] = unknown[]> = EventsAsyncIterator_Options<T>;
 }
 
 // todo: implement addAbortSignal (https://nodejs.org/api/stream.html#streamaddabortsignalsignal-stream)
