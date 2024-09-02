@@ -57,7 +57,7 @@ import events, {
     kDestroyingEvent,
     ABORT_ERR,
 
-    once,
+    once, EventEmitterEx2,
 } from '../../modules/events';
 import ServerTiming from 'termi@ServerTiming';
 import { TIME } from '../../utils/time';
@@ -2454,6 +2454,62 @@ describe('events', function() {
             });
         });
     }) as EmptyFunction);
+
+    describe('EventEmitterEx 2', () => {
+        const ee = new EventEmitterEx2();
+        const enum TEST_EVENTS {
+            roomNew = 1 << 20,
+            roomJoin = 2 << 20,
+        }
+
+        it("method on() - emit default event", () => {
+            let counterEvents = 0;
+            let counterEvents_raw = 0;
+            const listenerEvents = () => { counterEvents++; };
+            const listenerEvents_raw = () => { counterEvents_raw++; };
+
+            ee.on2(TEST_EVENTS.roomJoin, listenerEvents);
+            ee.on2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
+
+            ee.emit2(TEST_EVENTS.roomJoin);
+
+            expect(counterEvents).toBe(1);
+            expect(counterEvents_raw).toBe(0);
+
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
+            //
+            ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents);
+            ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
+            //
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
+        });
+
+        it("method on() - emit raw event", () => {
+            let counterEvents = 0;
+            let counterEvents_raw = 0;
+            const listenerEvents = () => { counterEvents++; };
+            const listenerEvents_raw = () => { counterEvents_raw++; };
+
+            ee.on2(TEST_EVENTS.roomJoin, listenerEvents);
+            ee.on2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
+
+            ee.emit2(TEST_EVENTS.roomJoin, { isRaw: true });
+
+            expect(counterEvents).toBe(0);
+            expect(counterEvents_raw).toBe(1);
+
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
+            //
+            ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents);
+            ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
+            //
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
+        });
+    });
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
         class EventEmitterExSubClass extends EventEmitterEx {
