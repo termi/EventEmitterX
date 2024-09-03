@@ -2041,75 +2041,55 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return promise;
     }
 
-    static readonly errorMonitor = errorMonitor as typeof import("node:events").errorMonitor;
-    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("node:events").captureRejectionSymbol;
-    // domain is not supported
-    static readonly usingDomains = false;
-
-    static EventEmitter = EventEmitterEx;
-    static EventEmitterEx = EventEmitterEx;
-
-    /** alias for global AbortController */
-    static AbortController = AbortController;
-}
-
-export interface EventEmitterEx_2_EventMethodsOptions {
-    /** Сырое событие которое ещё не готово к использованию в GUI (почти такое же событие, но не для GUI) */
-    isRaw?: boolean;
-}
-
-// todo: класс является предложением для внесения корректировок в оригинальный EventEmitterEx,
-//  после одобрения нужно его удалить и в местах использования заменить оригиналом
-export class EventEmitterEx2<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
     on2<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
         listener: EMD<EventMap>[EventKey],
-        options?: EventEmitterEx_2_EventMethodsOptions,
+        options?: { isRaw?: boolean },
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx2._eventToEventRaw(_event)
+            ? EventEmitterEx._eventToEventRaw(_event)
             : _event
         ;
 
-        return super.on(event as EventKey, listener);
+        return this.on(event as EventKey, listener);
     }
 
     emit2<EventKey extends keyof EMD<EventMap>>(
         _event: EventKey,
-        options?: EventEmitterEx_2_EventMethodsOptions,
+        options?: { isRaw?: boolean },
         ...args: Parameters<EMD<EventMap>[EventKey]>
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx2._eventToEventRaw(_event)
+            ? EventEmitterEx._eventToEventRaw(_event)
             : _event
         ;
 
-        return super.emit(event as EventKey, ...args);
+        return this.emit(event as EventKey, ...args);
     }
 
     removeListener2<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
         listener: EMD<EventMap>[EventKey],
-        options?: EventEmitterEx_2_EventMethodsOptions,
+        options?: { isRaw?: boolean },
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx2._eventToEventRaw(_event)
+            ? EventEmitterEx._eventToEventRaw(_event)
             : _event
         ;
 
-        return super.removeListener(event as EventKey, listener);
+        return this.removeListener(event as EventKey, listener);
     }
 
-    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(
+    listenerCount2<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
-        options?: EventEmitterEx_2_EventMethodsOptions,
+        options?: { isRaw?: boolean },
     ): number {
         const event = options?.isRaw
-            ? EventEmitterEx2._eventToEventRaw(_event)
+            ? EventEmitterEx._eventToEventRaw(_event)
             : _event
         ;
 
-        return super.listenerCount(event as EventKey);
+        return this.listenerCount(event as EventKey);
     }
 
     private static _eventToEventRaw(event: EventName): EventName {
@@ -2128,9 +2108,17 @@ export class EventEmitterEx2<EventMap extends DefaultEventMap = DefaultEventMap>
             }
         }
     }
-    // todo: метод once2 так же определить
-    // todo: метод removeListener2 так же определить
-    // todo: метод emit2 так же определить
+
+    static readonly errorMonitor = errorMonitor as typeof import("node:events").errorMonitor;
+    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("node:events").captureRejectionSymbol;
+    // domain is not supported
+    static readonly usingDomains = false;
+
+    static EventEmitter = EventEmitterEx;
+    static EventEmitterEx = EventEmitterEx;
+
+    /** alias for global AbortController */
+    static AbortController = AbortController;
 }
 
 const tagEventEmitterEx = 'EventEmitterEx';
