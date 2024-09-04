@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./build/ts-output",
+    // https://www.typescriptlang.org/tsconfig/#allowSyntheticDefaultImports
+    // Решение ошибки `TS1259: Module '"@types/react/index"' can only be default-imported using the 'esModuleInterop' flag`.
+    // Используется совместно с `"esModuleInterop": true`
+    // Чтобы можно было писать
+    //  `import React from "react";`
+    //  вместо
+    //  `import * as React from "react";`
+    // todo: На данный момент [27.08.2024] не работает почему-то
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+  ]
+}
