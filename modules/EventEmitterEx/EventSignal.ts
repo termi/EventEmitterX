@@ -81,9 +81,9 @@ export class EventSignal<T, S=T, D=undefined> {
     public data: D = void 0;
 
     // For React
-    private _componentType?: EventSignal.NewOptions<T, S, D>["componentType"];
+    public readonly componentType?: EventSignal.NewOptions<T, S, D>["componentType"];
     // For React
-    private _reactFC?: EventSignal.NewOptions<T, S, D>["reactFC"] | false;
+    private _reactFC?: [ reactFC: EventSignal.NewOptions<T, S, D>["reactFC"] | false, preDefinedProps?: Object ];
 
     // Reserved for React
     declare readonly $$typeof: symbol;
@@ -244,10 +244,10 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (reactFC) {
-                this._reactFC = reactFC;
+                this._reactFC = [ reactFC ];
             }
             else if (componentType) {
-                this._componentType = componentType;
+                this.componentType = componentType;
             }
         }
     }
@@ -1042,7 +1042,7 @@ export class EventSignal<T, S=T, D=undefined> {
     setReactFC(reactFC?: EventSignal.NewOptions<T, S, D>["reactFC"] | false) {
         const prev = this._reactFC;
 
-        this._reactFC = reactFC;
+        this._reactFC = [ reactFC ];
 
         return prev;
     }
@@ -1185,18 +1185,32 @@ export class EventSignal<T, S=T, D=undefined> {
          * A wrapper component that renders a EventSignal's value directly as a Text node or JSX.
          */
         function EventSignalComponent({ eventSignal }: { eventSignal: EventSignal<any> }) {
-            const componentType = eventSignal._componentType;
-            const reactFC = Boolean(_React_createElement)
+            const { componentType } = eventSignal;
+            const reactFCDescriptor = Boolean(_React_createElement)
                 ? eventSignal._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType) : void 0)
                 : void 0
             ;
+            const reactFC = reactFCDescriptor?.[0];
             const has_reactFC = reactFC != null && reactFC !== false;
+            const preDefinedProps = has_reactFC ? reactFCDescriptor?.[1] : void 0;
 
             // todo: Разобраться, что делать для обработки ошибок, которые могут возникать внутри
             //  computation-функций. Тут в _useSyncExternalStore передаётся ссылка на `signal.get`.
             //  Это лишает нас возможности тут же по месту обрабатывать ошибки,
             //  которые будут при вызове `signal.get`. Надо подумать, как сделать лучше.
             if (_useSyncExternalStore) {
+                //todo: Как обрабатывать ошибки:
+                // 1. Сделать метод: EventSignal.getLast который будет возвращать _value без перевычисления (будет перевычесленно, только если это самое первое обращение к _value).
+                // 2. Тут в try/catch вызывать eventSignal.get, если он упал с ошибкой, то запоминать ошибку
+                // 3. В любом случае, вызывать _useSyncExternalStore(eventSignal.subscribe, eventSignal.getLast);
+                // 4. Если на 2м этапе была ошибка, то рендерить специальный компонент, который отвечает за отображение ошибок
+                //todo: Как обрабатывать async computation:
+                // 1. Метод getLast должен быть сделан
+                // 2. Если вызов eventSignal.get вернул Promise, значит это async computation
+                // 3. В любом случае, вызывать _useSyncExternalStore(eventSignal.subscribe, eventSignal.getLast);
+                // 4. Если это самый первый вызов async computation и в _value ещё ничего нет, то рендерить тут специальный компонент для отображения прогресса
+                // 5. Когда async computation завершиться и значение будет получено, то компонент сам перерендериться
+                //
                 // https://react.dev/reference/react/useSyncExternalStore
                 const signalValue = _useSyncExternalStore(eventSignal.subscribe, eventSignal.get);
 
@@ -1207,7 +1221,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         : reactFC
                     ;
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    const children = _React_createElement!(memorizedReactFC, { eventSignal, key, version });
+                    const children = _React_createElement!(memorizedReactFC, { key, eventSignal, version, componentType, ...preDefinedProps });
 
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                     return _React_createElement!(_ReactFragment, null, children);
@@ -1305,11 +1319,27 @@ export class EventSignal<T, S=T, D=undefined> {
         });
     }
 
-    static registerReactComponentForComponentType(
-        componentType: EventSignal.NewOptions<any, any, any>["componentType"],
-        reactFC: EventSignal.NewOptions<any, any, any>["reactFC"],
+    static registerReactComponentForComponentType<
+        T=unknown,
+        S=T,
+        D=unknown,
+        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D>["componentType"],
+        PROPS extends {
+            eventSignal: EventSignal<T, S, D>,
+            version?: number,
+            componentType?: CT,
+        } = {
+            eventSignal: EventSignal<T, S, D>,
+            version?: number,
+            componentType?: CT,
+            [key: string]: unknown,
+        },
+    >(
+        componentType: CT,
+        reactFC: (props: PROPS) => any,
+        preDefinedProps?: Omit<PROPS, 'componentType' | 'eventSignal' | 'version'>,
     ) {
-        return _setReactFunctionComponent(componentType, reactFC);
+        return _setReactFunctionComponent(componentType, reactFC, preDefinedProps);
     }
     /*
     // Optimized: Will update the text node directly
@@ -1387,7 +1417,7 @@ export namespace EventSignal {
 }
 
 const _reactFunctionComponentByComponentType_WeakMap = new WeakMap();
-const _reactFunctionComponentByComponentType_Map = new Map<number | string, (props: any) => any>();
+const _reactFunctionComponentByComponentType_Map = new Map<number | string, [ reactFC: (props: any) => any, preDefinedProps?: Object ]>();
 
 function _getReactFunctionComponent(componentType: EventSignal.NewOptions<any, any, any>["componentType"]) {
     const type = typeof componentType;
@@ -1403,7 +1433,11 @@ function _getReactFunctionComponent(componentType: EventSignal.NewOptions<any, a
     return _reactFunctionComponentByComponentType_Map.get(componentType as number | string) || null;
 }
 
-function _setReactFunctionComponent(componentType: EventSignal.NewOptions<any, any, any>["componentType"], reactFC?: (props: any) => any) {
+function _setReactFunctionComponent(
+    componentType: EventSignal.NewOptions<any, any, any>["componentType"],
+    reactFC?: (props: any) => any,
+    preDefinedProps?: Object,
+) {
     const type = typeof componentType;
 
     if (componentType === null || type === 'undefined') {
@@ -1417,7 +1451,7 @@ function _setReactFunctionComponent(componentType: EventSignal.NewOptions<any, a
             _reactFunctionComponentByComponentType_WeakMap.delete(componentType as Object);
         }
         else {
-            _reactFunctionComponentByComponentType_WeakMap.set(componentType as Object, reactFC);
+            _reactFunctionComponentByComponentType_WeakMap.set(componentType as Object, [ reactFC, preDefinedProps ]);
         }
 
         return prev || null;
@@ -1429,7 +1463,7 @@ function _setReactFunctionComponent(componentType: EventSignal.NewOptions<any, a
         _reactFunctionComponentByComponentType_Map.delete(componentType as number | string);
     }
     else {
-        _reactFunctionComponentByComponentType_Map.set(componentType as number | string, reactFC);
+        _reactFunctionComponentByComponentType_Map.set(componentType as number | string, [ reactFC, preDefinedProps ]);
     }
 
     return prev || null;
