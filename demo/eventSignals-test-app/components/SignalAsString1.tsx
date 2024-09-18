@@ -5,7 +5,7 @@ import { useEffect } from "react";
 
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-export default function SignalAsString1({ eventSignal }: { eventSignal: EventSignal<any> }) {
+export default function SignalAsString1({ eventSignal, textColor }: { eventSignal: EventSignal<any>, textColor: string }) {
     useEffect(() => {
         console.log('SignalAsString1 useEffect');
 
@@ -15,6 +15,6 @@ export default function SignalAsString1({ eventSignal }: { eventSignal: EventSig
     }, []);
 
     return (<span className="SignalAsString1">
-        <button style={{ color: 'green' }}>{eventSignal.get()}</button>
+        <button style={{ color: textColor }}>{eventSignal.get()}</button>
     </span>);
 }

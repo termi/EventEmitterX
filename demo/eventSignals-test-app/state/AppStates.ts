@@ -91,6 +91,80 @@ const $userFullNameObject = new EventSignal({
     componentType: userFullNameComponentType,
 });
 
+export type JsonPlaceholderUserDTO = {
+    id: number, // 1,
+    name: string, // "Leanne Graham",
+    username: string, // "Bret",
+    email: string, // "Sincere@april.biz",
+    address: {
+        street: string, // "Kulas Light",
+        suite: string, // "Apt. 556",
+        city: string, // "Gwenborough",
+        zipcode: string, // "92998-3874",
+        geo: {
+            lat: string, // "-37.3159",
+            lng: string, // "81.1496",
+        },
+    },
+    phone: string, // "1-770-736-8031 x56442",
+    website: string, // "hildegard.org",
+    company: {
+        name: string, // "Romaguera-Crona",
+        catchPhrase: string, // "Multi-layered client-server neural-net",
+        bs: string, // "harness real-time e-markets",
+    },
+};
+
+const jsonPlaceholderUserComponentType = 'jsonPlaceholderUserComponentType';
+
+const $jsonPlaceholderUser1 = new EventSignal<Promise<number>, number, {
+    currentUserId?: number,
+    userDTO?: JsonPlaceholderUserDTO,
+    abortController?: AbortController,
+}>($counter1.get(), async (_, sourceUserId) => {
+    const newUserid = sourceUserId ?? $counter1.get();
+
+    $jsonPlaceholderUser1.data.currentUserId = newUserid;
+    $jsonPlaceholderUser1.data.abortController?.abort(`request new userId=${newUserid}`);
+
+    const abortController = new AbortController();
+
+    $jsonPlaceholderUser1.data.abortController = abortController;
+
+    await new Promise((resolve) => {
+        queueMicrotask(() => {
+            setTimeout(resolve, 500);
+        });
+    });
+
+    if (abortController.signal.aborted) {
+        return newUserid;
+    }
+
+    const response = await fetch(`https://jsonplaceholder.typicode.com/users?id=${newUserid}`, {
+        signal: abortController.signal,
+    });
+    const usersDTO = await response.json();
+    const newUserDTO = usersDTO[0];
+
+    if (!newUserDTO) {
+        throw new Error(`User not found with userId=${newUserid}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+    if (newUserid === 9) {
+        newUserDTO["invalidProp"]["invalidProp"] = 'this will cause error';
+    }
+
+    // eslint-disable-next-line require-atomic-updates
+    $jsonPlaceholderUser1.data.userDTO = newUserDTO;
+
+    return newUserid;
+}, {
+    componentType: jsonPlaceholderUserComponentType,
+    data: {},
+});
+
 export const mainState = {
     $counter1,
     $computed1,
@@ -108,6 +182,10 @@ export const mainState = {
 
     userFullNameComponentType,
     stringCounterComponentType,
+
+    $jsonPlaceholderUser1,
+    jsonPlaceholderUserComponentType,
 };
 
 globalThis.__mainState = mainState;
+globalThis.EventSignal = EventSignal;

@@ -1,14 +1,15 @@
 'use strict';
 
 import * as React from "react";
+
 import { mainState } from "../state/AppStates";
 
 export default function Counter1() {
     console.log('render Counter1');
 
-    return (<>
-        <h1>Counter1</h1>
-        <h2>Value is: {mainState.$computed1}</h2>
+    return (<div style={{ width: '180px' }}>
+        <h2>Counter1</h2>
+        <h3>Value is: {mainState.$computed1}</h3>
 
         <div>
             <span>Change Counter1:</span>
@@ -21,5 +22,5 @@ export default function Counter1() {
             |
             <button onClick={() => mainState.decrementCounter2()}>-</button>
         </div>
-    </>);
+    </div>);
 }

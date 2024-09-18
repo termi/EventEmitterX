@@ -22,7 +22,7 @@ const $mappedSignal = $userFullNameObject.map(value => value.fullName.replace(/(
 }));
 
 export default function PageTwo() {
-    console.log('render PageTwo');
+    console.log('render PageTwo', $mappedSignal);
 
     const { 0: counter, 1: setCounter } = useState(0);
 
@@ -33,7 +33,7 @@ export default function PageTwo() {
         <form style={{ marginTop: '10px' }}>
             <fieldset style={{
                 display: 'grid',
-                gridTemplateColumns: 'max-content max-content',
+                gridTemplateColumns: 'max-content',
                 gridGap: '5px',
             }}>
                 {$userFirstName}
