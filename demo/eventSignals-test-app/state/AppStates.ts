@@ -121,8 +121,12 @@ const $jsonPlaceholderUser1 = new EventSignal<Promise<number>, number, {
     currentUserId?: number,
     userDTO?: JsonPlaceholderUserDTO,
     abortController?: AbortController,
-}>($counter1.get(), async (_, sourceUserId) => {
-    const newUserid = sourceUserId ?? $counter1.get();
+}>($counter1.get(), async (prevUserId, sourceUserId) => {
+    const _newUserid = $counter1.get();
+    const newUserid = sourceUserId !== void 0 && _newUserid === prevUserId
+        ? sourceUserId
+        : _newUserid
+    ;
 
     $jsonPlaceholderUser1.data.currentUserId = newUserid;
     $jsonPlaceholderUser1.data.abortController?.abort(`request new userId=${newUserid}`);
