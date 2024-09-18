@@ -517,11 +517,13 @@ describe('EventSignal', () => {
                 void prevValue;
                 void sourceValue;
 
+                const sValue = $signal.get();
+
                 if (typeof sourceValue === 'number' && sourceValue % 2 === 0) {
-                    return `was even, new value is ${$signal.get()}, sourceValue is ${sourceValue}`;
+                    return `was even, new value is ${sValue}, sourceValue is ${sourceValue}`;
                 }
 
-                return String($signal.get());
+                return String(sValue);
             }, {
                 description: 'signal from another emitter with deps',
                 sourceEmitter: ee,
@@ -655,7 +657,7 @@ describe('EventSignal', () => {
             expect(user2).toBeDefined();
 
             const $currentUser = new EventSignal<UserOrNull, number>(Promise.resolve(null), async (_, userId) => {
-                expect(_?.then).toBeUndefined();
+                expect((_ as unknown as Promise<any>)?.then).toBeUndefined();
 
                 return await usersStore.getUser(userId);
             });
@@ -706,14 +708,14 @@ describe('EventSignal', () => {
 
         it('async computation2', async function() {
             const usersStore = new UsersStore(new EventEmitterEx(), defaultUsers);
-            const $currentUser = new EventSignal<UserOrNull, number>(null, (_, userId) => {
-                if ($currentUser.computationsCount < 2) {
-                    if (_ !== null) {
+            const $currentUser = new EventSignal<UserOrNull, number>(null, (prevValue, userId) => {
+                if ($currentUser.computationsCount < 3) {
+                    if (prevValue !== null) {
                         throw new Error('On first computation in this case, prev value should be null');
                     }
                 }
                 else {
-                    assertIsDefined(_);
+                    assertIsDefined(prevValue);
                 }
 
                 return usersStore.getUser(userId);
@@ -1835,12 +1837,12 @@ class UsersStore {
 
     constructor(public emitter: EventEmitterEx, users?: User[]) {
         emitter.addListener('user-add', (user: User) => {
-            const { id } = user;
+            const { id: userId } = user;
 
-            if (!this.getUserSync(id)) {
+            if (!this.getUserSync(userId)) {
                 this.users.push(user);
 
-                emitter.emit(`${id}---username-changes`, id);
+                emitter.emit(`${userId}---username-changes`, userId);
             }
         });
         emitter.addListener('user-update', (userDTO: UserDTO) => {
