@@ -1898,8 +1898,8 @@ class UsersStore {
     }
 
     getUserNameSignal(userId: number, finaleSourceValue?: number) {
-        return this.userNameSignalSignals[userId] ??= new EventSignal('', (prevValue, sourceValue, data) => {
-            data.computationCounter++;
+        return this.userNameSignalSignals[userId] ??= new EventSignal('', (prevValue, sourceValue, eventSignal) => {
+            eventSignal.data.computationCounter++;
 
             if ((sourceValue ?? userId) !== userId) {
                 // setting finaleValue != userId will trigger to call computation with sourceValue == finaleValue
