@@ -20,5 +20,8 @@ export default function PageOne() {
         </div>
         <br />
         {mainState.$jsonPlaceholderUser1}
+        <br />
+        {/* На данный момент внопка снизу не работает как надо из-за фундаментальной стратегии применённой к EventSignal: computation не знает, кто инициализоровал изменения: set() или одна из зависимостей. */}
+        {/*<button onClick={() => mainState.$jsonPlaceholderUser1.set(currentUserId => ++currentUserId)}>get next user</button>*/}
     </>);
 }

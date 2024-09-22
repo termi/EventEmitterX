@@ -121,19 +121,25 @@ const $jsonPlaceholderUser1 = new EventSignal<Promise<number>, number, {
     currentUserId?: number,
     userDTO?: JsonPlaceholderUserDTO,
     abortController?: AbortController,
-}>($counter1.get(), async (prevUserId, sourceUserId) => {
+}>($counter1.get(), async (prevUserId, sourceUserId, eventSignal) => {
     const _newUserid = $counter1.get();
+    // todo: Чтобы отдавать приоритет sourceUserId, а не $counter1.get(), нужно добавить EventSignal.flags в котором будет подниматься флаг .lastChangesFromNewSourceValue
     const newUserid = sourceUserId !== void 0 && _newUserid === prevUserId
         ? sourceUserId
         : _newUserid
     ;
 
-    $jsonPlaceholderUser1.data.currentUserId = newUserid;
-    $jsonPlaceholderUser1.data.abortController?.abort(`request new userId=${newUserid}`);
+    //todo: Это приводит к ошибке, можно тестировать вместе с ErrorBoundary, когда он будет реализован
+    // if (newUserid === prevUserId) {
+    //     return;
+    // }
+
+    eventSignal.data.currentUserId = newUserid;
+    eventSignal.data.abortController?.abort(`request new userId=${newUserid}`);
 
     const abortController = new AbortController();
 
-    $jsonPlaceholderUser1.data.abortController = abortController;
+    eventSignal.data.abortController = abortController;
 
     await new Promise((resolve) => {
         queueMicrotask(() => {
@@ -161,7 +167,7 @@ const $jsonPlaceholderUser1 = new EventSignal<Promise<number>, number, {
     }
 
     // eslint-disable-next-line require-atomic-updates
-    $jsonPlaceholderUser1.data.userDTO = newUserDTO;
+    eventSignal.data.userDTO = newUserDTO;
 
     return newUserid;
 }, {

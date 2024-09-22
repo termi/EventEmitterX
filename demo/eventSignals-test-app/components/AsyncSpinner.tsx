@@ -21,6 +21,13 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     animation: AsyncSpinnerLoader_rotation 1s linear infinite;
 }
 
+.AsyncSpinnerLoader__text {
+    max-width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 @keyframes AsyncSpinnerLoader_rotation {
     0% {
         transform: rotate(0deg);
@@ -39,9 +46,9 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 }
 </style>`);
 
-export default function AsyncSpinner({ eventSignal }: { eventSignal: EventSignal<number, unknown, { currentUserId?: number }> }) {
+export default function AsyncSpinner({ eventSignal, hint }: { eventSignal?: EventSignal<unknown, unknown, unknown | { currentUserId?: number }>, hint?: string }) {
     return (<span className="AsyncSpinnerLoader">
         <span className="AsyncSpinnerLoader__spinner"></span>
-        <span className="AsyncSpinnerLoader__text">{eventSignal.data?.currentUserId}</span>
+        <span className="AsyncSpinnerLoader__text">{hint ?? eventSignal?.data?.["currentUserId"]}</span>
     </span>);
 }

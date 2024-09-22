@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-magic-numbers */
 'use strict';
 
 // https://jsonplaceholder.typicode.com/todos/3
@@ -14,6 +15,7 @@ import { mainState } from "./state/AppStates";
 
 import PageOne from "./pages/PageOne";
 import PageTwo from "./pages/PageTwo";
+import PageThree from "./pages/PageThree";
 import Page404 from "./pages/Page404";
 import UserCard from "./components/UserCard";
 import SignalAsString1 from "./components/SignalAsString1";
@@ -49,18 +51,26 @@ EventSignal.registerReactComponentForComponentType(mainState.stringCounterCompon
 }
 
 {// Демонстрация работы асинхронных сигналов
-    EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, {
-        'default': JsonPlaceholderUser,
-        'pending': AsyncSpinner,
-        'error': ErrorView,
-    });
+    EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, JsonPlaceholderUser);
+    EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, AsyncSpinner, 'pending');
+    EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, ErrorView, 'error');
 }
 
 mainState.$counter2.addListener(newValue => {
     if (newValue < 0) {
         EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, void 0);
     }
-    // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+    else if (newValue > 10) {
+        if (newValue % 5 === 0) {
+            const textColor = randomColor();
+            const backgroundColor = randomColor();
+
+            EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString2, { textColor, backgroundColor });
+        }
+        else {
+            EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString2);
+        }
+    }
     else if (newValue > 5) {
         EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString2, { textColor: 'red' });
     }
@@ -72,9 +82,12 @@ mainState.$counter2.addListener(newValue => {
 initNavigation({
     root: createRoot(document.querySelector('#main')),
     routes: [
-        { path: '/one', action() { return <><PageOne /></>; } },
-        { path: '/two', action() { return <><PageTwo /></>; } },
-        { path: '(.*)', action() { return <><Page404 /></>; } },
+        { path: '/one',   action() { return <><PageOne /></>; } },
+        { path: '/two',   action() { return <><PageTwo /></>; } },
+        { path: '/three', action() { return <><PageThree /></>; } },
+        { path: '(.*)',   action() { return <><Page404 /></>; } },
     ],
     page404: Page404,
 });
+
+const randomColor = () => `#${Math.floor(Math.random() * 16_777_215).toString(16)}`;
