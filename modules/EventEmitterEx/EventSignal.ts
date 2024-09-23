@@ -1661,10 +1661,12 @@ const _unAwaitNextAnimationFrame = (func: () => void) => {
 };
 
 const _reactFunctionComponentByComponentType_WeakMap = new WeakMap();
-const _reactFunctionComponentByComponentType_Map = new Map<number | string, [
-    reactFC: EventSignal.ReactFC<any, any, any> | { [status: string]: EventSignal.ReactFC<any, any, any> },
-    preDefinedProps?: Object,
-]>();
+const _reactFunctionComponentByComponentType_Map = new Map<number | string, {
+    [status: string]: [
+        reactFC: EventSignal.ReactFC<any, any, any>,
+        preDefinedProps?: Object,
+    ],
+}>();
 
 function _getReactFunctionComponent(
     componentType: EventSignal.NewOptions<any, any, any>["componentType"],
@@ -1679,25 +1681,13 @@ function _getReactFunctionComponent(
         return null;
     }
 
-    let reactFNOrObj: ReturnType<typeof _reactFunctionComponentByComponentType_Map.get> | null;
+    const reactFCs: ReturnType<typeof _reactFunctionComponentByComponentType_Map.get> | null = (
+        (type === 'object' || (type === 'symbol' && _isUniqueSymbol(componentType as symbol)))
+            ? _reactFunctionComponentByComponentType_WeakMap.get(componentType as Object)
+            : _reactFunctionComponentByComponentType_Map.get(componentType as number | string)
+    ) || null;
 
-    if (type === 'object' || type === 'symbol') {
-        reactFNOrObj = _reactFunctionComponentByComponentType_WeakMap.get(componentType as Object) || null;
-    }
-    else {
-        reactFNOrObj = _reactFunctionComponentByComponentType_Map.get(componentType as number | string) || null;
-    }
-
-    if (reactFNOrObj && typeof reactFNOrObj[0] === 'object' && !('$$typeof' in reactFNOrObj[0])) {
-        const reactFN = reactFNOrObj[0][status ?? 'default'];
-
-        return reactFN ? [ reactFN, reactFNOrObj[1] ] : null;
-    }
-
-    return reactFNOrObj as [
-        reactFC: EventSignal.ReactFC<any, any, any>,
-        preDefinedProps?: Object,
-    ] || null;
+    return reactFCs ? ((status != null ? reactFCs[status] : null) || reactFCs['default'] || null) : null;
 }
 
 function _isUniqueSymbol(sym: symbol) {
@@ -1712,8 +1702,6 @@ function _isUniqueSymbol(sym: symbol) {
     return typeof Symbol.keyFor.call(Symbol, sym) === 'undefined';
 }
 
-const kReactFCsByStatus = Symbol('kReactFCsByStatus');
-
 function _setReactFunctionComponent(
     componentType: EventSignal.NewOptions<any, any, any>["componentType"],
     reactFC: EventSignal.ReactFC<any, any, any, any> | null | undefined,
@@ -1726,54 +1714,29 @@ function _setReactFunctionComponent(
         return null;
     }
 
+    const _status = status ?? 'default';
     const map = (type === 'object' || (type === 'symbol' && _isUniqueSymbol(componentType as symbol)))
         ? (_reactFunctionComponentByComponentType_WeakMap as unknown as typeof _reactFunctionComponentByComponentType_Map)
         : _reactFunctionComponentByComponentType_Map
     ;
-    const prev = map.get(componentType as string) || null;
-    const prev_reactFC = prev?.[0];
+    const prev_reactFCs = map.get(componentType as string) || null;
+    const prev_reactFCDescriptor = prev_reactFCs?.[_status];
 
-    if (status !== void 0) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error ignore `TS2538: Type 'unique symbol' cannot be used as an index type.`
-        if (typeof prev_reactFC === 'object' && !!prev_reactFC && prev_reactFC[kReactFCsByStatus]) {
-            if (reactFC == null) {
-                delete prev_reactFC[status];
-            }
-            else {
-                prev_reactFC[status] = reactFC;
-            }
-        }
-        else {
-            if (reactFC == null) {
-                // nothing to do
-            }
-            else {
-                const newValue: { [status: string]: EventSignal.ReactFC<any, any, any, any> } = (!prev_reactFC || status === 'default')
-                    ? { [status]: reactFC }
-                    : { 'default': prev_reactFC as EventSignal.ReactFC<any, any, any, any>, [status]: reactFC }
-                ;
-
-                Object.setPrototypeOf(newValue, null);
-
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error ignore `TS2322: Type 'boolean' is not assignable to type 'ReactFC '.`
-                newValue[kReactFCsByStatus] = true;
-
-                map.set(componentType as string, [ newValue, preDefinedProps ]);
-            }
-        }
-    }
-    else {
-        if (reactFC == null) {
+    if (reactFC == null) {
+        if (prev_reactFCs !== null) {
             map.delete(componentType as string);
         }
-        else {
-            map.set(componentType as string, [ reactFC, preDefinedProps ]);
-        }
+    }
+    else if (prev_reactFCs === null) {
+        map.set(componentType as string, Object.setPrototypeOf({
+            [_status]: [ reactFC, preDefinedProps ],
+        }, null));
+    }
+    else {
+        prev_reactFCs[_status] = [ reactFC, preDefinedProps ];
     }
 
-    return prev;
+    return prev_reactFCDescriptor || null;
 }
 
 const kTargetListener = Symbol('kTargetListener');
