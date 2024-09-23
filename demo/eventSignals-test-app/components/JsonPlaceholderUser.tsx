@@ -17,19 +17,27 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 }
 </style>`);
 
-export default function JsonPlaceholderUser({ eventSignal, componentType, version }: {
+export default function JsonPlaceholderUser({ eventSignal, componentType, version, textColor, backgroundColor }: {
     eventSignal: EventSignal<number, any, {
         userDTO?: JsonPlaceholderUserDTO,
         abortController?: AbortController,
     }>,
     componentType: string,
     version: number,
+    textColor: string,
+    backgroundColor: string,
 }) {
     const { userDTO } = eventSignal.data;
 
-    return (<span className="JsonPlaceholderUser" data-user-id={eventSignal.get()} data-componenttype={componentType} data-version={version}>
+    return (<div
+        className="JsonPlaceholderUser"
+        data-user-id={eventSignal.get()}
+        data-componenttype={componentType}
+        data-version={version}
+        style={{ color: textColor, backgroundColor }}
+    >
         {ObjectToTable({ obj: userDTO })}
-    </span>);
+    </div>);
 }
 
 function ObjectToTable({ obj }: { obj: Object }) {

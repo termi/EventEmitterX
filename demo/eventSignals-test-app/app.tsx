@@ -22,12 +22,14 @@ import SignalAsString1 from "./components/SignalAsString1";
 import SignalAsString2 from "./components/SignalAsString2";
 import JsonPlaceholderUser from "./components/JsonPlaceholderUser";
 import AsyncSpinner from "./components/AsyncSpinner";
+import AsyncSpinner2 from "./components/AsyncSpinner2";
 import ErrorView from "./components/ErrorView";
 
 globalThis.__React = React;
 
 // Инициализируем EventSignal для работы с React.
 EventSignal.initReact({ useSyncExternalStore: React.useSyncExternalStore, createElement: React.createElement, memo: React.memo });
+
 // Регистрируем компонент UserCard для отображения EventSignal с componentType == mainState.userFullNameComponentType.
 // Внимание: тут React.memo только для тестирования и демонстрации. ОН НЕ НУЖЕН в вашем коде.
 EventSignal.registerReactComponentForComponentType(mainState.userFullNameComponentType, React.memo(UserCard));
@@ -56,6 +58,13 @@ EventSignal.registerReactComponentForComponentType(mainState.stringCounterCompon
     EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, ErrorView, 'error');
 }
 
+mainState.$counter1.addListener(newValue => {
+    (newValue > 9)
+        ? EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, AsyncSpinner2, 'pending')
+        : EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, AsyncSpinner, 'pending')
+    ;
+});
+
 mainState.$counter2.addListener(newValue => {
     if (newValue < 0) {
         EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, void 0);
@@ -66,9 +75,11 @@ mainState.$counter2.addListener(newValue => {
             const backgroundColor = randomColor();
 
             EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString2, { textColor, backgroundColor });
+            EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, JsonPlaceholderUser, 'default', { textColor, backgroundColor });
         }
         else {
             EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString2);
+            EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, JsonPlaceholderUser);
         }
     }
     else if (newValue > 5) {
