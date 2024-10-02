@@ -11,7 +11,13 @@
     //  `import * as React from "react";`
     // todo: На данный момент [27.08.2024] не работает почему-то
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "preserveConstEnums": false,
+    "isolatedModules": false,
+    "target": "ES2022",
+    "module": "ESNext"
   },
   "include": [
     "./src/**/*.ts",
