@@ -14,6 +14,7 @@
 import type { EventEmitter } from "node:events";
 import { isTest } from 'termi@runEnv';
 import { EventEmitterEx } from "../events";
+import { arrayContentStringify, stringifyWithCircularHandle } from "./utils";
 
 // todo:
 //  1. Использовать версию EventEmitterX с WeakMap в качестве _events, чтобы не "держать" сигналы от удаления GC.
@@ -126,8 +127,8 @@ export class EventSignal<T, S=T, D=undefined> {
     declare readonly _source?: null;
     // Reserved for React
     declare readonly _owner?: null;
-    // Reserved for React
-    declare readonly component?: null;
+    // // Reserved for React
+    // declare readonly component?: null;
 
     //todo: Возможности, которые можно добавить:
     // 1. В опциях конструктора добавить свойство actions - это объект с методами, которые изменяют значение EventSignal.
@@ -149,8 +150,9 @@ export class EventSignal<T, S=T, D=undefined> {
     // constructor(initialValue: Awaited<T>, asyncComputation: EventSignal.AsyncComputationWithSource<T, S, D>);
     constructor(initialValue: Awaited<T> | T, options: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>);
     constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource2<T, S, D>, options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D>);
     constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>, options: EventSignal.NewOptionsWithSource<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>, options: EventSignal.NewOptions<T, S, D>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>, options: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithInitialSourceValue<T, S, D>);
     constructor(
         initialValue: Awaited<T>,
         computationOrOptions?:// eslint-disable-next-line callforce/sort-type-constituents
@@ -190,6 +192,7 @@ export class EventSignal<T, S=T, D=undefined> {
 
         this.hasComputation = typeof _computation === 'function';
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
+        this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D>)?.initialSourceValue ?? void 0;
 
         // noinspection JSUnusedAssignment
         initialValue = void 0 as Awaited<T>;
@@ -269,6 +272,13 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         this.key = this.id.toString(36);
+
+        Object.defineProperty(this.component, 'name', {
+            value: `EventSignal.component#${this.key}${description ? `(${description})` : ''}`,
+            configurable: true,
+            writable: false,
+            enumerable: true,
+        });
     }
 
     destructor() {
@@ -283,13 +293,14 @@ export class EventSignal<T, S=T, D=undefined> {
             _sourceEmitterRef,
         } = this;
         const has_finaleValue = _finaleValue !== void 0;
+        const has_finaleSourceValue = _finaleSourceValue !== void 0;
 
         this.isDestroyed = true;
 
         //todo: Сейчас не работает
         // EventSignal._setComponentOnDestroy(this);
 
-        if (has_finaleValue || _finaleSourceValue !== void 0) {
+        if (has_finaleValue || has_finaleSourceValue) {
             this._setSourceValue((has_finaleValue ? _finaleValue : _finaleSourceValue) as unknown as S, true);
 
             const maybePromise = this._calculateValue(has_finaleValue);
@@ -305,6 +316,9 @@ export class EventSignal<T, S=T, D=undefined> {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore readonly attribute
             this._finaleValue = void 0;
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore ignore readonly attribute
+            this._finaleSourceValue = void 0;
         }
 
         /**
@@ -328,8 +342,12 @@ export class EventSignal<T, S=T, D=undefined> {
             _initialComputations.length = 0;
         }
 
+        // If has finaleSourceValue do not cleanup this._sourceValue due .getSourceValue() method
+        if (!has_finaleSourceValue) {
+            this._sourceValue = void 0;
+        }
+
         this._hasSourceEmitter = false;
-        this._sourceValue = void 0;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore readonly attribute
         this._sourceEmitterRef = void 0;
@@ -1114,11 +1132,13 @@ export class EventSignal<T, S=T, D=undefined> {
                 _listenerWithAnimFrameDebounce();
             };
 
-            _componentsEmitter.on(this.componentType as string, _listenerComponentTypeUpdate);
+            if (this.componentType) {
+                _componentsEmitter.on(this.componentType as string, _listenerComponentTypeUpdate);
+            }
         }
 
         return () => {
-            if (_listenerComponentTypeUpdate) {
+            if (_listenerComponentTypeUpdate && this.componentType) {
                 _componentsEmitter.removeListener(this.componentType as string, _listenerComponentTypeUpdate);
             }
 
@@ -1199,27 +1219,21 @@ export class EventSignal<T, S=T, D=undefined> {
         return prev;
     }
 
-    /* todo: Пока не работает как задумано, потому что контент в children рендериться независимо и перед данным компонентом
-    component = (props: Record<string, any> & { children?: unknown }, context?: Object) => {
+    component = (props: Record<string, any> & {
+        children?: unknown,
+        sFC?: EventSignal.ReactFC<T, S, D> | false,
+        // sComponents?: Map<ComponentType, EventSignal.ReactFC<any, any, any>>)
+    }, context?: Object) => {
         const { type } = this;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
         const _type: EventSignal<T, S, D>["type"] = 'type' in type ? type.type : type;
-
-        // return {
-        //     $$typeof: Symbol.for("react.element"),
-        //     type: _type,
-        //     props: { eventSignal: this, ...props },
-        //     ref: null,
-        //     key: this.key,
-        // };
 
         return _type({
             eventSignal: this,
             ...props,
         }, context);
     };
-    */
 
     static createSignal<T>(initialValue: T): EventSignal<T, T>;
     static createSignal<T, S, D>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D>, options?: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>): EventSignal<T, S, D>;
@@ -1325,9 +1339,7 @@ export class EventSignal<T, S=T, D=undefined> {
         */
         const memorizedComponents = new WeakMap<Function, Function>();
         const memorizedComponents_emplaceHandler = Object.setPrototypeOf({
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore
-            insert(key) {
+            insert(key: Function) {
                 return _React_memo ? _React_memo(key) : key;
             },
         }, null);
@@ -1341,7 +1353,16 @@ export class EventSignal<T, S=T, D=undefined> {
          *
          * A wrapper component that renders a EventSignal's value directly as a Text node or JSX.
          */
-        function EventSignalComponent({ eventSignal, children, ...otherProps }: { eventSignal: EventSignal<any>, children?: Object }) {
+        function EventSignalComponent({
+            eventSignal,
+            children,
+            sFC,
+            ...otherProps
+        }: {
+            eventSignal: EventSignal<any>,
+            children?: Object,
+            sFC?: EventSignal.ReactFC<any, any, any> | false,
+        }) {
             /**
              * Детектируем рекурсивный вызов EventSignalComponent(), чтобы избежать ситуации, когда внутри
              *  зарегистированного React-компонента в JSX возвращается сам EventSignal и мы опять вызываем EventSignalComponent(),
@@ -1354,10 +1375,10 @@ export class EventSignal<T, S=T, D=undefined> {
             // (можно сделать для этого отдельный метод, который будет вызывать computation только если оно ещё ни разу не вызывалось).
             const signalValue = eventSignal.getSafe();
             const { componentType } = eventSignal;
-            const reactFCDescriptor = Boolean(_React_createElement)
+            const reactFCDescriptor = sFC !== void 0 ? [ sFC ] : (Boolean(_React_createElement)
                 ? eventSignal._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
                 : void 0
-            ;
+            );
             const reactFC = reactFCDescriptor?.[0];
             const has_reactFC = reactFC != null && reactFC !== false;
             const preDefinedProps = has_reactFC ? reactFCDescriptor?.[1] as Record<any, any> : void 0;
@@ -1417,7 +1438,15 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (typeof signalValue === 'object' && signalValue) {
-                return JSON.stringify(signalValue);
+                if (Array.isArray(signalValue)) {
+                    return arrayContentStringify(signalValue, _isReactComponentObject);
+                }
+
+                if (_isReactComponentObject(signalValue)) {
+                    return signalValue;
+                }
+
+                return stringifyWithCircularHandle(signalValue);
             }
 
             return signalValue;
@@ -1439,6 +1468,12 @@ export class EventSignal<T, S=T, D=undefined> {
                 configurable: true,
                 get() {
                     return { eventSignal: this };
+                },
+            },
+            displayName: {
+                configurable: true,
+                get() {
+                    return String(Math.random());
                 },
             },
             ref: { configurable: true, value: null },
@@ -1533,6 +1568,10 @@ export namespace EventSignal {
         ? (prevValue: TT, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | void)
         : (prevValue: T, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | void)
     ;
+    export type ComputationWithSource2<T, S, D> = T extends Promise<infer TT>
+        ? (prevValue: TT, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | void)
+        : (prevValue: T, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | void)
+    ;
 
     export type ReactFC<T, S, D, PROPS={}> = (props: {
         eventSignal: EventSignal<T, S, D>,
@@ -1567,6 +1606,9 @@ export namespace EventSignal {
         // }
         // // comes to signal._.increment and signal._.decrement, signal._.setFromDOMEvent
     };
+    export interface NewOptionsWithInitialSourceValue<T, S, D> extends NewOptions<T, S, D> {
+        initialSourceValue: S;
+    }
     export type NewOptionsWithSource<T, S, D> = NewOptions<T, S, D> & {
         sourceEmitter: EventEmitter | EventEmitterEx | EventTarget | undefined,
         // todo: добавить sourceMapAndFilter, который может быть использован вместо пары sourceMap/sourceFilter
@@ -1599,6 +1641,14 @@ type _PreDefinedProps<PROPS=any> = Omit<Partial<PROPS>, 'componentType' | 'event
 const _componentsEmitter = new EventEmitterEx({
     listenerOncePerEventType: true,
 });
+
+function _isReactComponentObject(object: { $$typeof?: unknown, type?: unknown, [key: string]: unknown }) {
+    return !!object
+        && typeof object === 'object'
+        && object.$$typeof !== void 0
+        && object.type !== void 0
+    ;
+}
 
 function _shallowEqualObjects(obj1: Object | null | undefined, obj2: Object | null | undefined) {
     if (obj1 === obj2

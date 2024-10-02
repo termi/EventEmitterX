@@ -895,7 +895,6 @@ describe('EventSignal', () => {
                     description: '$fullName',
                     // subscribe to deps
                     deps: [ $firstName, $secondName ],
-                    data: 0,
                 });
                 const names = [
                     { firstName: 'Jon', secondName: 'Dow' },
@@ -916,7 +915,7 @@ describe('EventSignal', () => {
                     $secondName.set(secondName);
                 }
 
-                // values SHOULD BE empty error due listeners is calling in next microtask
+                // values SHOULD BE empty array due listeners is calling in next microtask
                 expect(values).toEqual([]);
 
                 // await next microtask
@@ -946,7 +945,6 @@ describe('EventSignal', () => {
                     description: '$fullName',
                     // subscribe to deps
                     deps: [ $firstName, $secondName ],
-                    data: 0,
                 });
                 const names = [
                     { firstName: 'Jon', secondName: 'Dow' },
