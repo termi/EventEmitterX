@@ -11,7 +11,9 @@ export default function ErrorView({ eventSignal, children }: { eventSignal: Even
         return null;
     }
 
-    return (<span className="ErrorView" style={{ color: 'red' }}>
+    const hint = (lastError instanceof Error) ? lastError.stack : void 0;
+
+    return (<span className="ErrorView" style={{ color: 'red' }} title={hint}>
         <span className="ErrorView__error">⚠️{String(lastError["message"] || lastError)}</span>
         {children ? (<span className="ErrorView__children">️{children}</span>) : null}
     </span>);

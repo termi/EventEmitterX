@@ -16,6 +16,7 @@ import { mainState } from "./state/AppStates";
 import PageOne from "./pages/PageOne";
 import PageTwo from "./pages/PageTwo";
 import PageThree from "./pages/PageThree";
+import PageFour from "./pages/PageFour";
 import Page404 from "./pages/Page404";
 import UserCard from "./components/UserCard";
 import SignalAsString1 from "./components/SignalAsString1";
@@ -96,6 +97,7 @@ initNavigation({
         { path: '/one',   action() { return <><PageOne /></>; } },
         { path: '/two',   action() { return <><PageTwo /></>; } },
         { path: '/three', action() { return <><PageThree /></>; } },
+        { path: '/four',  action() { return <><PageFour /></>; } },
         { path: '(.*)',   action() { return <><Page404 /></>; } },
     ],
     page404: Page404,

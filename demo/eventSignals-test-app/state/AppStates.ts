@@ -117,63 +117,82 @@ export type JsonPlaceholderUserDTO = {
 
 const jsonPlaceholderUserComponentType = 'jsonPlaceholderUserComponentType';
 
-const $jsonPlaceholderUser1 = new EventSignal<Promise<number>, number, {
-    currentUserId?: number,
-    userDTO?: JsonPlaceholderUserDTO,
-    abortController?: AbortController,
-}>($counter1.get(), async (prevUserId, sourceUserId, eventSignal) => {
-    const _newUserid = $counter1.get();
-    // todo: Чтобы отдавать приоритет sourceUserId, а не $counter1.get(), нужно добавить EventSignal.flags в котором будет подниматься флаг .lastChangesFromNewSourceValue
-    const newUserid = sourceUserId !== void 0 && _newUserid === prevUserId
-        ? sourceUserId
-        : _newUserid
-    ;
+const _placeholderUserEventSignalCache: Record<number, ReturnType<typeof _makePlaceholderUserEventSignal>> = Object.create(null);
 
-    //todo: Это приводит к ошибке, можно тестировать вместе с ErrorBoundary, когда он будет реализован
-    // if (newUserid === prevUserId) {
-    //     return;
-    // }
+export function clearPlaceholderUserEventSignalCache() {
+    for (const key in _placeholderUserEventSignalCache) {
+        delete _placeholderUserEventSignalCache[key];
+    }
+}
 
-    eventSignal.data.currentUserId = newUserid;
-    eventSignal.data.abortController?.abort(`request new userId=${newUserid}`);
+export function makePlaceholderUserEventSignal(id: number, getNewValue?: () => number) {
+    return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(id, getNewValue);
+}
 
-    const abortController = new AbortController();
+function _makePlaceholderUserEventSignal(id: number, getNewValue?: () => number) {
+    return new EventSignal<Promise<number>, number, {
+        currentUserId?: number,
+        userDTO?: JsonPlaceholderUserDTO,
+        abortController?: AbortController,
+    }>(id, async (prevUserId, sourceUserId, eventSignal) => {
+        const _newUserid = getNewValue?.();
+        // todo: Чтобы отдавать приоритет sourceUserId, а не $counter1.get(), нужно добавить EventSignal.flags в котором будет подниматься флаг .lastChangesFromNewSourceValue
+        const newUserid = (sourceUserId !== void 0 && _newUserid === prevUserId && _newUserid !== void 0
+            ? sourceUserId
+            : _newUserid
+        ) ?? prevUserId;
 
-    eventSignal.data.abortController = abortController;
+        //todo: Это приводит к ошибке, можно тестировать вместе с ErrorBoundary, когда он будет реализован
+        // if (newUserid === prevUserId) {
+        //     return;
+        // }
 
-    await new Promise((resolve) => {
-        queueMicrotask(() => {
-            setTimeout(resolve, 500);
+        eventSignal.data.currentUserId = newUserid;
+        eventSignal.data.abortController?.abort(`request new userId=${newUserid}`);
+
+        const abortController = new AbortController();
+
+        eventSignal.data.abortController = abortController;
+
+        await new Promise((resolve) => {
+            queueMicrotask(() => {
+                // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+                setTimeout(resolve, newUserid > 10 ? 1000 : 500);
+            });
         });
-    });
 
-    if (abortController.signal.aborted) {
+        if (abortController.signal.aborted) {
+            return newUserid;
+        }
+
+        const response = await fetch(`https://jsonplaceholder.typicode.com/users?id=${newUserid}`, {
+            signal: abortController.signal,
+        });
+        const usersDTO = await response.json();
+        const newUserDTO = usersDTO[0];
+
+        if (!newUserDTO) {
+            throw new Error(`User not found with userId=${newUserid}`);
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+        if (newUserid === 9) {
+            newUserDTO["invalidProp"]["invalidProp"] = 'this will cause error';
+        }
+
+        // eslint-disable-next-line require-atomic-updates
+        eventSignal.data.userDTO = newUserDTO;
+
         return newUserid;
-    }
-
-    const response = await fetch(`https://jsonplaceholder.typicode.com/users?id=${newUserid}`, {
-        signal: abortController.signal,
+    }, {
+        componentType: jsonPlaceholderUserComponentType,
+        data: {},
     });
-    const usersDTO = await response.json();
-    const newUserDTO = usersDTO[0];
+}
 
-    if (!newUserDTO) {
-        throw new Error(`User not found with userId=${newUserid}`);
-    }
+const $jsonPlaceholderUser1 = makePlaceholderUserEventSignal($counter1.get(), $counter1.get);
 
-    // eslint-disable-next-line @typescript-eslint/no-magic-numbers
-    if (newUserid === 9) {
-        newUserDTO["invalidProp"]["invalidProp"] = 'this will cause error';
-    }
-
-    // eslint-disable-next-line require-atomic-updates
-    eventSignal.data.userDTO = newUserDTO;
-
-    return newUserid;
-}, {
-    componentType: jsonPlaceholderUserComponentType,
-    data: {},
-});
+export type Signal$jsonPlaceholderUser1 = typeof $jsonPlaceholderUser1;
 
 export const mainState = {
     $counter1,
