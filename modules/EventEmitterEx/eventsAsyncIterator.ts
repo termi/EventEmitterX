@@ -442,12 +442,8 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
         //     unconsumedEvents.length = 0;
         // }
     };
-    const _onStop = () => {
-        terminateIterator(_ITERATOR_STOP_REASON__ON_STOP_EVENT);
-    };
-    const _onAbort = () => {
-        terminateIterator(_ITERATOR_STOP_REASON__ABORT);
-    };
+    const _onStop = terminateIterator.bind(null, _ITERATOR_STOP_REASON__ON_STOP_EVENT);
+    const _onAbort = terminateIterator.bind(null, _ITERATOR_STOP_REASON__ABORT);
     const _onError = (errorReason: Error | any) => {
         // on 'error' event errorReason can be `undefined`!!!
         has_iteratorErrorToReject = true;
