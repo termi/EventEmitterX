@@ -59,6 +59,7 @@ import events, {
 
     once,
 } from '../../modules/events';
+import { assertIsDefined, assertIsString } from 'termi@type_guards';
 import ServerTiming from 'termi@ServerTiming';
 import { TIME } from '../../utils/time';
 import { AbortController, AbortControllersGroup, AbortSignal } from 'termi@abortable';
@@ -3702,8 +3703,8 @@ describe('events', function() {
                 });
             });
 
-            it('with AbortSignal', function() {
-                let error: DOMException|void = void 0;
+            it('with AbortSignal', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
                 let counter = 0;
                 const ac = new AbortController();
 
@@ -3716,9 +3717,18 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(0);
-                        expect_toBeDefined(error);
-                        expect(error?.code).toBe(ABORT_ERR);
-                        expect(error?.name).toBe('AbortError');
+
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.code).toBe(ABORT_ERR);
+                        expect(error.name).toBe('AbortError');
+
+                        // check enriched error stack
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        expect(error.stack).toContain('(emulated async stack)');
+
                         expect(ee.listenerCount('test6')).toBe(0);
                         expect(ee.listenerCount('error')).toBe(0);
                         expect(listenerCount(ac.signal, 'abort')).toBe(0);
@@ -3733,9 +3743,9 @@ describe('events', function() {
                 return promise;
             });
 
-            it('with AbortSignal (async/await)', async function() {
-                let error1: DOMException|void = void 0;
-                let error2: DOMException|void = void 0;
+            it('with AbortSignal (async/await)', async function testFunctionForErrorCheck() {
+                let error1: DOMException|undefined = void 0;
+                let error2: DOMException|undefined = void 0;
                 let counter = 0;
                 const ac1 = new AbortController();
                 const ac2 = new NativeAbortController();
@@ -3774,12 +3784,26 @@ describe('events', function() {
                 }
 
                 expect(counter).toBe(0);
-                expect(error1).toBeDefined();
-                expect(error2).toBeDefined();
-                expect(error1?.code).toBe(ABORT_ERR);
-                expect(error1?.name).toBe('AbortError');
-                expect(error2?.code).toBe(ABORT_ERR);
-                expect(error2?.name).toBe('AbortError');
+
+                assertIsDefined<DOMException>(error1);
+                assertIsString(error1.name);
+                assertIsString(error1.stack);
+                assertIsDefined<DOMException>(error2);
+                assertIsString(error2.name);
+                assertIsString(error2.stack);
+
+                expect(error1.code).toBe(ABORT_ERR);
+                expect(error1.name).toBe('AbortError');
+                expect(error2.code).toBe(ABORT_ERR);
+                expect(error2.name).toBe('AbortError');
+
+                // check enriched error stack
+                expect(error1.stack).toContain(testFunctionForErrorCheck.name);
+                expect(error1.stack).toContain('(emulated async stack)');
+                //todo: add enrichedErrorStack to createAbortError in AbortController.ts
+                // expect(error2.stack).toContain(testFunctionForErrorCheck.name);
+                // expect(error2.stack).toContain('(emulated async stack)');
+
                 expect(ee.listenerCount('test6')).toBe(0);
                 expect(ee.listenerCount('error')).toBe(0);
                 expect(listenerCount(ac1.signal, 'abort')).toBe(0);
@@ -4109,8 +4133,8 @@ describe('events', function() {
             // do not using it.skip to avoid marking tests as "skipped" after running
             const itif = (condition: boolean) => condition ? it : () => {}/*it.skip*/;
 
-            it('simple', async function() {
-                let error: DOMException|void = void 0;
+            it('simple', async function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
                 let counter = 0;
 
                 const promise = once(ee, 'test7', {
@@ -4124,11 +4148,19 @@ describe('events', function() {
                     })
                     .then(() => {
                         expect(counter).toBe(0);
-                        expect_toBeDefined(error);
-                        expect(error?.name).toBe('TimeoutError');
+
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.name).toBe('TimeoutError');
                         expect(ee.listenerCount('test7')).toBe(0);
 
                         clearTimeout(timeout);
+
+                        // check enriched error stack
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
 
@@ -4141,8 +4173,8 @@ describe('events', function() {
                 await promise;
             });
 
-            it('check error message #1.1', function() {
-                let error: DOMException|void = void 0;
+            it('check error message #1.1', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4155,16 +4187,23 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect_toBeDefined(error);
-                        expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toContain(' [1] ');
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.name).toBe('TimeoutError');
+                        expect(error.message).toContain(' [1] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        // check enriched error stack
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
             });
 
-            it('check error message #1.2', function() {
-                let error: DOMException|void = void 0;
+            it('check error message #1.2', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4179,16 +4218,19 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect_toBeDefined(error);
-                        expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toContain(' ["0n"] ');
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.name).toBe('TimeoutError');
+                        expect(error.message).toContain(' ["0n"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
                     })
                 ;
             });
 
-            it('check error message #1.3', function() {
-                let error: DOMException|void = void 0;
+            it('check error message #1.3', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4201,17 +4243,24 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect_toBeDefined(error);
-                        expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toContain(' [0] ');
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.name).toBe('TimeoutError');
+                        expect(error.message).toContain(' [0] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        // check enriched error stack
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #1.4', function() {
-                let error: DOMException|void = void 0;
+            itif(!isEventTarget)('check error message #1.4', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4224,21 +4273,29 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect_toBeDefined(error);
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(error?.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(error?.message).toContain(' ["Symbol(timeout-message)"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        // check enriched error stack
+                        // eslint-disable-next-line jest/no-standalone-expect
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        // eslint-disable-next-line jest/no-standalone-expect
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #2', function() {
-                let error: DOMException|void = void 0;
+            itif(!isEventTarget)('check error message #2', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4253,20 +4310,28 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect_toBeDefined(error);
+                        expect(error.name).toBe('TimeoutError');
                         // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.name).toBe('TimeoutError');
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
+                        expect(error.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","0n"] ');
                         // eslint-disable-next-line jest/no-standalone-expect
                         expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        // check enriched error stack
+                        // eslint-disable-next-line jest/no-standalone-expect
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        // eslint-disable-next-line jest/no-standalone-expect
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
             });
 
-            it('check error message #3', function() {
-                let error: DOMException|void = void 0;
+            it('check error message #3', function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
@@ -4280,42 +4345,57 @@ describe('events', function() {
                         error = err;
                     })
                     .then(() => {
-                        expect_toBeDefined(error);
-                        expect(error?.name).toBe('TimeoutError');
-                        expect(error?.message).toContain(' ["timeout-message","timeout-message-error"] ');
+                        assertIsDefined<DOMException>(error);
+                        assertIsString(error.name);
+                        assertIsString(error.stack);
+
+                        expect(error.name).toBe('TimeoutError');
+                        expect(error.message).toContain(' ["timeout-message","timeout-message-error"] ');
                         expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                        // check enriched error stack
+                        expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                        expect(error.stack).toContain('(emulated async stack)');
                     })
                 ;
             });
 
             // Symbol is not allowed as `once` second argument if `once` first argument is EventTarget
-            itif(!isEventTarget)('check error message #4', function() {
-                let error: DOMException|void = void 0;
+            itif(!isEventTarget)('check error message #4', async function testFunctionForErrorCheck() {
+                let error: DOMException|undefined = void 0;
 
                 queueMicrotask(() => {
                     advanceTimersByTime(TIME.SECONDS);
                 });
 
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                return once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
-                    errorEventName: Symbol('timeout-message-error'),
-                    timeout: 1,
-                })
-                    .catch(err => {
-                        error = err;
-                    })
-                    .then(() => {
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect_toBeDefined(error);
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.name).toBe('TimeoutError');
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect(error?.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
-                        // eslint-disable-next-line jest/no-standalone-expect
-                        expect(ee.listenerCount('timeout-message')).toBe(0);
-                    })
-                ;
+                try {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                    // @ts-expect-error ignore `TS2769: No overload matches this call.  The last overload gave the following error.  Type 'number' is not assignable to type 'string | symbol'.  Type 'bigint' is not assignable to type 'string | symbol'.`
+                    await once(ee, [ 'timeout-message1', 2, Symbol('timeout-message3'), 4n ], {
+                        errorEventName: Symbol('timeout-message-error'),
+                        timeout: 1,
+                    });
+                }
+                catch (err) {
+                    error = err as DOMException;
+                }
+
+                assertIsDefined<DOMException>(error);
+                assertIsString(error.name);
+                assertIsString(error.stack);
+
+                // eslint-disable-next-line jest/no-standalone-expect
+                expect(error.name).toBe('TimeoutError');
+                // eslint-disable-next-line jest/no-standalone-expect
+                expect(error.message).toContain(' ["timeout-message1",2,"Symbol(timeout-message3)","4n","Symbol(timeout-message-error)"] ');
+                // eslint-disable-next-line jest/no-standalone-expect
+                expect(ee.listenerCount('timeout-message')).toBe(0);
+
+                // check enriched error stack
+                // eslint-disable-next-line jest/no-standalone-expect
+                expect(error.stack).toContain(testFunctionForErrorCheck.name);
+                // eslint-disable-next-line jest/no-standalone-expect
+                expect(error.stack).toContain('(emulated async stack)');
             });
         });
 

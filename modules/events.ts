@@ -152,6 +152,7 @@ interface StaticOnceOptionsDefault {
     // todo: onError?
     /** Promise constructor to use */
     Promise?: PromiseConstructor;
+    /** @deprecated this is `true` by default now and replaced by {@link EventEmitterEx.staticOnceEnrichErrorStack} */
     isEnrichAbortStack?: boolean;
     // [key: string]: any;
     debugInfo?: Object;
@@ -1423,7 +1424,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      */
     static on = eventsAsyncIterator;
 
-    static staticOnceEnrichAbortStack = false;
+    static staticOnceEnrichErrorStack = true;
 
     // todo: Вынести `static once` в отдельный файл: eventAwaitFor (это нужно сделать с сохранением истории, поэтому
     //  нужно сделать два бранча - в отдном переименовать этот файлы в eventAwaitFor.ts и оставить только код `static once`,
@@ -1462,7 +1463,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
      *
      * @see {@link https://nodejs.org/api/events.html#events_events_once_emitter_name_options nodejs events.once(emitter, name, options)}
      */
-    static once(
+    static once(// EventEmitterX.once
         emitter: DOMEventTarget | EventEmitterEx | IMinimumCompatibleEmitter | INodeEventEmitter,
         types: EventName | EventName[],
         // options?: StaticOnceOptionsEventTarget|StaticOnceOptions<typeof emitter, typeof types extends Array<infer T> ? T : typeof types>
@@ -1513,9 +1514,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let timing = staticOnceOptions.timing || void 0;
         // todo: check `_isTiming(value: ServerTiming | ITiming | Console | unknown): value is ITiming;`
         let hasTiming = _isDefined(timing);
-        const isEnrichAbortStack = !!staticOnceOptions.isEnrichAbortStack;
-        const enrichAbortStackBy = (isEnrichAbortStack || EventEmitterEx.staticOnceEnrichAbortStack)
-            ? _sanitizeEnrichedAbortErrorStack(new Error('-enrichAbortStackBy-')).stack
+        const isEnrichErrorStack = EventEmitterEx.staticOnceEnrichErrorStack;
+        const enrichErrorStackBy = isEnrichErrorStack
+            ? _sanitizeErrorStack(new Error('-enrichStaticOnceErrorsStackBy-(ignore this)-'), true).stack
             : void 0
         ;
         const debugInfo = staticOnceOptions.debugInfo || void 0;
@@ -1899,10 +1900,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
                         const abortError = createAbortError(ABORT_ERR, signalReason);
 
-                        if (enrichAbortStackBy) {
+                        _sanitizeErrorStack(abortError);
+
+                        if (enrichErrorStackBy) {
                             // подмешиваем в "abortError.stack" стек созданные выше, по время вызова `static once`.
-                            abortError.stack += `\n    (emulated async stack) (EventEmitterEx.once(emitter, "${String(types)}", { signal })) [isEnrichAbortStack==true]`;
-                            abortError.stack += enrichAbortStackBy;
+                            _enrichErrorStackToOnceTimeoutError(abortError, enrichErrorStackBy, types, errorEventName);
                         }
 
                         reject(abortError);
@@ -1945,9 +1947,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     //   свойства error.types и error.errorType.
                     //  2. Если types - это массив с количеством элементов большим разумного числа (например, больше 30),
                     //   то не выводить его в сообщении ошибки, а прикреплять его как error.types).
-                    reject(createTimeoutError(`waiting of ${_typesToArrayStringTag(types, errorEventNameIsDefined
-                        ? errorEventName
-                        : void 0)} timeout`));
+                    reject(_createOnceTimeoutError({
+                        eventNames: types,
+                        errorEventNames: errorEventNameIsDefined ? errorEventName : void 0,
+                    }, enrichErrorStackBy));
                 }, timeout);
 
                 cleanTimeoutCallback = function() {
@@ -2137,25 +2140,62 @@ export {
     EventEmitterEx as default,
 };
 
-function _sanitizeEnrichedAbortErrorStack(abortError: Error) {
-    const { stack = '' } = abortError;
+function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = false) {
+    let { stack = '' } = error;
 
-    if (!abortError["originalStack"]) {
-        abortError["originalStack"] = abortError;
+    if (!error["originalStack"]) {
+        Object.defineProperty(error, "originalStack", {
+            value: stack,
+            configurable: true,
+            writable: true,
+            enumerable: false,
+        });
     }
 
-    abortError.stack = stack.split(/\n/).filter(stackLine => {
+    if (autoRemoveErrorMessageFromStach) {
+        const startOfStack = stack.search(/\s*at\s/);
+
+        if (startOfStack !== -1) {
+            stack = stack.substring(startOfStack);
+        }
+    }
+
+    error.stack = stack.split(/\n/).filter(stackLine => {
         if (/[/\\]AbortController\./.test(stackLine)) {
+            // note: Сейчас файл называется AbortController.ts, но в будущем может называться abortable.ts или abortUtils.ts
             return false;
         }
         if (/[/\\]events\./.test(stackLine)) {
+            // events.ts or EventEmitterX/events.ts
             return false;
         }
 
         if (/[/\\]node_modules[/\\]/.test(stackLine)) {
-            if (stackLine.includes('jest-circus')) {
+            if (/[/\\]jest-circus[/\\]/.test(stackLine)) {
                 return false;
             }
+            if (/[/\\]jest-runner[/\\]/.test(stackLine)) {
+                return false;
+            }
+            if (/[/\\]jest-cli[/\\]/.test(stackLine)) {
+                return false;
+            }
+            if (/[/\\]@jest[/\\]core[/\\]/.test(stackLine)) {
+                return false;
+            }
+            if (/[/\\]@sinonjs[/\\]fake-timers[/\\]/.test(stackLine)) {
+                return false;
+            }
+            if (/[/\\]jsdom[/\\]lib[/\\]jsdom[/\\]/.test(stackLine)) {
+                return false;
+            }
+        }
+
+        if (stackLine.includes('node:internal/process/task_queues:')
+            || stackLine.includes('node:async_hooks:')
+        ) {
+            // nodejs lines
+            return false;
         }
 
         // noinspection RedundantIfStatementJS
@@ -2166,7 +2206,7 @@ function _sanitizeEnrichedAbortErrorStack(abortError: Error) {
         return true;
     }).join('\n');
 
-    return abortError;
+    return error;
 }
 
 interface EventEmitterSimpleProxy_Options extends _ConstructorOptions {
@@ -2897,8 +2937,38 @@ if (TimeoutError.constructor.name !== tagTimeoutError) {
     Object.defineProperty(TimeoutError.constructor, 'name', { value: tagTimeoutError, configurable: true });
 }
 
-export function createTimeoutError(message: string, cause?: any) {
-    return new TimeoutError(message, cause !== void 0 ? { cause } : void 0);
+function _createOnceTimeoutError({
+    eventNames,
+    errorEventNames,
+    cause,
+}: {
+    eventNames: EventName | EventName[],
+    errorEventNames: EventName | EventName[] | undefined,
+    cause?: any,
+}, enrichErrorStackBy?: string) {
+    const message = `EventEmitterX.once: Waiting of ${_typesToArrayStringTag(eventNames, errorEventNames)} timeout`;
+    const error = new TimeoutError(message, cause !== void 0 ? { cause } : void 0);
+
+    _sanitizeErrorStack(error);
+
+    if (enrichErrorStackBy) {
+        _enrichErrorStackToOnceTimeoutError(error, enrichErrorStackBy, eventNames, errorEventNames);
+    }
+
+    return error;
+}
+
+function _enrichErrorStackToOnceTimeoutError(
+    error: Error,
+    enrichErrorStackBy: string,
+    eventNames: EventName | EventName[],
+    errorEventNames: EventName | EventName[] | undefined,
+) {
+    const onceOptionsString = `{ signal${errorEventNames ? `, errorEventName: ${_typesToArrayStringTag(errorEventNames)}` : ''} }`;
+
+    // подмешиваем в "abortError.stack" стек созданные выше, по время вызова `static once`.
+    error.stack += `\n    (emulated async stack) (EventEmitterX.once(emitter, ${_typesToArrayStringTag(eventNames)}, ${onceOptionsString}))`;
+    error.stack += enrichErrorStackBy;
 }
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
@@ -3145,20 +3215,21 @@ function _assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
 }
 
 /** @private */
-function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEventName?: EventName) {
+function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEventName?: EventName | EventName[] | void) {
     if (!types && types !== 0 && (n0 === void 0 || (types as EventName & bigint) !== n0)) {
         types = [];
     }
 
     if (errorEventName || errorEventName === 0 || (n0 !== void 0 && (errorEventName as EventName & bigint) === n0)) {
+        const errorEventNameList = Array.isArray(errorEventName) ? errorEventName : [ errorEventName as EventName ];
+
         // noinspection JSDeprecatedSymbols
         if (!Array.isArray(types)) {
             // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            types = [ (types! as EventName), errorEventName! ];
+            types = [ (types! as EventName), ...errorEventNameList ];
         }
         else {
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-            types = [ ...types, errorEventName! ];
+            types = [ ...types, ...errorEventNameList ];
         }
     }
 
