@@ -2258,32 +2258,32 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
     private _onEventEmitterEvent(event: EventName, ...args: unknown[]) {
         switch (args.length) {
             case 0:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `Argument of type '[]' is not assignable to parameter of type 'Parameters<EMD<EventMap>[EventName]>'.`
                 super.emit(event);
 
                 break;
             case 1:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `Argument of type '[unknown]' is not assignable to parameter of type 'Parameters<EMD<EventMap>[EventName]>'.`
                 super.emit(event, args[0]);
 
                 break;
             case 2:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `Argument of type '[unknown, unknown]' is not assignable to parameter of type 'Parameters<EMD<EventMap>[EventName]>'.`
                 super.emit(event, args[0], args[1]);
 
                 break;
             case 3:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `Argument of type '[unknown, unknown, unknown]' is not assignable to parameter of type 'Parameters<EMD<EventMap>[EventName]>'.`
                 super.emit(event, args[0], args[1], args[2]);
 
                 break;
             default:
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `Argument of type 'unknown[]' is not assignable to parameter of type 'Parameters<EMD<EventMap>[EventName]>'.`
                 super.emit(event, ...args);
         }
     }
