@@ -84,6 +84,8 @@ export interface ICounter {
      * @see [MDN console.count()]{@link https://developer.mozilla.org/en-US/docs/Web/API/Console/count}
      */
     count: (eventName: EventName, wasListener: boolean) => void;
+
+    [key: string | symbol]: unknown;
 }
 
 interface _ConstructorOptions {
@@ -300,7 +302,7 @@ function _isLifecycleEvent(event: EventName) {
 type InnerListeners = {
     'newListener': (eventName: EventName, listener: Listener) => void,
     'removeListener': (eventName: EventName, listener: Listener) => void,
-    'error': (error: Error, ...args: any[]) => void,
+    'error': ((error: Error, ...args: any[]) => void) | ((...args: any[]) => void),
     [kDestroyingEvent]: () => void,
 };
 
