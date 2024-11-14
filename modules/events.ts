@@ -2137,6 +2137,7 @@ export namespace EventEmitterEx {
 
 export {
     EventEmitterEx as EventEmitter,
+    EventEmitterEx as EventEmitterX,
     EventEmitterEx as default,
 };
 
