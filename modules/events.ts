@@ -462,8 +462,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         this._f |= EventEmitterEx_Flags_destroyed;
         this._emitCounter = void 0;
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore
         this.emit(kDestroyingEvent);
 
         this.removeAllListeners();
@@ -526,26 +526,26 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 if (_checkBit(_f, EventEmitterEx_Flags_has_errorMonitor_listener)) {
                     switch (argumentsLength) {
                         case 1:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore
                             this.emit(errorMonitor);
 
                             break;
                         case 2:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore
                             this.emit(errorMonitor, a1);
 
                             break;
                         case 3:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore
                             this.emit(errorMonitor, a1, a2);
 
                             break;
                         case 4:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                            // @ts-expect-error
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore
                             this.emit(errorMonitor, a1, a2, a3);
 
                             break;
