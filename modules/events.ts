@@ -93,10 +93,11 @@ interface _ConstructorOptions {
     // listener can be registered at most once per event type
     listenerOncePerEventType?: boolean;
     captureRejections?: boolean;
-    /* todo: add handleEvent support
-    // support DOMEventTarget.handleEvent
-    supportHandleEvent?: boolean;
+    /**
+     * support DOMEventTarget.handleEvent
+     * @see {@link EventListenerObject}
      */
+    supportEventListenerObject?: boolean;
     /**
      * If passed, call `counter.count(eventName)` for every [EventEmitterEx#emit]{@link EventEmitterEx.emit} call.
      *
@@ -375,6 +376,7 @@ const EventEmitterEx_Flags_has_newListener_listener = 1 << 11;
 const EventEmitterEx_Flags_has_removeListener_listener = 1 << 12;
 const EventEmitterEx_Flags_has_errorMonitor_listener = 1 << 13;
 const EventEmitterEx_Flags_has_duplicatedListener_listener = 1 << 16;
+const EventEmitterEx_Flags_supportEventListenerObject = 1 << 20;
 const EventEmitterEx_Flags_emitCounter_isConsole = 1 << 21;
 const EventEmitterEx_Flags_emitCounter_isDebugTraceListeners = 1 << 25;
 const EventEmitterEx_Flags_destroyed = 1 << 30;
@@ -382,8 +384,9 @@ const EventEmitterEx_Flags_destroyed = 1 << 30;
 // todo: rename to EventEmitterX
 /** Implemented event emitter */
 export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
-    // noinspection JSUnusedGlobalSymbols
     public readonly isEventEmitterEx = true;
+    // noinspection JSUnusedGlobalSymbols
+    public readonly isEventEmitterX = true;
     // noinspection JSUnusedGlobalSymbols
     public readonly isEventEmitter = true;
     protected readonly [kIsEventEmitterEx] = true;
@@ -398,10 +401,6 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     private _f = 0;
     private _emitCounter: Console | ICounter | void;
 
-    /* todo: add handleEvent support
-    // supportHandleEvent, support DOMEventTarget.handleEvent
-    private _she = false;
-    */
     /**
      * Private list of local once listeners.
      * @private
@@ -413,7 +412,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             const {
                 maxListeners,
                 listenerOncePerEventType,
-                // supportHandleEvent,
+                supportEventListenerObject,
                 captureRejections,
                 emitCounter,
                 listenerWithoutThis,
@@ -437,11 +436,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
             if (listenerWithoutThis) {
                 this._f |= EventEmitterEx_Flags_listenerWithoutThis;
             }
-            /*
-            if (supportHandleEvent !== void 0) {
-                this._she = supportHandleEvent;
+            if (supportEventListenerObject) {
+                this._f |= EventEmitterEx_Flags_supportEventListenerObject;
             }
-            */
             if (emitCounter) {
                 this._emitCounter = emitCounter;
 
@@ -509,7 +506,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, a1, a2, a3) {
         const isErrorEvent = event === 'error';
         const emitCounter = this._emitCounter;
-        const handler = this._events[event];
+        let handler = this._events[event];
         const argumentsLength = arguments.length;
         let hasEnyListener = false;
 
@@ -563,8 +560,23 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
             }
 
-            const isFn = typeof handler === 'function';
-            const context = listenerWithoutThis ? void 0 : this;
+            let isFn = typeof handler === 'function';
+            let context = listenerWithoutThis ? void 0 : this;
+
+            if (_checkBit(_f, EventEmitterEx_Flags_supportEventListenerObject)
+                && !isFn
+                && 'handleEvent' in (handler as unknown as EventListenerObject)
+            ) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore `TS2322: Type EventListenerObject is not assignable to type this`
+                context = handler as unknown as EventListenerObject;
+                handler = (handler as unknown as EventListenerObject).handleEvent;
+                isFn = true;
+
+                if (!handler) {
+                    return;
+                }
+            }
 
             if (isFn) {
                 const func_handler = handler as Function;
@@ -739,19 +751,15 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         prepend: boolean,
         once: boolean,
     ): boolean {
-        // const {_she: supportHandleEvent} = this;
-        // if (typeof listener === 'object') {
-        //     console.log(listener);
-        // }
-
-        _checkListener(listener, /*supportHandleEvent*/false);
-
         const {
             _events,
             _maxListeners,
             _f,
             __onceWrappers,
         } = this;
+
+        _checkListener(listener, _checkBit(_f, EventEmitterEx_Flags_supportEventListenerObject));
+
         const has_newListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_newListener_listener);
         const isDebugTraceListeners = _checkBit(_f, EventEmitterEx_Flags_emitCounter_isDebugTraceListeners);
         const hasAnyOnceListener = __onceWrappers.size > 0;
@@ -906,14 +914,18 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         event: EventKey,
         listener: EMD<EventMap>[EventKey],
     ): this {
-        _checkListener(listener);
-
         // todo: this._count(statisticKeys.kRemoveListener)
         const {
             _events,
             _f,
             __onceWrappers,
         } = this;
+
+        // todo: Поддержка supportEventListenerObject не доделана для:
+        //  1. removeListener
+        //  1. once (__onceWrappers)
+        _checkListener(listener, _checkBit(_f, EventEmitterEx_Flags_supportEventListenerObject));
+
         // const listenerOncePerEventType = _checkBit(_f, EventEmitterEx_Flags_listenerOncePerEventType);
         const handler = _events[event];
 
@@ -2121,6 +2133,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
     static EventEmitter = EventEmitterEx;
     static EventEmitterEx = EventEmitterEx;
+    static EventEmitterX = EventEmitterEx;
 
     /** alias for global AbortController */
     static AbortController = AbortController;
@@ -2133,8 +2146,19 @@ if (EventEmitterEx.constructor.name !== tagEventEmitterEx) {
     Object.defineProperty(EventEmitterEx.constructor, 'name', { value: tagEventEmitterEx, configurable: true });
 }
 
+type EventEmitterX_Listener = Listener;
+
+// todo: rename to EventEmitterX, `export { EventEmitterX as EventEmitterEx }` for backward compatibility
 export namespace EventEmitterEx {
     export type ConstructorOptions = _ConstructorOptions;
+    export type Listener = EventEmitterX_Listener;
+
+    /**
+     * @see {@link EventListenerObject}
+     */
+    export type ListenerAsObject = {
+        handleEvent?: (this: ListenerAsObject, ...args: unknown[]) => void,
+    };
 }
 
 export {
@@ -2219,7 +2243,7 @@ interface EventEmitterSimpleProxy_Options extends _ConstructorOptions {
 export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
     private _eventEmitter: EventEmitterEx | INodeEventEmitter | void;
     // private _eventTarget: DOMEventTarget|void;
-    private _proxyHandlers: Partial<Record<EventName, (...args: any[]) => void>> = {};
+    private _proxyHandlers: Partial<Record<EventName, (...args: any[]) => void>> = Object.create(null);
 
     // private _isEventTarget = false;
 
@@ -2440,7 +2464,7 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
         }
 
         if (!event) {
-            this._proxyHandlers = {};
+            this._proxyHandlers = Object.create(null);
         }
 
         return super.removeAllListeners(event);
@@ -2479,7 +2503,7 @@ interface EventEmitterProxy_Options extends _ConstructorOptions {
      */
     getTargetEmitter?: EventEmitterProxy_TargetProxyHook;
     /**
-     * Можно ли вызвать {EventEmitterProxy#emit}{@link EventEmitterProxy.emit} для отправки события в `targetEmitter`?
+     * Можно ли вызвать [EventEmitterProxy#emit]{@link EventEmitterProxy.emit} для отправки события в `targetEmitter`?
      *
      * Default: `false`
      */
@@ -2493,8 +2517,8 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     private _targetEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | void;
     // private _eventTarget: DOMEventTarget|void;
     private _allowDirectEmitToTarget: Required<EventEmitterProxy_Options["allowDirectEmitToTarget"]>;
-    private _hasProxyHandlers: Partial<Record<EventName, true>> = {};
-    private _antiLoopingInfoMap: Partial<Record<EventName, { args: unknown[] }>> = {};
+    private _hasProxyHandlers: Partial<Record<EventName, true>> = Object.create(null);
+    private _antiLoopingInfoMap: Partial<Record<EventName, { args: unknown[] }>> = Object.create(null);
     private _knownSubscriptions: [
         eventType: EventName,
         eventEmitter: ICompatibleEmitter,
@@ -2792,7 +2816,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     private _removeListenerFromTargets(event: EventName | void, targetEmitter: ICompatibleEmitter | void) {
         const has_event = event !== void 0;
         const has_targetEmitter = targetEmitter !== void 0;
-        const subscriptionsCounters: Record<EventName, number> = {};
+        const subscriptionsCounters: Record<EventName, number> = Object.create(null);
         const {
             _knownSubscriptions,
         } = this;
@@ -2977,10 +3001,14 @@ function _enrichErrorStackToOnceTimeoutError(
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
 // todo: export function defaultMaxListeners(n: number){}
 
-/** @private */
-function _checkListener(listener: Listener/* | EventListenerObject*/, supportHandleEvent = false): asserts listener is Listener/* | EventListenerObject*/ {
+/**
+ * @param listener
+ * @param supportEventListenerObject - see {@link EventListenerObject}
+ * @private
+ */
+function _checkListener(listener: Listener/* | EventListenerObject*/, supportEventListenerObject = false): asserts listener is Listener/* | EventListenerObject*/ {
     if (typeof listener !== 'function') {
-        if (supportHandleEvent) {
+        if (supportEventListenerObject) {
             if (typeof listener !== 'object' || !listener) {
                 throw new TypeError('"listener" argument must be a function or Object.{handleEvent: Function|void}');
             }
@@ -3082,7 +3110,7 @@ export function isEventEmitterCompatible(emitter: EventEmitterEx | INodeEventEmi
  */
 export function isEventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap>(emitter: EventEmitterEx | Object): emitter is EventEmitterEx<EventMap> {
     // fast pre-check of public property "isEventEmitterEx"
-    if (!emitter || !(emitter as EventEmitterEx).isEventEmitterEx) {
+    if (!emitter || !(emitter as EventEmitterEx).isEventEmitterX) {
         return false;
     }
 
