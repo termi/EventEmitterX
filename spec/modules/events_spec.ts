@@ -4595,7 +4595,7 @@ describe('events', function() {
                     expect([ 'string', 'number', 'symbol' ]).toContain(typeof name);
                     expect(typeof lister).toBe('function');
                 });
-                ee.on('error', (error) => {
+                ee.on('error', (error: unknown) => {
                     expect((error as unknown) instanceof Error).toBe(true);
                 });
                 /*
