@@ -32,6 +32,7 @@ const subscribersEventsEmitter = new EventEmitterEx({
 // eslint-disable-next-line prefer-const
 let isDev = true;
 let idIncrement = 0;
+// note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
 
 export class EventSignal<T, S=T, D=undefined> {
