@@ -1614,7 +1614,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 let needErrorListener = true;
 
                 listenersCleanUp = function() {
-                    for (const [ type, listener ] of eventListenersByType) {
+                    for (const { 0: type, 1: listener } of eventListenersByType) {
                         if (isEventTarget) {
                             _eventTargetRemoveListener((emitter as DOMEventTarget), type, listener, eventTargetListenerOptions);
                         }
@@ -2823,11 +2823,11 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
         for (let i = 0, len = _knownSubscriptions.length ; i < len ; i++) {
             const knownSubscription = _knownSubscriptions[i] as NonNullable<typeof _knownSubscriptions[0]>;
-            const [
-                eventType,
-                eventEmitter,
-                eventProxyHandler,
-            ] = knownSubscription;
+            const {
+                0: eventType,
+                1: eventEmitter,
+                2: eventProxyHandler,
+            } = knownSubscription;
             let counter = (subscriptionsCounters[eventType] || 0) + 1;
 
             if ((has_event ? eventType === event : true)
