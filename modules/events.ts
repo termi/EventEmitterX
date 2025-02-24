@@ -109,6 +109,12 @@ interface _ConstructorOptions {
      * Passing `true` to this parameter will cause to calls listener functions without any `this` value.
      */
     listenerWithoutThis?: boolean;
+    /**
+     * For testing purpose.
+     *
+     * Attach call stack to listener when adding new listener for event.
+     * Call stack will be attached to `listener.__debugTrace` property.
+     */
     isDebugTraceListeners?: boolean;
 }
 
