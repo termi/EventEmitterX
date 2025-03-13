@@ -491,6 +491,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         this.destructor();
     }
 
+    get isDestroyed() {
+        return _checkBit(this._f, EventEmitterEx_Flags_destroyed);
+    }
+
     get [kCapture]() {
         return _checkBit(this._f, EventEmitterEx_Flags_captureRejections);
     }
@@ -1916,6 +1920,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         const signalReason = signal?.reason;
                         // Тут всегда должна создаваться новая AbortError (НЕ DOMException),
                         //  даже если `isAbortError(signalReason) === true`, а "signalReason" - это DOMException ABORT_ERR
+                        // note: Точно всегда? А почему? А для AbortControllersGroup тоже новая AbortError для каждого AbortController?
                         // todo: Вызывать ErrorTools.createAbortError
                         // todo: Сделать отдельный класс ошибок EventsAbortError (аналогично EventsTypeError)?
                         const abortError = createAbortError(ABORT_ERR, signalReason);
@@ -2145,6 +2150,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     static AbortController = AbortController;
 }
 
+EventEmitterEx.prototype[Symbol.toStringTag] = 'EventEmitterX';
+
+// todo: replace 'EventEmitterEx' with 'EventEmitterX'
 const tagEventEmitterEx = 'EventEmitterEx';
 
 if (EventEmitterEx.constructor.name !== tagEventEmitterEx) {
