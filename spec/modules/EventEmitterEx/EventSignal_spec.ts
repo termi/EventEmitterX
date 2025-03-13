@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 /* eslint-disable no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment, promise/no-nesting,jest/prefer-expect-resolves */
 /* globals describe, xdescribe, it, xit, expect */
 'use strict';
