@@ -41,9 +41,11 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
         };
 
         const on = function on(type, listener) {
+            // eslint-disable-next-line no-invalid-this
             this.addEventListener(type, listener);
         };
         const off = function off(type, listener) {
+            // eslint-disable-next-line no-invalid-this
             this.removeEventListener(type, listener);
         };
 
@@ -71,7 +73,7 @@ module.exports.compatibleEventEmitter_from_EventTarget = function(maybeEventTarg
         else {
             maybeEventTarget.listenerCount = function(type) {
                 const emitter = this;
-                let symbols = Object.getOwnPropertySymbols(emitter).filter(a => a["description"] === 'impl');
+                const symbols = Object.getOwnPropertySymbols(emitter).filter(a => a["description"] === 'impl');
 
                 if (symbols.length > 0) {
                     // implementation from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
@@ -134,11 +136,12 @@ function getEventListeners(emitter, type) {
     }
 
     {
-        const symbols = Object.getOwnPropertySymbols(emitter).filter(a => a["description"] === 'impl');
+        const symbols = Object.getOwnPropertySymbols(emitter);
+        const jsDOMSymbols = symbols.filter(a => a["description"] === 'impl');
 
-        if (symbols.length > 0) {
+        if (jsDOMSymbols.length > 0) {
             // implementation from polyfill node_modules/jsdom/lib/jsdom/living/generated/EventTarget.js
-            const eventTargetImpl = emitter[symbols[0]];
+            const eventTargetImpl = emitter[jsDOMSymbols[0]];
 
             if (eventTargetImpl) {
                 // noinspection JSUnresolvedVariable
@@ -148,6 +151,24 @@ function getEventListeners(emitter, type) {
                 if (handlers) {
                     return handlers;
                 }
+            }
+        }
+
+        const nativeNodeJSSymbols = symbols.filter(a => a["description"] === 'kEvents');
+
+        if (nativeNodeJSSymbols.length > 0) {
+            /** @type {Map | undefined} */
+            const eventsMap = emitter[nativeNodeJSSymbols[0]];
+
+            if (eventsMap) {
+                /*
+                if (type == null) {
+                    return [ ...eventsMap.values() ].flat();
+                }
+                */
+                const nativeNodejsListenerRoot = eventsMap.get(type);
+
+                return _flatNativeNodejsListenersIntoArray(nativeNodejsListenerRoot);
             }
         }
     }
@@ -166,6 +187,49 @@ function getEventListeners(emitter, type) {
 }
 
 module.exports.getEventListeners = getEventListeners;
+
+/**
+ * @typedef {Object} NativeNodejsListener
+ * @property {boolean} once
+ * @property {boolean} capture
+ * @property {boolean} passive
+ * @property {boolean} isNodeStyleListener
+ * @property {boolean} weak
+ * @property {boolean} removed
+ * @property {number} flags
+ * @property {Function} callback
+ * @property {Function} listener - alias for {@link callback}
+ * @property {NativeNodejsListenerRoot | NativeNodejsListener | null} previous
+ * @property {NativeNodejsListener | null} next
+ */
+
+/**
+ * @typedef {Object} NativeNodejsListenerRoot
+ * @property {number} size
+ * @property {NativeNodejsListener | null} next
+ */
+
+/**
+ * @param {NativeNodejsListenerRoot} nativeNodejsListenerRoot
+ * @private
+ */
+function _flatNativeNodejsListenersIntoArray(nativeNodejsListenerRoot) {
+    if (!nativeNodejsListenerRoot || nativeNodejsListenerRoot.size === 0) {
+        return [];
+    }
+
+    /** @type {Function[]} */
+    const result = [];
+    let next = nativeNodejsListenerRoot.next;
+
+    while (next) {
+        result.push(next.listener);
+
+        next = next.next;
+    }
+
+    return result;
+}
 
 module.exports.listenerCount = function listenerCount(emitter, type) {
     if (typeof emitter.listenerCount === 'function') {
