@@ -1338,12 +1338,13 @@ export class EventSignal<T, S=T, D=undefined> {
             });
         };
         */
-        const memorizedComponents = new WeakMap<Function, Function>();
-        const memorizedComponents_emplaceHandler = Object.setPrototypeOf({
-            insert(key: Function) {
-                return _React_memo ? _React_memo(key) : key;
-            },
-        }, null);
+        const memorizedComponents = new WeakMap<EventSignal.ReactFC<any, any, any>, EventSignal.ReactFC<any, any, any>>();
+        const memorizedComponents_onNew = function(key: EventSignal.ReactFC<any, any, any>) {
+            return _React_memo
+                ? _React_memo(key) as EventSignal.ReactFC<any, any, any>
+                : key
+            ;
+        };
 
         /**
          * todo: Добавить обёртку ErrorBoundary
@@ -1401,8 +1402,8 @@ export class EventSignal<T, S=T, D=undefined> {
                     }
 
                     const { key, version } = eventSignal;
-                    const memorizedReactFC = _React_memo && !("$$typeof" in reactFC)
-                        ? memorizedComponents.emplace(reactFC, memorizedComponents_emplaceHandler)
+                    const memorizedReactFC: EventSignal.ReactFC<any, any, any> = _React_memo && !("$$typeof" in reactFC)
+                        ? memorizedComponents.getOrInsertComputed(reactFC, memorizedComponents_onNew)
                         : reactFC
                     ;
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
