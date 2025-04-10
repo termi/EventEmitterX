@@ -12,8 +12,10 @@
 // * [cellx - The ultra-fast implementation of reactivity for javascript](https://github.com/Riim/cellx/)
 
 import type { EventEmitter } from "node:events";
+
 import { isTest } from 'termi@runEnv';
-import { EventEmitterEx } from "../events";
+import { isUniqueSymbol } from 'termi@type_guards';
+import { EventEmitterX } from "../events";
 import { arrayContentStringify, stringifyWithCircularHandle } from "./utils";
 
 // todo:
@@ -21,11 +23,11 @@ import { arrayContentStringify, stringifyWithCircularHandle } from "./utils";
 //     А точнее, чтобы подписки на _signalSymbol авто-удалялись при удалении из памяти EventSignal, для которого этот _signalSymbol создавался.
 //  2. Кидать события onCreateEventSignal, onDestroyEventSignal и другие
 //  3. Добавить в опции конструктора EventSignal свойство "domain" для переопределения, какой signalEventsEmitter использовать.
-const signalEventsEmitter = new EventEmitterEx({
+const signalEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
 
-const subscribersEventsEmitter = new EventEmitterEx({
+const subscribersEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
 
@@ -34,6 +36,9 @@ let isDev = true;
 let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
+
+const _EventSignal__UpdateFlags__wasDepsUpdate = 1 << 1;
+const _EventSignal__UpdateFlags__wasSourceSetting = 1 << 2;
 
 export class EventSignal<T, S=T, D=undefined> {
     public readonly id = ++idIncrement;
@@ -54,6 +59,7 @@ export class EventSignal<T, S=T, D=undefined> {
     // private readonly _uniqueSymbol: symbol;
     private readonly _signalSymbol: symbol;
     private _version = 0;
+    private _updateFlags = 0;
     private _computationsCount = 0;
     private _componentVersion = 0;
     private _computationPromise: Promise<T> | null = null;
@@ -62,7 +68,9 @@ export class EventSignal<T, S=T, D=undefined> {
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
     private readonly _abortSignal?: AbortSignal;
-    private readonly _setNeedToCompute = () => {
+    private readonly _oneOfDepUpdated = () => {
+        this._updateFlags |= _EventSignal__UpdateFlags__wasDepsUpdate;
+
         if (!this._isNeedToCompute) {
             this._isNeedToCompute = true;
 
@@ -86,7 +94,7 @@ export class EventSignal<T, S=T, D=undefined> {
     public readonly lastError?: Error | string;
     public isDestroyed = false;
     /** WeakRef or replacement object */
-    private readonly _sourceEmitterRef?: { deref(): EventEmitter | EventEmitterEx | EventTarget | undefined };
+    private readonly _sourceEmitterRef?: { deref(): EventEmitter | EventEmitterX | EventTarget | undefined };
     private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceMap"];
     private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceFilter"];
     private readonly _initialComputations?: [
@@ -188,7 +196,7 @@ export class EventSignal<T, S=T, D=undefined> {
         const {
             _subscriptionsToDeps,
             _computation,
-            _setNeedToCompute,
+            _oneOfDepUpdated,
         } = this;
 
         this.hasComputation = typeof _computation === 'function';
@@ -215,7 +223,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 for (const { eventName } of deps) {
                     _subscriptionsToDeps.add(eventName);
 
-                    signalEventsEmitter.on(eventName, _setNeedToCompute);
+                    signalEventsEmitter.on(eventName, _oneOfDepUpdated);
                 }
             }
 
@@ -224,7 +232,7 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (sourceEvent && sourceEmitter) {
-                this._sourceEmitterRef = _weakRefFabric<EventEmitter | EventEmitterEx | EventTarget>(sourceEmitter);
+                this._sourceEmitterRef = _weakRefFabric<EventEmitter | EventEmitterX | EventTarget>(sourceEmitter);
                 this._sourceMapFn = sourceMap;
                 this._sourceFilterFn = sourceFilter;
                 this._initialComputations = [];
@@ -289,7 +297,7 @@ export class EventSignal<T, S=T, D=undefined> {
             _signalSymbol,
             _abortSignal,
             _subscriptionsToDeps,
-            _setNeedToCompute,
+            _oneOfDepUpdated,
             _initialComputations,
             _sourceEmitterRef,
         } = this;
@@ -326,7 +334,7 @@ export class EventSignal<T, S=T, D=undefined> {
          * Удаляем подписки на другие EventSignal.
          */
         for (const eventName of _subscriptionsToDeps) {
-            signalEventsEmitter.removeListener(eventName, _setNeedToCompute);
+            signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
         }
 
         _subscriptionsToDeps.clear();
@@ -490,8 +498,10 @@ export class EventSignal<T, S=T, D=undefined> {
             try {
                 this._computationsCount++;
 
+                // Если в _computation нужны _updateFlags они должны быть прочитаны сразу, в синхронном коде.
                 const newValue = _computation(prevValue, _sourceValue, this);
 
+                this._updateFlags = 0;
                 this._isNeedToCompute = false;
 
                 // fixme: Async computation is experimental!
@@ -602,6 +612,7 @@ export class EventSignal<T, S=T, D=undefined> {
                     }
                     finally {
                         this._nowInSettings = false;
+                        this._updateFlags = 0;
                     }
                 }
             }
@@ -654,6 +665,10 @@ export class EventSignal<T, S=T, D=undefined> {
         return this._sourceValue;
     };
 
+    getUpdateFlags() {
+        return this._updateFlags;
+    }
+
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
     set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)) {
@@ -705,12 +720,16 @@ export class EventSignal<T, S=T, D=undefined> {
                 || !Object.is(newSourceValue, _sourceValue)
             ))
         ) {
+            this._updateFlags |= _EventSignal__UpdateFlags__wasSourceSetting;
             this._sourceValue = newSourceValue;
-            this._isNeedToCompute = true;
 
-            signalEventsEmitter.emit(this._signalSymbol);
+            if (!this._nowInComputing) {
+                this._isNeedToCompute = true;
 
-            return true;
+                signalEventsEmitter.emit(this._signalSymbol);
+
+                return true;
+            }
         }
 
         return false;
@@ -730,13 +749,13 @@ export class EventSignal<T, S=T, D=undefined> {
                 // call recalculation in microtask
                 this._recalcPromise = Promise.resolve()
                     // eslint-disable-next-line promise/prefer-await-to-then
-                    .then(() => {
+                    .then(async () => {
                         this._recalcPromise = void 0;
 
                         // call new recalculation value:
                         //  1. resolving pending promises
                         //  2. trigger new changes event to subscribers
-                        this.get();
+                        await this._calculateValue(void 0);
                         // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
                     }).catch(error => {
                         // todo: Не выводить ошибку в консоль, а кидать в signalEventsEmitter событие 'signalError' в
@@ -875,7 +894,7 @@ export class EventSignal<T, S=T, D=undefined> {
             //  2. Когда в EventsEmitterEx будет реализован третий параметр, передевать:
             //    2.1. cleanupCallback(onTeardown) - коллбек, который должен вызываться, когда этот listener удаляется
             //    2.2. weakSpyOnTarget - объект, который нужно добавить в WeakMap и при удалении которого GC мы должны удалить listener (это будет проверять setInterval каждые 2-5 минут).
-            signalEventsEmitter.addListener(signalSymbol, this._setNeedToCompute);
+            signalEventsEmitter.addListener(signalSymbol, this._oneOfDepUpdated);
         }
     }
 
@@ -1377,11 +1396,11 @@ export class EventSignal<T, S=T, D=undefined> {
             // (можно сделать для этого отдельный метод, который будет вызывать computation только если оно ещё ни разу не вызывалось).
             const signalValue = eventSignal.getSafe();
             const { componentType } = eventSignal;
-            const reactFCDescriptor = sFC !== void 0 ? [ sFC ] : (Boolean(_React_createElement)
+            const reactFCDescriptor = sFC === void 0 && Boolean(_React_createElement)
                 ? eventSignal._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
                 : void 0
-            );
-            const reactFC = reactFCDescriptor?.[0];
+            ;
+            const reactFC = sFC !== void 0 ? sFC : reactFCDescriptor?.[0];
             const has_reactFC = reactFC != null && reactFC !== false;
             const preDefinedProps = has_reactFC ? reactFCDescriptor?.[1] as Record<any, any> : void 0;
             let snapshotVersion: string | undefined = void 0;
@@ -1412,7 +1431,9 @@ export class EventSignal<T, S=T, D=undefined> {
                         eventSignal,
                         version,
                         snapshotVersion,
-                        componentType, ...preDefinedProps, ...otherProps,
+                        componentType,
+                        ...preDefinedProps,
+                        ...otherProps,
                     }, children || null);
 
                     if (isDev) {
@@ -1612,7 +1633,7 @@ export namespace EventSignal {
         initialSourceValue: S;
     }
     export type NewOptionsWithSource<T, S, D> = NewOptions<T, S, D> & {
-        sourceEmitter: EventEmitter | EventEmitterEx | EventTarget | undefined,
+        sourceEmitter: EventEmitter | EventEmitterX | EventTarget | undefined,
         // todo: добавить sourceMapAndFilter, который может быть использован вместо пары sourceMap/sourceFilter
         sourceEvent: (number | string | symbol)[] | number | string | symbol,
         sourceMap?: (eventName: number | string | symbol, ...args: any[]) => S,
@@ -1640,7 +1661,7 @@ export namespace EventSignal {
 
 type _PreDefinedProps<PROPS=any> = Omit<Partial<PROPS>, 'componentType' | 'eventSignal' | 'version'>;
 
-const _componentsEmitter = new EventEmitterEx({
+const _componentsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
 
@@ -1712,21 +1733,35 @@ const _unAwaitNextAnimationFrame = (func: () => void) => {
     }
 };
 
+const _hasWeekMapSymbolsSupport = (function() {
+    try {
+        const wm = new WeakMap();
+        const symbol = Symbol();
+        const obj = {};
+
+        wm.set(symbol as unknown as Object, obj);
+
+        return wm.get(symbol as unknown as Object) === obj;
+    }
+    catch {
+        return false;
+    }
+})();
+
+type _ComponentDescriptionForStatus = [
+    reactFC: EventSignal.ReactFC<any, any, any>,
+    preDefinedProps?: Object,
+];
+
 const _reactFunctionComponentByComponentType_WeakMap = new WeakMap();
 const _reactFunctionComponentByComponentType_Map = new Map<number | string, {
-    [status: string]: [
-        reactFC: EventSignal.ReactFC<any, any, any>,
-        preDefinedProps?: Object,
-    ],
+    [status: string]: _ComponentDescriptionForStatus,
 }>();
 
 function _getReactFunctionComponent(
     componentType: EventSignal.NewOptions<any, any, any>["componentType"],
     status?: string,
-): [
-    reactFC: EventSignal.ReactFC<any, any, any>,
-    preDefinedProps?: Object,
-] | null {
+): _ComponentDescriptionForStatus | null {
     const type = typeof componentType;
 
     if (componentType === null || type === 'undefined') {
@@ -1734,24 +1769,15 @@ function _getReactFunctionComponent(
     }
 
     const reactFCs: ReturnType<typeof _reactFunctionComponentByComponentType_Map.get> | null = (
-        (type === 'object' || (type === 'symbol' && _isUniqueSymbol(componentType as symbol)))
+        (type === 'object' || (type === 'symbol' && _hasWeekMapSymbolsSupport && isUniqueSymbol(componentType as symbol)))
             ? _reactFunctionComponentByComponentType_WeakMap.get(componentType as Object)
             : _reactFunctionComponentByComponentType_Map.get(componentType as number | string)
     ) || null;
 
-    return reactFCs ? ((status != null ? reactFCs[status] : null) || reactFCs['default'] || null) : null;
-}
-
-function _isUniqueSymbol(sym: symbol) {
-    if (typeof (Symbol as unknown as { isRegistered: (sym: symbol) => boolean | undefined }).isRegistered === 'function'
-        && typeof (Symbol as unknown as { isWellKnown: (sym: symbol) => boolean | undefined }).isWellKnown === 'function'
-    ) {
-        return !(Symbol as unknown as { isRegistered: (sym: symbol) => boolean | undefined }).isRegistered(sym)
-            && !(Symbol as unknown as { isWellKnown: (sym: symbol) => boolean | undefined }).isWellKnown(sym)
-        ;
-    }
-
-    return typeof Symbol.keyFor.call(Symbol, sym) === 'undefined';
+    return reactFCs
+        ? ((status != null ? reactFCs[status] : null) || reactFCs["default"] || null)
+        : null
+    ;
 }
 
 function _setReactFunctionComponent(
@@ -1767,10 +1793,11 @@ function _setReactFunctionComponent(
     }
 
     const _status = status ?? 'default';
-    const map = (type === 'object' || (type === 'symbol' && _isUniqueSymbol(componentType as symbol)))
-        ? (_reactFunctionComponentByComponentType_WeakMap as unknown as typeof _reactFunctionComponentByComponentType_Map)
-        : _reactFunctionComponentByComponentType_Map
-    ;
+    const map = (
+        (type === 'object' || (type === 'symbol' && _hasWeekMapSymbolsSupport && isUniqueSymbol(componentType as symbol)))
+            ? (_reactFunctionComponentByComponentType_WeakMap as unknown as typeof _reactFunctionComponentByComponentType_Map)
+            : _reactFunctionComponentByComponentType_Map
+    );
     const prev_reactFCs = map.get(componentType as string) || null;
     const prev_reactFCDescriptor = prev_reactFCs?.[_status];
 
@@ -1779,13 +1806,26 @@ function _setReactFunctionComponent(
             map.delete(componentType as string);
         }
     }
-    else if (prev_reactFCs === null) {
-        map.set(componentType as string, Object.setPrototypeOf({
-            [_status]: [ reactFC, preDefinedProps ],
-        }, null));
-    }
     else {
-        prev_reactFCs[_status] = [ reactFC, preDefinedProps ];
+        const componentDescriptionForStatus = {
+            0: reactFC,
+            1: preDefinedProps,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore allow `__proto__: null`
+            __proto__: null,
+        } as unknown as _ComponentDescriptionForStatus;
+
+        if (prev_reactFCs === null) {
+            map.set(componentType as string, {
+                [_status]: componentDescriptionForStatus,
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__: null`
+                __proto__: null,
+            });
+        }
+        else {
+            prev_reactFCs[_status] = componentDescriptionForStatus;
+        }
     }
 
     return prev_reactFCDescriptor || null;
@@ -1809,7 +1849,10 @@ function _eventTargetAgnosticAddListener<T>(
         }
     }
     else if (typeof (emitter as EventTarget).addEventListener === 'function') {
-        const eventName = typeof name === 'symbol' ? String(`symbol----${String(name)}`) : name as string;
+        const eventName = typeof (name as unknown) === 'symbol'
+            ? String(`symbol----${String(name)}`)
+            : name as string
+        ;
 
         (emitter as EventTarget).addEventListener(eventName, listener as (() => void), flags);
     }
@@ -1824,7 +1867,10 @@ function _eventTargetAgnosticRemoveListener<T>(emitter: EventEmitter | EventTarg
         (emitter as EventEmitter).removeListener(name as string, listener);
     }
     else if (typeof (emitter as EventTarget).removeEventListener === 'function') {
-        const eventName = typeof name === 'symbol' ? String(`symbol----${String(name)}`) : name as string;
+        const eventName = typeof (name as unknown) === 'symbol'
+            ? String(`symbol----${String(name)}`)
+            : name as string
+        ;
         const compatibleListener = listener[kTargetListener] || listener;
 
         (emitter as EventTarget).removeEventListener(eventName, compatibleListener);
