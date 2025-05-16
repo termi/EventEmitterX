@@ -152,8 +152,8 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
     // if (signal?.aborted)
     //     throw ErrorTools.createAbortError(undefined, { cause: signal.reason });
 
-    if (event === void 0 || event === null) {
-        throw new TypeError(`eventsAsyncIterator: Invalid "event" argument. Received ${event}`);
+    if (event == null) {
+        throw new TypeError(`eventsAsyncIterator: Invalid "event" argument. Received ${String(event as unknown)}`);
     }
 
     const {

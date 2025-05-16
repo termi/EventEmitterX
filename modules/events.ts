@@ -63,10 +63,10 @@ export interface IMinimumCompatibleEmitter {
 }
 
 // type NodeEventEmitter = EventEmitter;
-export declare type Listener = (this: EventEmitterEx | undefined, ...args: any[]) => Promise<any> | void;
+export declare type Listener = (this: EventEmitterEx | undefined, ...args: any[]) => Promise<any> | undefined | void;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
-    handleEvent(...args: Parameters<EventMap[EventKey]>): Promise<any> | void;
+    handleEvent(...args: Parameters<EventMap[EventKey]>): Promise<any> | undefined;
 }
 */
 export declare type NodeEventName = string | symbol;
@@ -132,7 +132,7 @@ interface StaticOnceOptionsDefault {
      * @see [nodejs AbortController]{@link https://nodejs.org/api/globals.html#globals_class_abortcontroller}
      * @see [MDN AbortController]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortController}
      */
-    abortControllers?: (AbortController | void)[];
+    abortControllers?: (AbortController | undefined)[];
     // todo: Подумать о переименовании в timings (так в NoSQL)
     timing?: ServerTiming;
     /** the timeout in ms for resolving the promise before it is rejected with an
@@ -252,15 +252,15 @@ const {
 }: {
     readonly errorMonitor: typeof import("node:events").errorMonitor,
     readonly captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol,
-    readonly getEventListeners: typeof import("node:events").getEventListeners | void,
+    readonly getEventListeners: typeof import("node:events").getEventListeners | undefined,
 } = (function(): {
     readonly errorMonitor: typeof import("node:events").errorMonitor,
     readonly captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol,
-    readonly getEventListeners: typeof import("node:events").getEventListeners | void,
+    readonly getEventListeners: typeof import("node:events").getEventListeners | undefined,
 } {
-    let errorMonitor: typeof import("node:events").errorMonitor | void;
-    let captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol | void;
-    let getEventListeners: typeof import("node:events").getEventListeners | void;
+    let errorMonitor: typeof import("node:events").errorMonitor | undefined;
+    let captureRejectionSymbol: typeof import("node:events").captureRejectionSymbol | undefined;
+    let getEventListeners: typeof import("node:events").getEventListeners | undefined;
 
     if (isNodeJS) {
         // this is nodejs
@@ -405,7 +405,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
     _maxListeners = Number.POSITIVE_INFINITY;
 
     private _f = 0;
-    private _emitCounter: Console | ICounter | void;
+    private _emitCounter: Console | ICounter | undefined;
 
     /**
      * Private list of local once listeners.
@@ -946,7 +946,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let has_removeListener_listener = _checkBit(_f, EventEmitterEx_Flags_has_removeListener_listener);
 
         const hasAnyOnceListener = __onceWrappers.size > 0;
-        let newListenersCount: number | void = void 0;
+        let newListenersCount: number | undefined = void 0;
         // let originalListener: void|Function = void 0;
 
         if (typeof handler === 'function') {
@@ -1545,8 +1545,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         ;
         const debugInfo = staticOnceOptions.debugInfo || void 0;
         const hasDebugInfo = _isObject(debugInfo);
-        let abortControllersGroup: TAbortControllersGroup | void;
-        let listenersCleanUp: Function | void = void 0;
+        let abortControllersGroup: TAbortControllersGroup | undefined;
+        let listenersCleanUp: Function | undefined = void 0;
 
         if (isEventTarget) {
             if (usePrependListener) {
@@ -1614,7 +1614,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         let promise;
 
         if (Array.isArray(types)) {
-            let winnerEventType: (typeof types extends (infer T)[] ? T : typeof types) | void;
+            let winnerEventType: (typeof types extends (infer T)[] ? T : typeof types) | undefined;
 
             promise = new _Promise<any[]>((resolve, reject) => {
                 const eventListenersByType: [
@@ -1891,8 +1891,8 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
 
         if (signal || timeout) {
-            let abortCallback: ((this: AbortSignal | void, event_: AbortSignalEventMap["abort"] | typeof sCleanAbortPromise) => void) | void;
-            let cleanTimeoutCallback: Function | void;
+            let abortCallback: ((this: AbortSignal | undefined | void, event_: AbortSignalEventMap["abort"] | typeof sCleanAbortPromise) => void) | undefined;
+            let cleanTimeoutCallback: Function | undefined;
 
             // Turn an event into a promise, reject it once `abort` is dispatched
             const cancelPromise = signal ? new _Promise<void>((resolve, reject) => {
@@ -1943,7 +1943,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 signal.addEventListener('abort', abortCallback);
             }) : void 0;
             const timeoutPromise = timeout ? new _Promise<void>((resolve, reject) => {
-                let timeoutId: Timeout | void = setTimeout(() => {
+                let timeoutId: Timeout | undefined = setTimeout(() => {
                     if (hasTiming) {
                         _assertIsDefined(timing);
 
@@ -2255,7 +2255,7 @@ interface EventEmitterSimpleProxy_Options extends _ConstructorOptions {
 }
 
 export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
-    private _eventEmitter: EventEmitterEx | INodeEventEmitter | void;
+    private _eventEmitter: EventEmitterEx | INodeEventEmitter | undefined;
     // private _eventTarget: DOMEventTarget|void;
     private _proxyHandlers: Partial<Record<EventName, (...args: any[]) => void>> = Object.create(null);
 
@@ -2493,15 +2493,15 @@ if (EventEmitterSimpleProxy.constructor.name !== tagEventEmitterSimpleProxy) {
 }
 
 type EventEmitterProxy_SourceProxyHook = (
-    defaultEventEmitter: ICompatibleEmitter | void,
+    defaultEventEmitter: ICompatibleEmitter | undefined,
     eventType: EventName,
-) => ICompatibleEmitter | null | void;
+) => ICompatibleEmitter | null | undefined;
 
 type EventEmitterProxy_TargetProxyHook = (
-    defaultEventEmitter: ICompatibleEmitter | void,
+    defaultEventEmitter: ICompatibleEmitter | undefined,
     eventType: EventName,
     eventArgs: unknown[] | null,
-) => ICompatibleEmitter | null | void;
+) => ICompatibleEmitter | null | undefined;
 
 interface EventEmitterProxy_Options extends _ConstructorOptions {
     sourceEmitter?: ICompatibleEmitter/* | DOMEventTarget*/;
@@ -2525,10 +2525,10 @@ interface EventEmitterProxy_Options extends _ConstructorOptions {
 }
 
 export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
-    private _getSourceEmitter: EventEmitterProxy_SourceProxyHook | void = void 0;
-    private _getTargetEmitter: EventEmitterProxy_TargetProxyHook | void = void 0;
-    private _sourceEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | void;
-    private _targetEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | void;
+    private _getSourceEmitter: EventEmitterProxy_SourceProxyHook | undefined = void 0;
+    private _getTargetEmitter: EventEmitterProxy_TargetProxyHook | undefined = void 0;
+    private _sourceEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | undefined;
+    private _targetEmitter: ICompatibleEmitter/* | DOMEventTarget*/ | undefined;
     // private _eventTarget: DOMEventTarget|void;
     private _allowDirectEmitToTarget: Required<EventEmitterProxy_Options["allowDirectEmitToTarget"]>;
     private _hasProxyHandlers: Partial<Record<EventName, true>> = Object.create(null);
@@ -2827,7 +2827,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         return result;
     }
 
-    private _removeListenerFromTargets(event: EventName | void, targetEmitter: ICompatibleEmitter | void) {
+    private _removeListenerFromTargets(event: EventName | undefined, targetEmitter: ICompatibleEmitter | undefined) {
         const has_event = event !== void 0;
         const has_targetEmitter = targetEmitter !== void 0;
         const subscriptionsCounters: Record<EventName, number> = Object.create(null);
@@ -2913,7 +2913,7 @@ export const { once, on, getEventListeners } = EventEmitterEx;
  * @private
  */
 class EventsTypeError extends TypeError {
-    code: string | void;
+    code: string | undefined;
 
     constructor(message = '', code?: string) {
         message = String(message || '');
@@ -3097,7 +3097,7 @@ function _isDOMEventTargetSupportSymbolAsType(eventTarget: DOMEventTarget) {
  * @param emitter
  * @private
  */
-function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter | IMinimumCompatibleEmitter | INodeEventEmitter | Object | null | void): emitter is IMinimumCompatibleEmitter {
+function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter | IMinimumCompatibleEmitter | INodeEventEmitter | Object | null | undefined): emitter is IMinimumCompatibleEmitter {
     return !!emitter
         && typeof (emitter as INodeEventEmitter).on === 'function'
         && typeof (emitter as INodeEventEmitter).prependListener === 'function'
@@ -3105,7 +3105,7 @@ function _isEventEmitterCompatible(emitter: EventEmitterEx | ICompatibleEmitter 
     ;
 }
 
-export function isEventEmitterCompatible(emitter: EventEmitterEx | INodeEventEmitter | Object | null | void): emitter is ICompatibleEmitter {
+export function isEventEmitterCompatible(emitter: EventEmitterEx | INodeEventEmitter | Object | null | undefined): emitter is ICompatibleEmitter {
     return _isEventEmitterCompatible(emitter)
         && typeof (emitter as INodeEventEmitter).addListener === 'function'
         && typeof (emitter as INodeEventEmitter).once === 'function'
@@ -3193,7 +3193,7 @@ function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
  * @private
  */
 function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
-    const preValue = eventTarget[_kEventTargetSignalSupport] as boolean | void;
+    const preValue = eventTarget[_kEventTargetSignalSupport] as boolean | undefined;
 
     if (preValue !== void 0) {
         return preValue;
@@ -3260,7 +3260,7 @@ function _assertIsDefined<T>(value: T): asserts value is NonNullable<T> {
 }
 
 /** @private */
-function _typesToArrayStringTag(types: EventName | EventName[] | void, errorEventName?: EventName | EventName[] | void) {
+function _typesToArrayStringTag(types: EventName | EventName[] | undefined, errorEventName?: EventName | EventName[] | undefined) {
     if (!types && types !== 0 && (n0 === void 0 || (types as EventName & bigint) !== n0)) {
         types = [];
     }
