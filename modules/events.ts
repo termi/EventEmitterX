@@ -2184,6 +2184,10 @@ export {
 function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = false) {
     let { stack = '' } = error;
 
+    if (!Object.getOwnPropertyDescriptor(error, "stack")?.configurable) {
+        return error;
+    }
+
     if (!error["originalStack"]) {
         Object.defineProperty(error, "originalStack", {
             value: stack,
