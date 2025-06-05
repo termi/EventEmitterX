@@ -3758,9 +3758,26 @@ function _argumentsClone2(_arguments: IArguments, fromIndex = 0) {
 
 /**
  * @private
+ * @example
+ * // Check for error
+ * "Uncaught TypeError: Cannot assign to read only property 'stack' of object '[object DOMException]'"
  */
-function _isPropertyEditable(obj: Object, propertyName: string): boolean {
-    const stackPropertyDescriptors = Object.getOwnPropertyDescriptor(obj, propertyName);
+function _isPropertyEditable(obj: Object, propertyName: string, options: { isUseDefineProperty?: boolean } = {}): boolean {
+    if (Object.isFrozen(obj) || Object.isSealed(obj)) {
+        return false;
+    }
 
-    return !!(stackPropertyDescriptors?.configurable && stackPropertyDescriptors.writable && typeof stackPropertyDescriptors.set === 'function');
+    const propertyDescriptors = Object.getOwnPropertyDescriptor(obj, propertyName);
+
+    // No descriptor + object is not frozen/sealed, so 100% we can add property
+    if (!propertyDescriptors) {
+        return true;
+    }
+
+    // Can't use Object.defineProperty for props with configurable === false
+    if (options.isUseDefineProperty && !propertyDescriptors.configurable) {
+        return false;
+    }
+
+    return !!propertyDescriptors.writable;
 }
