@@ -2184,7 +2184,7 @@ export {
 function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = false) {
     let { stack = '' } = error;
 
-    if (!Object.getOwnPropertyDescriptor(error, "stack")?.configurable) {
+    if (!_isPropertyEditable(error, 'stack')) {
         return error;
     }
 
@@ -3754,4 +3754,13 @@ function _argumentsClone2(_arguments: IArguments, fromIndex = 0) {
     }
 
     return Array.prototype.slice.call(_arguments, fromIndex);
+}
+
+/**
+ * @private
+ */
+function _isPropertyEditable(obj: Object, propertyName: string): boolean {
+    const stackPropertyDescriptors = Object.getOwnPropertyDescriptor(obj, propertyName);
+
+    return !!(stackPropertyDescriptors?.configurable && stackPropertyDescriptors.writable && typeof stackPropertyDescriptors.set === 'function');
 }
