@@ -1,0 +1,11 @@
+
+.idea
+build
+build_cache
+build_ts
+node_modules
+
+backend/prisma/data
+backend/prisma/migrations
+
+npm-debug.log

@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./data/dev.db"
+}
+
+model Round {
+  id              Int                @id @default(autoincrement())
+  title           String
+  description     String?
+  token           String             @default(uuid())
+  completed       Boolean            @default(false)
+  createdAt       DateTime           @default(now())
+  startedAt       DateTime
+  endedAt         DateTime
+  cooldownSec     Int                @default(30)
+  flags           Int
+  author          User               @relation("RoundAuthor", fields: [authorId], references: [id])
+  authorId        Int
+  tapsCount       Int                @default(0)
+  hiddenTapsCount Int                @default(0)
+  taps            RoundTaps[]
+  tapsHistory     RoundTapsHistory[]
+
+  @@index([completed, startedAt(sort: Desc), endedAt(sort: Desc)])
+}
+
+model User {
+  id            Int                @id @default(autoincrement())
+  email         String             @unique
+  name          String
+  role          UserRole           @default(USER)
+  isActive      Boolean            @default(true)
+  passwordHash  String
+  passwordSalt  String             @default(uuid())
+  refreshToken  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  createdRounds Round[]            @relation("RoundAuthor")
+  taps          RoundTaps[]
+  tapsHistory   RoundTapsHistory[]
+
+  @@index([refreshToken])
+  @@index([email])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  USER_HIDE_TAPS
+}
+
+model RoundTaps {
+  id          Int      @id @default(autoincrement())
+  user        User     @relation(fields: [userId], references: [id])
+  userId      Int
+  round       Round    @relation(fields: [roundId], references: [id])
+  roundId     Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  count       Int      @default(0)
+  hiddenCount Int      @default(0)
+
+  @@unique([userId, roundId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model RoundTapsHistory {
+  id        Int      @id @default(autoincrement())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    Int
+  round     Round    @relation(fields: [roundId], references: [id])
+  roundId   Int
+  createdAt DateTime @default(now())
+  isHidden  Boolean  @default(false)
+  count     Int      @default(1)
+
+  @@index([createdAt(sort: Desc)])
+}

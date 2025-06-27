@@ -1,0 +1,65 @@
+
+.selected-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 24px;
+  height: calc(100vh - 200px);
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--header-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.selected-card-content {
+  text-align: center;
+}
+
+.selected-card-title {
+  color: var(--text-color);
+}
+
+.selected-card-description {
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--text-color);
+  opacity: 0.9;
+  margin-bottom: 24px;
+}
+
+.selected-card-timer {
+  padding: 10px;
+  border: 1px solid black;
+}
+
+.selected-card-timer__ticker {
+  margin-inline-start: 2em;
+  color: var(--nav-link-hover);
+}
+
+.selected-card-time {
+  font-size: 32px;
+  font-family: monospace;
+  color: var(--nav-link-hover);
+  margin-top: 20px;
+}
+
+.selected-card-clicker {
+  user-select: none;
+  padding: 40px;
+  border: 5px solid var(--header-border);
+  border-radius: 30px;
+}
+
+.selected-card-score-info {
+  padding: 10px;
+  border: 1px solid black;
+  display: flex;
+  justify-content: space-around;
+
+  .selected-card-score-info__total {
+    font-size: 120%;
+  }
+  .selected-card-score-info__user {
+    font-size: 140%;
+  }
+}

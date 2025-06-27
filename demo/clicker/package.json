@@ -1,0 +1,49 @@
+{
+  "name": "tech-task-for-interview",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "bash/run_dev_backend_frontend.sh",
+    "test": "bash/run_all_tests.sh",
+    "postinstall": "bash/postinstall/pnpm_install_inner_deps.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/termi/tech-task-for-interview.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/termi/tech-task-for-interview/issues"
+  },
+  "homepage": "https://github.com/termi/tech-task-for-interview#readme",
+  "description": "",
+  "packageManager": "pnpm@6.32.1+",
+  "dependencies": {
+    "@sinclair/typebox": "0.34.35",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "7.27.1",
+    "@eslint/js": "^9.29.0",
+    "@jest/globals": "30.0.2",
+    "@prisma/client": "link:./backend/node_modules/@prisma/client",
+    "@stylistic/eslint-plugin": "^4.4.1",
+    "@types/jest": "30.0.0",
+    "@types/mitm": "1.3.8",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "eslint": "^9.29.0",
+    "eslint-plugin-promise": "^7.2.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.20",
+    "eslint-plugin-unicorn": "^59.0.1",
+    "globals": "^16.2.0",
+    "jest": "30.0.2",
+    "mitm": "1.7.3",
+    "ts-jest": "29.4.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.1"
+  }
+}
