@@ -55,14 +55,6 @@ export function errorToDTO(error: Error | unknown): ErrorDTO {
     };
 }
 
-// note: Почему-то из файла types/global.d.ts не работает
-declare global {
-    interface ObjectConstructor {
-        keys<T extends object>(o: T): (keyof T)[];
-        keys(o: object): string[];
-    }
-}
-
 export function errorFromDTO(errorDTO: ErrorDTO) {
     if (!checkErrorStackIsEditable()) {
         return _syntheticCreateError(errorDTO);
