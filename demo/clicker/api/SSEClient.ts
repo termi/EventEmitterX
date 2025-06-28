@@ -7,6 +7,8 @@ import { isAbortError } from "../modules/common/abortable";
 import { EventSignal } from "../modules/EventEmitterX/EventSignal";
 import { mainProcessJTWStorage } from "../logic/mainProcessJTWStorage";
 import { request } from "./request";
+import { makeRandomString } from "../utils/random";
+import { append } from "../utils/object";
 
 const SECONDS = 1000;
 const SECONDS_30 = 30 * SECONDS;
@@ -29,7 +31,8 @@ type SSEClientEvents = {
 };
 
 const kManualDisconnectedReason = Symbol('kManualDisconnectedReason');
-const clientComponentTypeSSEClient = 'SSEClient';
+const stringTagName = 'SSEClient';
+const componentTypeSSEClient = makeRandomString('SSEClient', true);
 
 export class SSEClient extends EventEmitterX<SSEClientEvents> {
     private _ac: AbortController | undefined;
@@ -52,7 +55,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         this.maxRetries = options.maxRetries ?? 5;
         this.initialRetryDelay = options.initialRetryDelay ?? SECONDS;
 
-        this._outerSignal?.addEventListener('abort', this._onOuterAbort, { once: true });
+        this._outerSignal?.addEventListener('abort', this[Symbol.dispose], { once: true });
 
         this.on('error', (error: unknown) => {
             console.error('SSEClient: onerror:', error);
@@ -62,20 +65,16 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
     destructor() {
         this.disconnect();
 
-        this._outerSignal?.removeEventListener('abort', this._onOuterAbort);
+        this._outerSignal?.removeEventListener('abort', this[Symbol.dispose]);
         this.state$.destructor();
 
         this._outerSignal = void 0;
         this._flags |= SSEClientFlags.isDestroyed;
     }
 
-    [Symbol.dispose]() {
+    [Symbol.dispose] = () => {
         this.destructor();
     }
-
-    _onOuterAbort = () => {
-        this.destructor();
-    };
 
     get isDestroyed() {
         return (this._flags & SSEClientFlags.isDestroyed) !== 0;
@@ -142,7 +141,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
 
             return 'unknown';
         },
-        componentType: clientComponentTypeSSEClient,
+        componentType: componentTypeSSEClient,
     });
 
     private async createConnection(canThrowError?: boolean) {
@@ -229,37 +228,37 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         }
     }
 
-    private async processStream(reader: ReadableStreamDefaultReader<Uint8Array>) {
+    private async processStream(_reader: ReadableStreamDefaultReader<Uint8Array>) {
+        using reader = append(_reader, {
+            [Symbol.dispose]() {
+                reader.releaseLock();
+            },
+        });
         const decoder = new TextDecoder();
         let buffer = '';
 
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
+        while (true) {
+            const { done, value } = await reader.read();
 
-                if (done || this._ac?.signal.aborted) {
-                    break;
-                }
-
-                buffer += decoder.decode(value, { stream: true });
-
-                const events = buffer.split('\n\n');
-                buffer = events.pop() || '';
-
-                for (const event of events) {
-                    this.parseEvent(event);
-                }
+            if (done || this._ac?.signal.aborted) {
+                break;
             }
 
-            // Если поток завершился (сервер закрыл соединение)
-            if (!this.isManualDisconnect) {
-                this._flags &= ~SSEClientFlags.isConnected;
-                this.emit('disconnect', true);
-                this.scheduleReconnect();
+            buffer += decoder.decode(value, { stream: true });
+
+            const events = buffer.split('\n\n');
+            buffer = events.pop() || '';
+
+            for (const event of events) {
+                this.parseEvent(event);
             }
         }
-        finally {
-            reader.releaseLock();
+
+        // Если поток завершился (сервер закрыл соединение)
+        if (!this.isManualDisconnect) {
+            this._flags &= ~SSEClientFlags.isConnected;
+            this.emit('disconnect', true);
+            this.scheduleReconnect();
         }
     }
 
@@ -396,8 +395,12 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         }
     }
 
-    static clientComponentType = clientComponentTypeSSEClient;
+    declare [Symbol.toStringTag]: string;
+
+    static componentType = componentTypeSSEClient;
 }
+
+SSEClient.prototype[Symbol.toStringTag] = stringTagName;
 
 export namespace SSEClient {
     export type Options = {

@@ -241,27 +241,45 @@ class ActiveRoundsStore extends EventEmitterX {
         this.#ongoingRoundTapsTimeout = void 0;
 
         for (const { 0: roundId, 1: count } of this.#ongoingRoundTapsByRoundId) {
-            apiMethods.makeRoundTap(roundId, { count })
-                .then(data => {
-                    const roundModel = RoundModel.getById(roundId);
-
-                    if (roundModel) {
-                        roundModel.updateTaps(data);
-                    }
-                })
-                .catch(error => {
-                    this.emit('error', error, 'makeRoundTap:');
-                })
-            ;
+            this._makeRoundTapSync(roundId, count);
         }
 
         this.#ongoingRoundTapsByRoundId.clear();
+    }
+
+    private _makeRoundTapSync(roundId: Round["id"], count = 1) {
+        apiMethods.makeRoundTap(roundId, { count })
+            .then(data => {
+                const roundModel = RoundModel.getById(roundId);
+
+                if (roundModel) {
+                    roundModel.updateTaps(data);
+                }
+            })
+            .catch(error => {
+                this.emit('error', error, 'makeRoundTap:');
+            })
+        ;
     }
 
     makeRoundTapSync(roundId: Round["id"], count = 1) {
         const roundModel = RoundModel.getById(roundId);
 
         if (roundModel) {
+            const { timeLeft } = roundModel;
+
+            if (!timeLeft) {
+                // Раунд закончился
+                // todo: Кидать ошибку, перехватывать её и кидать в систему уведомлений
+                return;
+            }
+
+            if (timeLeft < TIMES.SECONDS_5) {
+                this._makeRoundTapSync(roundId, count);
+
+                return;
+            }
+
             // Локально обновляем значения (обновление с сервера их перезатрёт)
             // note: Если не проверять на currentUserStore.isHiddenTaps, для пользователя Никиты тут будет сначала
             //  инкрементиться числа, а потом обнуляться.

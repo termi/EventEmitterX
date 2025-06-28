@@ -513,6 +513,7 @@ export function startRoundRouters(app = fastifyApp) {
 type SSEEvent = {
     event: 'round-created' | 'round-taps' | 'round-ended',
     data: `json::${string}`,
+    roundId?: number,
 };
 
 export function startSSERoundRouters(app = fastifyApp) {
@@ -525,6 +526,7 @@ export function startSSERoundRouters(app = fastifyApp) {
             const ac = new AbortController();
             const { signal } = ac;
             const sendWaitingQueue: SSEEvent[] = [];
+            const sendWaitingQueueIndexes = new Map<string, number>();
             const abortCallback = () => {
                 const reason = mainProcessAbortController.signal.aborted && mainProcessAbortController.signal.reason || null
 
@@ -554,6 +556,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                     }
 
                     sendWaitingQueue.length = 0;
+                    sendWaitingQueueIndexes.clear();
                 }
                 else {
                     reply.sse({
@@ -582,7 +585,19 @@ export function startSSERoundRouters(app = fastifyApp) {
                         reply.sse(event);
                     }
                     else {
-                        sendWaitingQueue.push(event);
+                        const key = event.roundId ? `${event.event}#${event.roundId}` : void 0;
+                        const existedIndex = key ? sendWaitingQueueIndexes.get(key) : void 0;
+
+                        if (existedIndex !== void 0) {
+                            sendWaitingQueue[existedIndex] = event;
+                        }
+                        else {
+                            const index = sendWaitingQueue.push(event) - 1;
+
+                            if (key) {
+                                sendWaitingQueueIndexes.set(key, index);
+                            }
+                        }
                     }
                 }
             ;
@@ -607,6 +622,11 @@ export function startSSERoundRouters(app = fastifyApp) {
                 signal,
             });
 
+            reply.sse({
+                event: 'system',
+                data: `json::${JSON.stringify({ type: 'options', useDelaysAndBatching })}`,
+            });
+
             if (useDelaysAndBatching) {
                 // Добавляем задержку, чтобы не отправлять данные сразу
                 await promiseTimeout(TIMES.SECONDS);
@@ -623,6 +643,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                     sendSSEEvent({
                         event: 'round-created',
                         data: `json::${JSON.stringify(minimalRoundInfo)}`,
+                        roundId: minimalRoundInfo.id,
                     });
                 }
             })().catch(error => {
@@ -647,6 +668,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                     sendSSEEvent({
                         event: 'round-ended',
                         data: `json::${JSON.stringify(roundInfo)}`,
+                        roundId: roundInfo.id,
                     });
                 }
             })().catch(error => {
@@ -671,6 +693,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                     sendSSEEvent({
                         event: 'round-taps',
                         data: `json::${JSON.stringify(roundInfo)}`,
+                        roundId: roundInfo.id,
                     });
                 }
             })().catch(error => {

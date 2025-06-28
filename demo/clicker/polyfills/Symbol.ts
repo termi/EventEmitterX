@@ -1,5 +1,15 @@
 'use strict';
 
+import { defineProperty } from '../utils/object'
+
+if (typeof (Symbol.dispose as unknown) !== 'symbol') {
+    defineProperty(Symbol, 'dispose', Symbol.for('Symbol.dispose'))
+}
+
+if (typeof (Symbol.asyncDispose as unknown) !== 'symbol') {
+    defineProperty(Symbol, 'asyncDispose', Symbol.for('Symbol.asyncDispose'))
+}
+
 // https://github.com/tc39/proposal-symbol-predicates
 if (typeof Symbol !== 'undefined') {
     if (typeof (Symbol as unknown as { isRegistered: ((sym: symbol) => boolean) | undefined }).isRegistered !== 'function') {

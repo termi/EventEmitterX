@@ -95,7 +95,23 @@ export class RoundModel {
     }
 
     get isActive() {
-        return this.completed;
+        return this.timeLeft !== 0;
+    }
+
+    get timeLeft() {
+        if (this.completed) {
+            return 0;
+        }
+
+        const now = Date.now();
+        const endedAt = this.endedAt.getTime();
+        const startedAt = this.startedAt.getTime();
+
+        if (startedAt < now && now < endedAt) {
+            return endedAt - now;
+        }
+
+        return 0;
     }
 
     private _timerStatus: 1 | 2 | 3 = 1;

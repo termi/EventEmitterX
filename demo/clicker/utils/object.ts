@@ -40,16 +40,38 @@ export function append<T extends object | null | undefined, U extends Array<obje
                 _target[key] = sourceValue;
             }
         }
+
+        const symbols = Object.getOwnPropertySymbols(source);
+
+        for (let i = 0, len = symbols.length ; i < len ; i++) {
+            const key = symbols[i];
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore `TS7053: Element implicitly has an any type because expression of type symbol can't be used to index type {}`
+            const sourceValue = source[key];
+
+            if (_target[key] === void 0 && sourceValue !== void 0) {
+                _target[key] = sourceValue;
+            }
+        }
     }
 
     return _target;
 }
 
-export function defineProperty(obj: object, name: string, value: any) {
+export function defineProperty(obj: object, name: string, value: any, attributes?: PropertyDescriptor & ThisType<any>) {
+    if (typeof attributes?.get === 'function' || typeof attributes?.set === 'function') {
+        return Object.defineProperty(obj, name, {
+            enumerable: false,
+            configurable: true,
+            ...attributes,
+        });
+    }
+
     return Object.defineProperty(obj, name, {
         enumerable: false,
         configurable: true,
         writable: true,
+        ...attributes,
         value: value,
     });
 }

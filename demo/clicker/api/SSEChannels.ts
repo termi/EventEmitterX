@@ -27,7 +27,7 @@ export class SSEChannels {
     roundsSSEUpdate(options?: SSEChannels.Options) {
         return new SSEClient({
             url: createRouteWithQuery(options?.baseURI ?? this.baseURI, roundsSSEUpdate.url, {
-                forceDelays: '',
+                forceDelays: String(options?.forceDelays ?? ''),
             }),
             getJWTToken: options?.getJWTToken || this.getJWTToken || mainProcessJTWStorage.getAccessToken,
             signal: options?.signal || this._outerSignal,
