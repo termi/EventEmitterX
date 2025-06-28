@@ -114,6 +114,7 @@ export class RoundModel {
         return 0;
     }
 
+    // todo: Сделал по-быстрому. Вынести в `const enum`.
     private _timerStatus: 1 | 2 | 3 = 1;
 
     get timerStatus() {

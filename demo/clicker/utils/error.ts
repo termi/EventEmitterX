@@ -55,6 +55,7 @@ export function errorToDTO(error: Error | unknown): ErrorDTO {
     };
 }
 
+// note: Почему-то из файла types/global.d.ts не работает
 declare global {
     interface ObjectConstructor {
         keys<T extends object>(o: T): (keyof T)[];
@@ -67,6 +68,7 @@ export function errorFromDTO(errorDTO: ErrorDTO) {
         return _syntheticCreateError(errorDTO);
     }
 
+    // todo: use errorDTO.className to setup right prototype
     const error = new Error('-placeholder-');
 
     for (const key of Object.keys(errorDTO)) {

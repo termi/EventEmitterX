@@ -334,7 +334,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
     }
 
     private scheduleReconnect(canThrowError?: boolean): void {
-        if (this.retryCount >= (this.maxRetries ?? 5)) {
+        if (this.retryCount >= this.maxRetries) {
             this._flags &= ~SSEClientFlags.isInReconnection;
 
             const error = new Error('Max reconnection attempts reached');

@@ -29,19 +29,19 @@ export class TemporaryMap<K, V> extends Map<K, V> {
         else {
             this._interval = setInterval(this._checkOutdatedValues, this._checkEveryMs);
 
-            this.#signal?.addEventListener('abort', this.destructor, { once: true });
+            this.#signal?.addEventListener('abort', this[Symbol.dispose], { once: true });
         }
     }
 
-    destructor = () => {
+    destructor() {
         this.clear();
         clearInterval(this._interval);
         this._interval = void 0;
-        this.#signal?.removeEventListener('abort', this.destructor);
+        this.#signal?.removeEventListener('abort', this[Symbol.dispose]);
         this.#signal = void 0;
     }
 
-    [Symbol.dispose]() {
+    [Symbol.dispose] = () => {
         this.destructor();
     }
 

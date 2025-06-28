@@ -27,6 +27,17 @@ describe('utils/object', function() {
             expect(result.b).toBe(obj2.b);
             expect(result.c).toBe(obj2.c);
         });
+
+        it('should copy Symbols', function() {
+            const symbol = Symbol('test');
+            const obj1 = { test: { value: 1 } };
+            const obj2 = { [symbol]: 2 };
+
+            const result = append(null, obj1, obj2, null, void 0);
+
+            expect(result.test).toBe(obj1.test);
+            expect(result[symbol]).toBe(obj2[symbol]);
+        });
     });
 
     describe('checkIsPropertyEditable', function() {

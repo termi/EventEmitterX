@@ -17,7 +17,7 @@ import { applicationStats } from "../../../develop/ApplicationStats";
 import { assertIsInValidNwtPortsRange } from "../../../type_guards/net";
 import { makeRandomInteger } from "../../../utils/random";
 import { isIDEDebugger } from "../../../utils/runEnv";
-import { createAbortSignalTimeout } from "../../../utils/abortable";
+import { createAbortSignalTimeout } from "../../../utils/timers";
 import { localISOString } from "../../../utils/date";
 import { setDefaultBaseURI } from "../../../api/methods";
 
