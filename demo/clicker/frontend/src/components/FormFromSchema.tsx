@@ -73,11 +73,11 @@ export default function FormFromSchema(props: {
         <div className={buttonsClassName}>
             {buttons.map(buttonDescription => {
                 const {
+                    id,
                     name,
-                    id = name,
                     label = '',
                 } = buttonDescription;
-                const key = `${name || ''}-${id}-${label}`;
+                const key = id ? id : `${name || ''}-${label}`;
 
                 // @ts-expect-error todo: Очень странная ошибка от TS нужно разобраться
                 return (<button

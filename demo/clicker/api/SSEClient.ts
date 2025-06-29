@@ -35,7 +35,7 @@ const stringTagName = 'SSEClient';
 const componentTypeSSEClient = makeRandomString('SSEClient', true);
 
 export class SSEClient extends EventEmitterX<SSEClientEvents> {
-    private _ac: AbortController | undefined;
+    private _connectionAbortController: AbortController | undefined;
     private _outerSignal: AbortSignal | undefined;
     private readonly _url: string;
     private readonly _getJWTToken: (() => string) | undefined;
@@ -89,8 +89,8 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
     }
 
     async connect(): Promise<void> {
-        this._ac?.abort();
-        this._ac = void 0;
+        this._connectionAbortController?.abort();
+        this._connectionAbortController = void 0;
 
         if (this.isDestroyed) {
             throw new Error('SSEClient: instance already destroyed');
@@ -109,9 +109,9 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
             // @ts-ignore
             ? AbortSignal.any([
                 options.signal,
-                this._ac?.signal,
+                this._connectionAbortController?.signal,
             ].filter(a => !!a))
-            : this._ac?.signal
+            : this._connectionAbortController?.signal
         ;
 
         return EventEmitterX.once(this, eventName, {
@@ -174,8 +174,8 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         };
 
         try {
-            this._ac?.abort();
-            this._ac = new AbortController();
+            this._connectionAbortController?.abort();
+            this._connectionAbortController = new AbortController();
 
             const token = this._getJWTToken?.() || mainProcessJTWStorage.getAccessToken();
 
@@ -188,7 +188,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
                     'Authorization': `Bearer ${token}`,
                     'Accept': 'text/event-stream',
                 },
-                signal: this._ac.signal,
+                signal: this._connectionAbortController.signal,
                 returnFetchResponse: true,
             });
 
@@ -240,7 +240,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         while (true) {
             const { done, value } = await reader.read();
 
-            if (done || this._ac?.signal.aborted) {
+            if (done || this._connectionAbortController?.signal.aborted) {
                 break;
             }
 
@@ -386,8 +386,8 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         this.emit('disconnect', false);
         this._flags &= ~(SSEClientFlags.isConnected | SSEClientFlags.isInReconnection);
         this._flags |= SSEClientFlags.isManualDisconnect;
-        this._ac?.abort(kManualDisconnectedReason);
-        this._ac = void 0;
+        this._connectionAbortController?.abort(kManualDisconnectedReason);
+        this._connectionAbortController = void 0;
 
         if (this._retryTimeout) {
             clearTimeout(this._retryTimeout);

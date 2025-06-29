@@ -1,6 +1,5 @@
 'use strict';
 
-import * as React from 'react';
 import { useEffect, useState } from 'react';
 
 const globalTickTimerApi = getGlobalTickTimerApi('tickerGroup');
@@ -39,7 +38,7 @@ function durationString(duration: number, alwaysShowHours?: boolean) {
     return df2.format(duration);
 }
 
-const Ticker: React.FC<TickerProps> = (props) => {
+export default function Ticker(props: TickerProps) {
     const {
         className = 'ticker',
         isBackward = false,
@@ -50,10 +49,10 @@ const Ticker: React.FC<TickerProps> = (props) => {
         timestampOffset,
     } = props;
 
-    const [ newNow, setNewNow ] = useState(0);
+    const newNowState = useState(0);
 
     useEffect(() => {
-        const onGlobalTick = setNewNow;
+        const onGlobalTick = newNowState[1];
 
         globalTickTimerApi.addTickerHandler(
             onGlobalTick,
@@ -71,7 +70,7 @@ const Ticker: React.FC<TickerProps> = (props) => {
         return <span/>;
     }
 
-    const now = newNow || Date.now();
+    const now = newNowState[0] || Date.now();
     let duration = isBackward
         ? timestamp - now
         : now - timestamp
@@ -92,7 +91,7 @@ const Ticker: React.FC<TickerProps> = (props) => {
             {timeString}
         </span>
     );
-};
+}
 
 function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
@@ -211,5 +210,3 @@ function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {
         __proto__: null,
     };
 }
-
-export default Ticker;
