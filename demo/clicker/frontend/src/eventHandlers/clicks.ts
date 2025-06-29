@@ -3,7 +3,7 @@
 import React from 'react';
 
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
-import { RoundModel } from "../../../logic/RoundModel";
+import { RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
 
 export const onRoundCardSelectClick: React.MouseEventHandler = function(event) {
     const { currentTarget } = event;
@@ -30,10 +30,10 @@ export const onSelectedCardClicked: React.MouseEventHandler = function(event) {
 
         if (roundModel) {
             const {
-                timerStatus,
+                readyState,
             } = roundModel;
 
-            if (timerStatus !== 2) {
+            if (readyState !== RoundModelReadyState.started) {
                 // Раунд завершен или ещё не начался
                 return;
             }

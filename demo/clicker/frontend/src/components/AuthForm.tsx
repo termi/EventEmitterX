@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { Navigate } from "react-router-dom";
 
+import FormFromSchema from "./FormFromSchema";
+
 import { useAuth } from '../hooks/useAuth';
 
 import { stringifyError } from "../../../utils/error";
@@ -53,26 +55,19 @@ export default function AuthForm() {
         <div className="auth-card">
             <h2 className="auth-title">{isRegistration ? 'Register' : 'Login'}</h2>
             {lastError && <div style={{ color: 'red' }}>{stringifyError(lastError)}</div>}
-            <form className="auth-form" onSubmit={handleSubmit} aria-disabled={isPending}>
-                {(elementsList.map(elementDescription => {
-                    const {
-                        id,
-                        label,
-                    } = elementDescription;
-
-                    return (<div key={id} className="form-group">
-                        <label htmlFor={id} className="form-label">{label}</label>
-                        <input
-                            disabled={isPending}
-                            {...elementDescription}
-                        />
-                    </div>)
-                }))}
-
-                <button className="auth-button" type="submit" disabled={isPending}>
-                    {isPending ? 'Processing...' : isRegistration ? 'Register' : 'Login'}
-                </button>
-            </form>
+            <FormFromSchema
+                className="auth-form" onSubmit={handleSubmit} aria-disabled={isPending}
+                elements={elementsList}
+                buttons={[
+                    {
+                        id: 'submit',
+                        label: isPending ? 'Processing...' : isRegistration ? 'Register' : 'Login',
+                        type: 'submit',
+                        className: 'auth-button',
+                        disabled: isPending,
+                    }
+                ]}
+            />
             <div className="auth-switch">
                 {isRegistration
                     ? (<span>Already have an account?{' '}

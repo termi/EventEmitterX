@@ -2,6 +2,8 @@
 
 import type { RoundModel } from "../../../logic/RoundModel";
 
+import { currentUserStore } from "../../../logic/currentUserStore";
+
 import { onRoundCardSelectClick } from "../eventHandlers/clicks";
 import Ticker from "../components/Ticker";
 
@@ -22,12 +24,14 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
         userHiddenTapsCount,
         score,
         userScore,
+        winnerUserInfo,
     } = roundModel;
     const {
         isBackward,
         timestamp,
         timerTitle,
     } = timerInfo;
+    const isCurrentUserIsWinner = winnerUserInfo?.id === currentUserStore.userId;
 
     return (
         <div data-round-id={id}
@@ -50,8 +54,10 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
             </div>
             <div data-taps-count={tapsCount} data-user-taps-count={userTapsCount}
                  data-hidden-taps-count={hiddenTapsCount} data-user-hidden-taps-count={userHiddenTapsCount}
+                 className={'card-score-info' + (isCurrentUserIsWinner ? ' card-score-info--you-are-the-winner' : '')}
             >
-                Счет: {score} Ваш счет: {userScore}
+                <span className="card-score-info__total">Счет: {score}</span>
+                <span className="card-score-info__user">Ваш счет: {userScore}</span>
             </div>
         </div>
     );

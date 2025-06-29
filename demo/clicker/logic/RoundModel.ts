@@ -6,13 +6,22 @@ import { EventSignal } from "../modules/EventEmitterX/EventSignal";
 import { TemporaryMap } from "../utils/TemporaryMap";
 import { makeRandomString } from "../utils/random";
 import { TIMES } from "../utils/times";
-import { ReplaceDateWithString } from "../types/generics";
+import { MakeOptional, ReplaceDateWithString } from "../types/generics";
 import apiMethods from "../api/methods";
 import { mainProcessAbortController } from "./mainProcessAbortController";
 import mainProcessChangeDataCapture from "./mainProcessChangeDataCapture";
 import { currentUserStore } from "./currentUserStore";
 
-export type RoundDTO = ReplaceDateWithString<Round> & {
+type WinnerUserInfo = {
+    id: number,
+    name: string,
+}
+
+export type RoundWinnerUserInfo = {
+    winnerUser?: WinnerUserInfo | null,
+};
+
+export type RoundWithTaps = Round & RoundWinnerUserInfo & {
     taps?: {
         userId: RoundTaps["userId"],
         count: RoundTaps["count"],
@@ -20,9 +29,24 @@ export type RoundDTO = ReplaceDateWithString<Round> & {
     }[],
 };
 
+export type RoundDTO = ReplaceDateWithString<
+    Omit<
+        MakeOptional<RoundWithTaps, 'tapsCount' | 'hiddenTapsCount'>,
+        'token' | 'createdAt' | 'authorId'
+    >
+> & RoundWinnerUserInfo;
+
+export const enum RoundModelReadyState {
+    completed = 1,
+    started = 2,
+    awaiting = 3,
+    readyToComplete = 4,
+}
+
 const tagRoundModel = 'RoundModel';
 
 export const componentTypeForRoundModel = makeRandomString(tagRoundModel, true);
+export const kRoundModelFriendWinnerUserInfoSet = Symbol('kRoundModelFriendWinnerUserInfoSet');
 
 export class RoundModel {
     /**
@@ -55,8 +79,13 @@ export class RoundModel {
     ] as const;
 
     private _selected = false;
+    private _wasRoundTaps: boolean = false;
+    private _usersInfo: (Map<number, MinimalRoundInfo_UserInfo> & {
+        make(): MinimalRoundInfo_UserInfo,
+    }) | undefined;
+    private _winnerUserInfo: WinnerUserInfo | null = null;
 
-    constructor(roundDTO: RoundDTO, now = Date.now()) {
+    constructor(roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
         this.id = roundDTO.id;
         this.title = roundDTO.title;
         this.description = roundDTO.description;
@@ -66,19 +95,22 @@ export class RoundModel {
         this.flags = roundDTO.flags;
         this.completed = roundDTO.completed || calculateIsRoundCompleted(roundDTO, now);
 
-        this.tapsCount = roundDTO.tapsCount;
-
         const { taps } = roundDTO;
         const userTaps = taps?.find(tap => tap.userId === currentUserStore.userId);
 
+        this._wasRoundTaps = Array.isArray(taps) && taps.length > 0;
+        this.tapsCount = roundDTO.tapsCount ?? 0;
         this.userTapsCount = userTaps?.count ?? 0;
-        this.hiddenTapsCount = roundDTO.hiddenTapsCount;
+        this.hiddenTapsCount = roundDTO.hiddenTapsCount ?? 0;
         this.userHiddenTapsCount = userTaps?.hiddenCount ?? 0;
+        this._winnerUserInfo = roundDTO.winnerUser || null;
     }
 
     destructor() {
         this.signal$.destructor();
+        this._usersInfo?.clear();
         mainProcessChangeDataCapture.removeListener(`round-updated#${this.id}`, this.updateFromDTO);
+        mainProcessChangeDataCapture.removeListener(`round-ended#${this.id}`, this.updateFromDTO);
         mainProcessChangeDataCapture.removeListener(`round-taps#${this.id}`, this.updateTaps);
     }
 
@@ -114,34 +146,36 @@ export class RoundModel {
         return 0;
     }
 
-    // todo: Сделал по-быстрому. Вынести в `const enum`.
-    private _timerStatus: 1 | 2 | 3 = 1;
+    private _prevReadyState: RoundModelReadyState = RoundModelReadyState.awaiting;
 
-    get timerStatus() {
-        const now = Date.now();
+    getReadyState(now = Date.now()): RoundModelReadyState {
         const endedAtTimestamp = this.endedAt.getTime();
 
         if (this.completed || endedAtTimestamp <= now) {
-            return this._timerStatus = 1;
+            return this._prevReadyState = RoundModelReadyState.completed;
         }
 
         const startedAtTimestamp = this.startedAt.getTime();
 
         if (startedAtTimestamp < now) {
-            return this._timerStatus = 2;
+            return this._prevReadyState = RoundModelReadyState.started;
         }
 
         /*const startedAtTimestampMinusCooldown = startedAtTimestamp - (this.cooldownSec * TIMES.SECONDS);
 
         if (startedAtTimestampMinusCooldown > now) */{
-            return this._timerStatus = 3;
+            return this._prevReadyState = RoundModelReadyState.awaiting;
         }
     }
 
-    get timerInfo() {
-        const { timerStatus } = this;
+    get readyState(): RoundModelReadyState {
+        return this.getReadyState();
+    }
 
-        if (timerStatus === 1) {
+    get timerInfo() {
+        const { readyState } = this;
+
+        if (readyState === RoundModelReadyState.completed || readyState === RoundModelReadyState.readyToComplete) {
             return {
                 timerTitle: 'Раунд завершен',
                 isBackward: true,
@@ -149,7 +183,7 @@ export class RoundModel {
             };
         }
 
-        if (timerStatus === 2) {
+        if (readyState === RoundModelReadyState.started) {
             return {
                 timerTitle: 'Раунд закончится через',
                 isBackward: true,
@@ -191,27 +225,51 @@ export class RoundModel {
         this.signal$.set(currentValue => ++currentValue);
     }
 
-    checkTimerStatus(now = Date.now()) {
+    get wasRoundTaps() {
+        return this._wasRoundTaps;
+    }
+
+    set wasRoundTaps(wasRoundTaps) {
+        this._wasRoundTaps = wasRoundTaps;
+    }
+
+    get usersInfo() {
+        return this._usersInfo ??= (Object.assign(new Map<number, MinimalRoundInfo_UserInfo>(), {
+            make: makeMinimalRoundInfoUserInfoItem,
+        }));
+    }
+
+    get winnerUserInfo() {
+        return this._winnerUserInfo;
+    }
+
+    readonly [kRoundModelFriendWinnerUserInfoSet] = (winnerUserInfo: WinnerUserInfo) => {
+        this._winnerUserInfo = winnerUserInfo;
+    }
+
+    checkReadyState(now = Date.now()) {
         if (this.completed) {
-            return;
+            return RoundModelReadyState.completed;
         }
 
-        const completed = calculateIsRoundCompleted(this, now);
+        const prev_timerStatus = this._prevReadyState;
+        const readyState = this.getReadyState(now);
+        const readyToComplete = readyState === RoundModelReadyState.readyToComplete;
 
-        if (completed) {
-            this.completed = completed;
+        if (readyToComplete) {
+            this.completed = true;
             this.signal$.set(currentValue => ++currentValue);
         }
         else {
-            const prev_timerStatus = this._timerStatus;
-            const { timerStatus } = this;
+            const { readyState } = this;
 
-            if (prev_timerStatus !== timerStatus) {
+            if (prev_timerStatus !== readyState) {
                 this.signal$.set(currentValue => ++currentValue);
             }
         }
-    }
 
+        return readyState;
+    }
 
     localIncrementTaps(increment: number, isHiddenTaps: boolean) {
         if (isHiddenTaps) {
@@ -227,20 +285,26 @@ export class RoundModel {
     }
 
     updateTaps = (data: Awaited<ReturnType<typeof apiMethods.makeRoundTap>>) => {
-        this.tapsCount = data.roundCount;
-        this.hiddenTapsCount = data.roundHiddenTapsCount;
+        this._wasRoundTaps = true;
 
-        if (data.userCount) {
+        if (data.roundCount && data.roundCount > this.tapsCount) {
+            this.tapsCount = data.roundCount;
+        }
+        if (data.roundHiddenTapsCount && data.roundHiddenTapsCount > this.hiddenTapsCount) {
+            this.hiddenTapsCount = data.roundHiddenTapsCount;
+        }
+
+        if (data.userCount && data.userCount > this.userTapsCount) {
             this.userTapsCount = data.userCount;
         }
-        if (data.userHiddenCount) {
+        if (data.userHiddenCount && data.userHiddenCount > this.userHiddenTapsCount) {
             this.userHiddenTapsCount = data.userHiddenCount;
         }
 
         this.signal$.set(currentValue => ++currentValue);
     }
 
-    private updateFromDTO = (roundDTO: Partial<RoundDTO>) => {
+    private updateFromDTO = (roundDTO: Partial<RoundDTO | Round>) => {
         let hasChanges = false;
 
         for (const key of this.updatedKeys) {
@@ -259,18 +323,60 @@ export class RoundModel {
             }
         }
 
+        // todo: Может один winnerUser поменяться на другой?
+        if ('winnerUser' in roundDTO && !this._winnerUserInfo) {
+            const winnerUserInfo = roundDTO.winnerUser;
+
+            if (winnerUserInfo) {
+                Object.freeze(winnerUserInfo);
+                this._winnerUserInfo = winnerUserInfo;
+
+                hasChanges = true;
+            }
+        }
+
         if (hasChanges) {
             this.signal$.set(currentValue => ++currentValue);
         }
     }
 
-    static instancesRoundModelById = new Map<number, RoundModel>;
+    toDTO(noCounts = false): RoundDTO {
+        const dto: RoundDTO = {
+            id: this.id,
+            title: this.title,
+            description: this.description,
+            completed: this.completed,
+            startedAt: this.startedAt.toISOString(),
+            endedAt: this.endedAt.toISOString(),
+            cooldownSec: this.cooldownSec,
+            flags: this.flags,
+            winnerUser: this._winnerUserInfo || null,
+        };
+
+        if (!noCounts) {
+            dto.tapsCount = this.tapsCount;
+            dto.hiddenTapsCount = this.hiddenTapsCount;
+        }
+
+        return dto;
+    }
+
+    private static globalOnRoundEndHook: ((roundModel: RoundModel) => void) | undefined;
+
+    static registerGlobalOnRoundEndHook(globalOnRoundEndHook: typeof this.globalOnRoundEndHook) {
+        this.globalOnRoundEndHook = globalOnRoundEndHook;
+    }
+
+    static instancesRoundModelById = new TemporaryMap<Round["id"], RoundModel>({
+        signal: mainProcessAbortController.signal,
+        callDispose: true,
+    });
 
     static getById(id: Round["id"]) {
         return this.instancesRoundModelById.get(id) || null;
     }
 
-    static makeById(id: Round["id"], roundDTO: RoundDTO, now = Date.now()) {
+    static makeById(id: Round["id"], roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
         let instance = this.getById(id);
 
         if (instance) {
@@ -284,6 +390,7 @@ export class RoundModel {
         this.instancesRoundModelById.set(id, instance);
 
         mainProcessChangeDataCapture.on(`round-updated#${id}`, instance.updateFromDTO);
+        mainProcessChangeDataCapture.on(`round-ended#${id}`, instance.updateFromDTO);
         mainProcessChangeDataCapture.on(`round-taps#${id}`, instance.updateTaps);
 
         return instance;
@@ -296,7 +403,11 @@ export class RoundModel {
             const now = Date.now();
 
             for (const { 1: roundModel } of this.instancesRoundModelById) {
-                roundModel.checkTimerStatus(now);
+                const readyState = roundModel.checkReadyState(now);
+
+                if (readyState === RoundModelReadyState.readyToComplete || readyState === RoundModelReadyState.completed) {
+                    this.globalOnRoundEndHook?.(roundModel);
+                }
             }
         }, TIMES.SECONDS);
 
@@ -336,16 +447,6 @@ export type MinimalRoundInfo_UserInfo = {
     wasTaps: boolean,
     __proto__?: null,
 };
-export type MinimalRoundInfo = {
-    id: number,
-    startedAt: number,
-    endedAt: number,
-    cooldownSec: number,
-    wasRoundTaps?: boolean,
-    completed?: boolean,
-    usersInfo?: Map<number, MinimalRoundInfo_UserInfo>,
-    __proto__?: null,
-};
 
 export function makeMinimalRoundInfoUserInfoItem(): MinimalRoundInfo_UserInfo {
     return {
@@ -353,7 +454,3 @@ export function makeMinimalRoundInfoUserInfoItem(): MinimalRoundInfo_UserInfo {
         __proto__: null,
     };
 }
-
-export const localSavedRoundInfo = new TemporaryMap<Round["id"], MinimalRoundInfo>({
-    signal: mainProcessAbortController.signal,
-});

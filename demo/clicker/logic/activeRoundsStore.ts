@@ -14,6 +14,7 @@ import { currentUserStore } from "./currentUserStore";
 import { RoundDTO, RoundModel, sortRounds } from "./RoundModel";
 import { StoreStatus } from "./consts";
 import mainProcessChangeDataCapture from "./mainProcessChangeDataCapture";
+import { assertIsDefined } from "../type_guards/base";
 
 const tagCurrentUserStore = 'CurrentUserStore';
 
@@ -27,6 +28,7 @@ const newRoundElements = {
         label: 'Заголовок:',
         name: 'title',
         type: 'text',
+        autoFocus: true,
         minLength: 5,
         required: true,
     } satisfies FormElementDescription,
@@ -168,9 +170,11 @@ class ActiveRoundsStore extends EventEmitterX {
 
     private _addNewRound = (roundDTO: RoundDTO & { now: number }) => {
         const { id } = roundDTO;
+        let round = RoundModel.getById(id);
 
-        if (RoundModel.getById(id)) {
+        if (round) {
             // already has this round
+            return round;
         }
         else {
             this._rawRounds.push(roundDTO);
@@ -179,6 +183,12 @@ class ActiveRoundsStore extends EventEmitterX {
             this._rounds.sort(sortRounds);
 
             this.signal$.set(currentValue => _newVersionValueWithFlags(currentValue, _ActiveRoundsSignalUpdateFlags.withoutLoadingItems));
+
+            round = RoundModel.getById(id);
+
+            assertIsDefined(round);
+
+            return round;
         }
     }
 
@@ -188,7 +198,9 @@ class ActiveRoundsStore extends EventEmitterX {
 
             console.log('Раунд успешно создан', response);
 
-            this._addNewRound(Object.assign(response.item, { now: response.now }));
+            const newRound = this._addNewRound(Object.assign(response.item, { now: response.now }));
+
+            activeRoundsStore.selectRoundById(newRound.id);
         }
         else {
             throw new Error('Not Authenticated');

@@ -8,11 +8,10 @@ import type { Round } from "@prisma/client";
 import { applicationStats } from "../develop/ApplicationStats";
 import { EventEmitterX } from "../modules/EventEmitterX/events";
 import { isAbortError } from "../modules/common/abortable";
-import { ReplaceDateWithString } from "../types/generics";
 import { isNodeJS, isWebMainThread } from "../utils/runEnv";
 import sseChannels from "../api/SSEChannels";
 import { SSEClient } from "../api/SSEClient";
-import { MinimalRoundInfo } from "./RoundModel";
+import { RoundDTO } from "./RoundModel";
 import { mainProcessAbortController } from "./mainProcessAbortController";
 import { promiseTimeout } from "../utils/promise";
 import apiMethods from "../api/methods";
@@ -139,13 +138,13 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
 
 namespace MainProcessChangeDataCapture {
     export type Events = {
-        'round-updated': (props: Partial<ReplaceDateWithString<Round>> & { id: Round["id"] }, isDetailedEvent?: boolean) => void,
-        [eventName: `round-updated#${number}`]: (props: Partial<ReplaceDateWithString<Round>> & { id: Round["id"] }, isDetailedEvent?: boolean) => void,
-        'round-created': (roundDTO: ReplaceDateWithString<Round> & { now: number }, isDetailedEvent?: boolean) => void,
-        [eventName: `round-created#${number}`]: (roundInfo: MinimalRoundInfo, isDetailedEvent?: boolean) => void,
-        'round-ended': (roundInfo: MinimalRoundInfo, isDetailedEvent?: boolean) => void,
-        [eventName: `round-ended#${number}`]: (roundInfo: MinimalRoundInfo, isDetailedEvent?: boolean) => void,
-        'round-taps': (roundInfo: Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, isDetailedEvent?: boolean) => void,
+        'round-updated': (props: Partial<RoundDTO> & { id: Round["id"] }, isDetailedEvent?: boolean) => void,
+        [eventName: `round-updated#${number}`]: (props: Partial<RoundDTO> & { id: Round["id"] }, isDetailedEvent?: boolean) => void,
+        'round-created': (roundDTO: RoundDTO & { now: number }, isDetailedEvent?: boolean) => void,
+        [eventName: `round-created#${number}`]: (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
+        'round-ended': (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
+        [eventName: `round-ended#${number}`]: (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
+        'round-taps': (roundInfo: Omit<Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, 'userId'>, isDetailedEvent?: boolean) => void,
         [eventName: `round-taps#${number}`]: (roundInfo: Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, isDetailedEvent?: boolean) => void,
     };
 }

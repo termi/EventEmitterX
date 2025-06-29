@@ -2,8 +2,6 @@
 
 import type * as net from 'node:net';
 
-import type { Round } from "@prisma/client";
-
 import { afterAll, beforeAll } from "@jest/globals";
 import {
     useDebugTimers,
@@ -23,11 +21,10 @@ import { pathJoin } from "../../utils/path";
 import { setDefaultBaseURI, TestApiMethods } from "../../api/methods";
 import sseChannels from "../../api/SSEChannels";
 import { assertIsNonEmptyArray } from "../../type_guards/array";
-import { scoreFromTapsCount } from "../../logic/RoundModel";
+import { RoundDTO, scoreFromTapsCount } from "../../logic/RoundModel";
 import mainProcessChangeDataCapture from "../../logic/mainProcessChangeDataCapture";
 import { mainProcessJTWStorage } from "../../logic/mainProcessJTWStorage";
 import { InterceptOutgoingHTTP } from '../../tests_utils/InterceptOutgoingHTTP';
-import { ReplaceDateWithString } from "../../types/generics";
 
 describe('integration tests of backend', function() {
     const httpInterception = new InterceptOutgoingHTTP();
@@ -373,7 +370,7 @@ describe('integration tests of backend', function() {
 
                 // noinspection JSPotentiallyInvalidConstructorUsage
                 const webLikeMainProcessChangeDataCapture = new (Object.getPrototypeOf(mainProcessChangeDataCapture)).constructor() as typeof mainProcessChangeDataCapture;
-                const incomingMessages: { type: string, data: ReplaceDateWithString<Round> & { now: number } }[] = [];
+                const incomingMessages: { type: string, data: RoundDTO & { now: number } }[] = [];
 
                 // emulate open sse channel on web page
                 await webLikeMainProcessChangeDataCapture.openSSEChannelForRoundsUpdate(true);
@@ -396,6 +393,7 @@ describe('integration tests of backend', function() {
                 assertIsNonEmptyArray(incomingMessages);
                 expect(incomingMessages[0].type).toBe('round-created');
                 expect(incomingMessages[0].data.id).toBe(round.id);
+                expect(incomingMessages[0].data.now).toBeDefined();
             });
         });
     });

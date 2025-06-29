@@ -1,7 +1,9 @@
 'use strict';
 
-import type { RoundModel } from "../../../logic/RoundModel";
+import { type RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
 import type { activeRoundsStore } from "../../../logic/activeRoundsStore";
+
+import { currentUserStore } from "../../../logic/currentUserStore";
 
 import { onSelectedCardClicked } from "../eventHandlers/clicks";
 
@@ -73,10 +75,16 @@ function SelectedRoundScoreInfo({ eventSignal }: { eventSignal: RoundModel["sign
     const {
         score,
         userScore,
+        winnerUserInfo,
     } = roundModel;
+    const {
+        id: winnerUserId,
+        name: winnerUserName,
+    } = winnerUserInfo || {};
+    const isCurrentUserIsWinner = winnerUserId === currentUserStore.userId;
 
-    return (
-        <div className="selected-card-score-info">
+    return (<>
+        <div className={'selected-card-score-info' + (isCurrentUserIsWinner ? ' selected-card-score-info--you-are-the-winner' : '')}>
             <span className="selected-card-score-info__total">
                 Счет всего: {score}
             </span>
@@ -84,24 +92,42 @@ function SelectedRoundScoreInfo({ eventSignal }: { eventSignal: RoundModel["sign
                 Ваш счет: {userScore}
             </span>
         </div>
-    );
+        {winnerUserInfo ? <div className="selected-card-winner-info" data-winner-userid={winnerUserId}>
+            Победитель: {winnerUserName} {winnerUserId === currentUserStore.userId ? '(Вы)' : ''}
+        </div> : ''}
+    </>);
 }
 
 function SelectedRoundClicker({ eventSignal }: { eventSignal: RoundModel["signal$"] }) {
     const roundModel = eventSignal.data;
     const {
         id,
-        timerStatus,
+        readyState,
     } = roundModel;
 
-    if (timerStatus !== 2) {
+    if (readyState !== RoundModelReadyState.started) {
         return '';
     }
 
     return (
         <div className="selected-card-clicker" data-round-id={id}
-             onClick={onSelectedCardClicked}>
-            Кликайте сюда
+             onClick={onSelectedCardClicked}
+        >
+            <span>Кликайте сюда</span>
+            <pre className="selected-card-clicker__zone">
+                ┌───────────────────────────────────────┐<br/>
+                │            ░░░░░░░░░░░░░░░            │<br/>
+                │          ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░           │<br/>
+                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br/>
+                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br/>
+                │      ░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░       │<br/>
+                │    ░░▒▒▒▒░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░▒▒▒▒░░   │<br/>
+                │    ░░▒▒▒▒▒▒▒▒░░░░░░░░░░░░▒▒▒▒▒▒▒▒░░   │<br/>
+                │    ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░   │<br/>
+                │      ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░     │<br/>
+                │        ░░░░░░░░░░░░░░░░░░░░░░░░░░     │<br/>
+                └───────────────────────────────────────┘<br/>
+            </pre>
         </div>
     );
 }

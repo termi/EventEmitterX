@@ -63,3 +63,41 @@
     font-size: 140%;
   }
 }
+
+.selected-card-score-info--you-are-the-winner {
+  .selected-card-score-info__user {
+    color: red;
+  }
+}
+
+.selected-card-winner-info {
+  padding: 10px;
+  border: 1px solid black;
+  font-size: 140%;
+}
+
+@keyframes gradient {
+  0% {
+    background: radial-gradient(circle at center, rgba( 255, 125 , 125, 0 ) 0%, transparent 0%, transparent 100%);
+  }
+  25% {
+    background: radial-gradient(circle at center, rgba( 255, 125, 125, 0.3 ) 24%, transparent 25%, transparent 100%);
+  }
+  50% {
+    background: radial-gradient(circle at center, rgba( 255, 125, 125, 0.5 ) 49%, transparent 50%, transparent 100%);
+  }
+  75% {
+    background: radial-gradient(circle at center, rgba( 255, 125, 125, 0.8 ) 74%, transparent 75%, transparent 100%);
+  }
+  100% {
+    color: #fff;
+    background: radial-gradient(circle at center, #f88 99%, #fff 100%, #fff 100%);
+  }
+}
+
+.selected-card-clicker {
+  /*background: #fff;*/
+}
+.selected-card-clicker:active {
+  animation: gradient 100ms;
+}

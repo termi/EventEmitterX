@@ -9,11 +9,7 @@ import { authenticate } from "../auth/authMiddleware";
 import { authService } from "../auth/authService";
 import { createRound, getRound, makeRoundTap, rounds, roundsSSEUpdate } from "../../../api/routers";
 import { assertOneOfType } from "../../../type_guards/base";
-import {
-    assertIsNumberInRange,
-    assertIsPositiveNumber,
-    isPositiveNumber,
-} from "../../../type_guards/number";
+import { assertIsNumberInRange, assertIsPositiveNumber, isPositiveNumber } from "../../../type_guards/number";
 import { isISOString } from "../../../type_guards/string";
 import { ReplaceDateWithString } from "../../../types/generics";
 import mainProcessChangeDataCapture from "../../../logic/mainProcessChangeDataCapture";
@@ -24,13 +20,13 @@ import { promiseTimeout } from "../../../utils/promise";
 import { isTest } from "../../../utils/runEnv";
 import { isAbortError } from "../../../modules/common/abortable";
 import {
-    localSavedRoundInfo,
+    RoundDTO,
+    RoundModel,
+    RoundModelReadyState,
     scoreFromTapsCount,
-    makeMinimalRoundInfoUserInfoItem,
-    MinimalRoundInfo,
-    // MinimalRoundInfo_UserInfo,
 } from "../../../logic/RoundModel";
 import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
+import { roundsService } from "../services/roundsService";
 
 /** Хранилище закешированных и неизменяемых данных пользователя. Для быстрого доступа.  */
 const usersInfoMap = new Map<number, {
@@ -46,10 +42,11 @@ const MINUTES = 60 * SECONDS;
 const DEFAULT_cooldownSec = (Number(process.env.COOLDOWN_DURATION) || 30);
 const DEFAULT_roundDuration = (Number(process.env.ROUND_DURATION) || 60) * SECONDS;
 
-mainProcessChangeDataCapture.on('round-ended', roundMinimalInfo => {
-    const roundInfo = localSavedRoundInfo.getOrInsert(roundMinimalInfo.id, roundMinimalInfo);
-
-    roundInfo.completed = true;
+mainProcessChangeDataCapture.on('round-ended', roundDTO => {
+    // Если получили сообщение из другого Realm
+    if (!RoundModel.getById(roundDTO.id)) {
+        RoundModel.makeById(roundDTO.id, roundDTO);
+    }
 });
 
 export function startRoundRouters(app = fastifyApp) {
@@ -161,22 +158,11 @@ export function startRoundRouters(app = fastifyApp) {
                     author: { connect: user },
                 },
             });
-            const _endedAt = newRound.endedAt.getTime();
-            const roundInfo: MinimalRoundInfo = {
-                id: newRound.id,
-                startedAt: newRound.startedAt.getTime(),
-                endedAt: _endedAt,
-                cooldownSec: newRound.cooldownSec,
-                completed: _endedAt <= Date.now(),
-                __proto__: null,
-            };
 
-            localSavedRoundInfo.set(newRound.id, roundInfo);
+            const roundModel = RoundModel.makeById(newRound.id, newRound);
+
             mainProcessChangeDataCapture.emit('round-created', {
-                ...newRound,
-                createdAt: newRound.createdAt.toISOString(),
-                startedAt: newRound.startedAt.toISOString(),
-                endedAt: newRound.endedAt.toISOString(),
+                ...roundModel.toDTO(),
                 now,
             });
 
@@ -266,7 +252,7 @@ export function startRoundRouters(app = fastifyApp) {
                 return alreadyHandledResult as makeRoundTap.Types["Reply"];
             }
 
-            const now = Date.now();
+            let now = Date.now();
             const { timestamp, count } = req.body;
 
             assertIsPositiveNumber(timestamp);
@@ -288,12 +274,24 @@ export function startRoundRouters(app = fastifyApp) {
 
             assertIsPositiveNumber(roundId);
 
-            let roundInfo = localSavedRoundInfo.get(roundId);
+            let roundModel = RoundModel.getById(roundId);
 
-            if (!roundInfo) {
+            if (!roundModel) {
                 const round = await prismaClient.round.findUnique({
                     where: {
                         id: roundId,
+                    },
+                    include: {
+                        taps: {
+                            where: {
+                                userId,
+                            },
+                            select: {
+                                userId: true,
+                                count: true,
+                                hiddenCount: true,
+                            },
+                        },
                     },
                 });
 
@@ -306,51 +304,48 @@ export function startRoundRouters(app = fastifyApp) {
                     return;
                 }
 
-                const _endedAt = round.endedAt.getTime();
-
-                roundInfo = {
-                    id: round.id,
-                    startedAt: round.startedAt.getTime(),
-                    endedAt: _endedAt,
-                    cooldownSec: round.cooldownSec,
-                    completed: _endedAt <= Date.now(),
-                    usersInfo: new Map(),
-                    __proto__: null,
-                } satisfies MinimalRoundInfo;
-
-                localSavedRoundInfo.set(roundId, roundInfo);
+                roundModel = RoundModel.makeById(round.id, round);
+                now = Date.now();
             }
 
-            // const isRoundNotStartedYet = roundInfo.sta
+            const roundReadeState = roundModel.getReadyState(now);
 
             // проверяется, что раунд активен(текущее время в диапазоне от даты старта до даты завершения раунда)
-            if (roundInfo.completed || roundInfo.endedAt <= now) {
+            if (roundModel.completed || roundReadeState !== RoundModelReadyState.started) {
                 // todo: Написать рутину, которая будет следить за открытыми раундами и закрывать их когда подходит время
-                if (!roundInfo.completed) {
-                    roundInfo.completed = true;
-                    roundInfo.usersInfo?.clear();
+                if (!roundModel.completed && roundReadeState === RoundModelReadyState.readyToComplete) {
+                    roundModel.completed = true;
+                    roundModel.usersInfo?.clear();
 
-                    mainProcessChangeDataCapture.emit('round-ended', roundInfo);
+                    roundsService.makeRoundEnd(roundModel).catch(error => {
+                        mainProcessChangeDataCapture.emit('error', error);
+                    });
                 }
 
                 reply.status(404).send({
                     success: false,
-                    error: `Round (id=${roundId}) already completed`,
+                    error: (
+                        roundReadeState === RoundModelReadyState.readyToComplete
+                        || roundReadeState === RoundModelReadyState.completed
+                    )
+                        ? `Round (id=${roundId}) already completed`
+                        : `Round (id=${roundId}) not started yet`
+                    ,
                 });
 
                 return;
             }
 
             const currentTapIsNotHidden = !userInfo.isHideTaps;
-            const roundInfoForThisUser = (roundInfo.usersInfo ??= new Map())
-                .getOrInsertComputed(userId, makeMinimalRoundInfoUserInfoItem)
+            const roundInfoForThisUser = roundModel.usersInfo
+                .getOrInsertComputed(userId, roundModel.usersInfo.make)
             ;
-            const wasRoundTapsByThisUser = roundInfo.wasRoundTaps
+            const wasRoundTapsByThisUser = roundModel.wasRoundTaps
                 && roundInfoForThisUser.wasTaps
             ;
 
             if (!wasRoundTapsByThisUser) {
-                roundInfo.wasRoundTaps = true;
+                roundModel.wasRoundTaps = true;
                 roundInfoForThisUser.wasTaps = true;
             }
 
@@ -379,7 +374,7 @@ export function startRoundRouters(app = fastifyApp) {
                     },
                 })
                 // Запоминаем, что делали upsert этого раунда. А значит, что следующие действия могут быть только update.
-                : ((roundInfo.wasRoundTaps = true), prismaClient.roundTaps.upsert({
+                : ((roundModel.wasRoundTaps = true), prismaClient.roundTaps.upsert({
                     where: {
                         userId_roundId: {
                             userId,
@@ -468,7 +463,7 @@ export function startRoundRouters(app = fastifyApp) {
 
             {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { userCount, userHiddenCount, userScore, ...otherResult } = result;
+                const { userId, userCount, userHiddenCount, userScore, ...otherResult } = result;
 
                 mainProcessChangeDataCapture.emit('round-taps', otherResult);
             }
@@ -573,6 +568,12 @@ export function startSSERoundRouters(app = fastifyApp) {
                     reply.sse(event);
                 }
                 : (event: SSEEvent) => {
+                    if (event.event === 'round-ended') {
+                        reply.sse(event);
+
+                        return;
+                    }
+
                     const now = Date.now();
                     const timePassed = now - prevSendTime;
 
@@ -638,7 +639,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                 for await (const event of EventEmitterX.on(mainProcessChangeDataCapture, 'round-created', {
                     signal,
                 })) {
-                    const minimalRoundInfo = event[0] as MinimalRoundInfo;
+                    const minimalRoundInfo = event[0] as RoundDTO;
 
                     sendSSEEvent({
                         event: 'round-created',
@@ -663,7 +664,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                 for await (const event of EventEmitterX.on(mainProcessChangeDataCapture, 'round-ended', {
                     signal,
                 })) {
-                    const roundInfo = event[0] as MinimalRoundInfo;
+                    const roundInfo = event[0] as RoundDTO;
 
                     sendSSEEvent({
                         event: 'round-ended',
@@ -688,7 +689,7 @@ export function startSSERoundRouters(app = fastifyApp) {
                 for await (const event of EventEmitterX.on(mainProcessChangeDataCapture, 'round-taps', {
                     signal,
                 })) {
-                    const roundInfo = event[0] as MinimalRoundInfo;
+                    const roundInfo = event[0] as RoundDTO;
 
                     sendSSEEvent({
                         event: 'round-taps',

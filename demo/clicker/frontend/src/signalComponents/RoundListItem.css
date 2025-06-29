@@ -17,7 +17,7 @@
 
 .card.card--selected {
   border-left: 4px solid var(--nav-link-hover);
-  background-color: var(--theme-toggle-hover);
+  /*background-color: var(--theme-toggle-hover);*/
 }
 
 .card-title {
@@ -40,4 +40,16 @@
   font-size: 13px;
   color: var(--nav-link-hover);
   font-family: monospace;
+}
+
+.card-score-info {
+  .card-score-info__user {
+    padding-inline-start: 5px;
+  }
+}
+
+.card-score-info--you-are-the-winner {
+  .card-score-info__user {
+    color: red;
+  }
 }
