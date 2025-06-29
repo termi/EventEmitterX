@@ -1,6 +1,6 @@
 'use strict';
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
 import { currentUserStore } from "../../../logic/currentUserStore";
@@ -10,6 +10,8 @@ import FormFromSchema from "../components/FormFromSchema";
 import './DashboardPage.css';
 
 export default function DashboardPage() {
+    /** Чтобы в форме внутри dialog input's получили новые значения (defaultValue, min, max и т.д.), нужно перерендерить dialog */
+    const reRenderState = useState(0);
     const $dialogRef = useRef<HTMLDialogElement>(null);
     const { elementsList } = activeRoundsStore.createNewRound;
     const canCreateNewRound = currentUserStore.isAdmin;
@@ -23,7 +25,10 @@ export default function DashboardPage() {
     const $newRoundButton = canCreateNewRound ? (
         <button
             className="add-card-button"
-            onClick={() => $dialogRef.current?.showModal()}
+            onClick={() => {
+                reRenderState[1](a => ++a);
+                $dialogRef.current?.showModal();
+            }}
         >
             <span title="Создать новый раунд">+</span>
         </button>
@@ -33,7 +38,7 @@ export default function DashboardPage() {
             <h3>Создать новый раунд</h3>
 
             <FormFromSchema
-                onSubmit={handleNewRoundFormSubmit}
+                onSubmit={handleNewRoundFormSubmit} isResetOnSubmit={true}
                 elements={elementsList}
                 buttons={[
                     {
