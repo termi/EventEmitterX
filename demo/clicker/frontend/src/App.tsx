@@ -10,14 +10,10 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import DemoPage from './pages/DemoPage';
 
-import { EventEmitterX } from "../../modules/EventEmitterX/events";
-
 import './config/globals';
-import './registerComponents.ts';
+import './registerComponents';
 
 console.log((globalThis as unknown as { __BACKEND_PORT__?: string }).__BACKEND_PORT__);
-
-(globalThis as unknown as { _emitter?: EventEmitterX })._emitter = new EventEmitterX();
 
 export default function App() {
     return (

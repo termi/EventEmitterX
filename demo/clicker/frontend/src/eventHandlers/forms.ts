@@ -2,7 +2,9 @@
 
 import type React from "react";
 
+import mainProcessChangeDataCapture from "../../../logic/mainProcessChangeDataCapture";
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
+import { currentUserStore } from "../../../logic/currentUserStore";
 import { dateFromHTMLInputDateTimeLocalInput } from "../../../utils/html";
 
 export const handleNewRoundFormSubmit = Object.assign(function(event: React.FormEvent) {
@@ -20,26 +22,59 @@ export const handleNewRoundFormSubmit = Object.assign(function(event: React.Form
         startedAt,
     }).catch(error => {
         // todo: Выводить в панели нотификации
-        console.error(error);
+        mainProcessChangeDataCapture.emit('error', error, 'handleNewRoundFormSubmit:activeRoundsStore.createNewRound:');
     });
 }, {
-    subscriptions: [] as (() => void)[],
+    _s: [] as (() => void)[],
     emit() {
-        this.subscriptions.forEach(callback => callback());
+        this._s.forEach(callback => callback());
     },
     subscribe(callback: () => void) {
-        this.subscriptions.push(callback);
+        this._s.push(callback);
 
         return this.ubSubscribe.bind(this, callback);
     },
     ubSubscribe(callback: () => void) {
-        const index = this.subscriptions.indexOf(callback);
+        const index = this._s.indexOf(callback);
 
         if (index !== -1) {
-            this.subscriptions.splice(index, 1);
+            this._s.splice(index, 1);
         }
     },
     clear() {
-        this.subscriptions.length = 0;
+        this._s.length = 0;
     },
 });
+
+export const handleAuthFormSubmit = (event: React.FormEvent) => {
+    const { login, register } = currentUserStore;
+
+    event.preventDefault();
+
+    const targetForm = event.currentTarget as HTMLFormElement;
+    const isRegistration = targetForm.dataset.isRegistration === 'true';
+    const email = (targetForm.elements.namedItem(login.elements.email.name) as HTMLInputElement).value;
+    const password = (targetForm.elements.namedItem(login.elements.password.name) as HTMLInputElement).value;
+    const name = isRegistration
+        ? (targetForm.elements.namedItem(register.elements.name.name) as HTMLInputElement).value
+        : ''
+    ;
+
+    (isRegistration
+        ? register({
+            email,
+            name,
+            password,
+        }, { doNotThrowError: true })
+        : login({
+            email,
+            password,
+        }, { doNotThrowError: true })
+    ).catch(error => {
+        // todo: Выводить в систему нотификации
+        mainProcessChangeDataCapture.emit('error', error, (isRegistration
+            ? 'handleAuthFormSubmit:currentUserStore.register:'
+            : 'handleAuthFormSubmit:currentUserStore.login:'
+        ));
+    });
+};

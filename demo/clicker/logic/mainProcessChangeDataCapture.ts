@@ -8,13 +8,13 @@ import type { Round } from "@prisma/client";
 import { applicationStats } from "../develop/ApplicationStats";
 import { EventEmitterX } from "../modules/EventEmitterX/events";
 import { isAbortError } from "../modules/common/abortable";
-import { isNodeJS, isWebMainThread } from "../utils/runEnv";
 import sseChannels from "../api/SSEChannels";
 import { SSEClient } from "../api/SSEClient";
-import { RoundDTO } from "./RoundModel";
-import { mainProcessAbortController } from "./mainProcessAbortController";
+import { isNodeJS, isWebMainThread } from "../utils/runEnv";
 import { promiseTimeout } from "../utils/promise";
 import apiMethods from "../api/methods";
+import { RoundDTO } from "./RoundModel";
+import { mainProcessAbortController } from "./mainProcessAbortController";
 import { currentUserStore } from "./currentUserStore";
 
 class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCapture.Events> {
@@ -24,21 +24,24 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
         });
 
         this.subscribeToChangesFromOtherRealms();
-        this._emitWithListenersHook = (eventName, ...args) => {
-            if (!args[1]) {// check isDetailedEvent
-                this._sendEventToOtherRealms(eventName, ...args);
-                this._sendDetailedEvent(eventName, ...args);
+
+        const onAnyListenerHook: typeof this._emitWithListenersHook = (eventName, ...args) => {
+            if (eventName === 'error') {
+                return;
             }
-        };
-        this._emitWithNoListenersHook = (eventName, ...args) => {
+
             if (!args[1]) {// check isDetailedEvent
                 this._sendEventToOtherRealms(eventName, ...args);
                 this._sendDetailedEvent(eventName, ...args);
             }
         };
 
-        this.on('error', (error: unknown) => {
-            console.error('MainProcessChangeDataCapture: onerror:', error);
+        this._emitWithListenersHook = onAnyListenerHook;
+        this._emitWithNoListenersHook = onAnyListenerHook;
+
+        this.on('error', (error: unknown, prefix?: string) => {
+            applicationStats.onError(error as string | Error);
+            console.error('MainProcessChangeDataCapture: onerror:', prefix || '', error);
         });
     }
 

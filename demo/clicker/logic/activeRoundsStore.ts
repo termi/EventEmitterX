@@ -1,3 +1,5 @@
+// noinspection JSMismatchedCollectionQueryUpdate
+
 'use strict';
 
 import { Round } from "@prisma/client";
@@ -28,6 +30,7 @@ const newRoundElements = {
         label: 'Заголовок:',
         name: 'title',
         type: 'text',
+        defaultValue: 'Новый раунд',
         autoFocus: true,
         minLength: 5,
         required: true,
@@ -52,7 +55,6 @@ const newRoundElements = {
 }
 
 class ActiveRoundsStore extends EventEmitterX {
-    private _updateSignalWithoutLoading = false;
     /**
      * Reactive version of CurrentUserStore.
      */
@@ -118,6 +120,7 @@ class ActiveRoundsStore extends EventEmitterX {
         this.emit('status', newStatus);
     }
 
+    // noinspection JSUnusedGlobalSymbols
     get lastError() {
         if (this.status !== StoreStatus.error) {
             return;
@@ -126,6 +129,7 @@ class ActiveRoundsStore extends EventEmitterX {
         return this._lastError;
     }
 
+    // noinspection JSUnusedGlobalSymbols
     get isPending() {
         return this._status === StoreStatus.pending;
     }
@@ -196,7 +200,7 @@ class ActiveRoundsStore extends EventEmitterX {
         if (currentUserStore.isAuthenticated) {
             const response = await apiMethods.createRound(props);
 
-            console.log('Раунд успешно создан', response);
+            // console.log('Раунд успешно создан', response);
 
             const newRound = this._addNewRound(Object.assign(response.item, { now: response.now }));
 
@@ -212,6 +216,7 @@ class ActiveRoundsStore extends EventEmitterX {
 
     private _selectedRound: RoundModel | null = null;
 
+    // noinspection JSUnusedGlobalSymbols
     get selectedRound() {
         return this._selectedRound;
     }

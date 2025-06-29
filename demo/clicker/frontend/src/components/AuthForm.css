@@ -8,7 +8,7 @@
 }
 
 .auth-card {
-  background: white;
+  background: var(--bg-color);
   border-radius: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   padding: 40px;
@@ -17,8 +17,12 @@
   transition: all 0.3s ease;
 }
 
+.dark .auth-container {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+}
+
 .auth-title {
-  color: #2d3748;
+  color: var(--text-color);
   font-size: 24px;
   font-weight: 600;
   margin-bottom: 30px;

@@ -2,26 +2,28 @@
 .cards-page {
   display: flex;
   height: 100%;
+  flex-direction: row;
 }
 
 .cards-list {
   width: 20%;
   padding-right: 16px;
   overflow-y: auto;
-  max-height: calc(100vh - 120px);
+  /*max-height: calc(100vh - 120px);*/
+  min-width: 190px;
 }
 
 .selected-card-container {
-  width: 80%;
   padding-left: 16px;
+  flex-grow: 1;
 }
 
 .no-card-selected {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100%;
   color: var(--text-color);
   opacity: 0.6;
   font-size: 18px;
+  max-height: 70vh;
 }

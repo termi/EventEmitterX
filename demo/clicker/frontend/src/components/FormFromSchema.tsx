@@ -11,7 +11,7 @@ export default function FormFromSchema(props: {
 } & React.DetailedHTMLProps<React.FormHTMLAttributes<HTMLFormElement>, HTMLFormElement>) {
     const { onSubmit, elements, buttons = [], disabled = false, buttonsClassName, ...otherProps } = props;
 
-    return (<form onSubmit={onSubmit} {...otherProps}>
+    return (<form onSubmit={onSubmit} aria-disabled={disabled} {...otherProps}>
         {(elements.map(elementDescription => {
             const {
                 id,

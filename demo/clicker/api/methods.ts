@@ -1,3 +1,5 @@
+// noinspection JSNonASCIINames,NonAsciiCharacters
+
 'use strict';
 
 import type { Round } from "@prisma/client";
@@ -122,6 +124,7 @@ export class ApiMethods {
         return body;
     }
 
+    // noinspection JSUnusedGlobalSymbols
     async auth_check(props?: Partial<auth_check.Types["Querystring"]>, options?: {
         returnErrorResult: false,
     }): Promise<ExcluteSuccessFalseResult<auth_check.Types["Reply"]>>;

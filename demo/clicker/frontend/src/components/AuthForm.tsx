@@ -1,13 +1,13 @@
 'use strict';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Navigate } from "react-router-dom";
 
-import FormFromSchema from "./FormFromSchema";
-
-import { useAuth } from '../hooks/useAuth';
-
 import { stringifyError } from "../../../utils/error";
+import { useAuth } from '../hooks/useAuth';
+import { handleAuthFormSubmit } from "../eventHandlers/forms";
+
+import FormFromSchema from "./FormFromSchema";
 
 import './AuthForm.css';
 
@@ -25,43 +25,18 @@ export default function AuthForm() {
         return <Navigate to="/" replace/>;
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        const targetForm = e.currentTarget as HTMLFormElement;
-        const email = (targetForm.elements.namedItem(login.elements.email.name) as HTMLInputElement).value;
-        const password = (targetForm.elements.namedItem(login.elements.password.name) as HTMLInputElement).value;
-        const name = isRegistration
-            ? (targetForm.elements.namedItem(register.elements.name.name) as HTMLInputElement).value
-            : ''
-        ;
-
-        if (isRegistration) {
-            register({
-                email,
-                name,
-                password,
-            }, { doNotThrowError: true }).catch(console.error);
-        }
-        else {
-            login({
-                email,
-                password,
-            }, { doNotThrowError: true }).catch(console.error);
-        }
-    };
-
     return (
         <div className="auth-card">
             <h2 className="auth-title">{isRegistration ? 'Register' : 'Login'}</h2>
             {lastError && <div style={{ color: 'red' }}>{stringifyError(lastError)}</div>}
             <FormFromSchema
-                className="auth-form" onSubmit={handleSubmit} aria-disabled={isPending}
+                onSubmit={handleAuthFormSubmit} data-is-registration={isRegistration}
+                className="auth-form" disabled={isPending}
                 elements={elementsList}
                 buttons={[
                     {
                         id: 'submit',
-                        label: isPending ? 'Processing...' : isRegistration ? 'Register' : 'Login',
+                        label: isPending ? 'В процессе...' : isRegistration ? 'Регистрация' : 'Войти',
                         type: 'submit',
                         className: 'auth-button',
                         disabled: isPending,
@@ -70,13 +45,13 @@ export default function AuthForm() {
             />
             <div className="auth-switch">
                 {isRegistration
-                    ? (<span>Already have an account?{' '}
+                    ? (<span>Уже зарегистрированы?{' '}
                         <button className="switch-button"
-                                onClick={() => setIsRegistration(!isRegistration)}>Login</button>
+                                onClick={() => setIsRegistration(!isRegistration)}>Войти</button>
                         </span>)
-                    : (<span>Don't have an account?{' '}
+                    : (<span>Не зарегистрированы?{' '}
                         <button className="switch-button"
-                                onClick={() => setIsRegistration(!isRegistration)}>Register</button>
+                                onClick={() => setIsRegistration(!isRegistration)}>Регистрация</button>
                         </span>)
                 }
             </div>

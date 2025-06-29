@@ -62,6 +62,7 @@ export namespace auth_register {
             success: true,
             userId: number,
             userRole: UserRole,
+            userName: string,
             accessToken: string,
             refreshToken: string,
         } | RouterErrorResponse,
@@ -87,6 +88,7 @@ export namespace auth_login {
             success: true,
             userId: number,
             userRole: UserRole,
+            userName: string,
             accessToken: string,
             refreshToken: string,
         } | RouterErrorResponse,
@@ -115,6 +117,7 @@ export namespace auth_check {
             success: true,
             userId: number,
             userRole: UserRole,
+            userName: string,
         } | RouterErrorResponse,
         Headers: {
             'Authorization'?: `Bearer ${string}`,

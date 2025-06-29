@@ -2,16 +2,17 @@
 
 import type { UserRole } from "@prisma/client";
 
+import type { FormElementDescription } from "../types/htmlSchema";
+
 import { EventSignal } from "../modules/EventEmitterX/EventSignal";
 import { EventEmitterX } from "../modules/EventEmitterX/events";
 import { mainProcessJTWStorage } from "./mainProcessJTWStorage";
 import apiMethods from "../api/methods";
 import { makeRandomString } from "../utils/random";
 import { makeFormElementsList } from "../utils/html";
-import { assertIsNonEmptyString } from "../type_guards/string";
-import { FormElementDescription } from "../types/htmlSchema";
-import { StoreStatus } from "./consts";
 import { promiseTimeout } from "../utils/promise";
+import { assertIsNonEmptyString } from "../type_guards/string";
+import { StoreStatus } from "./consts";
 
 const registerElements = {
     email: {
@@ -67,6 +68,7 @@ class CurrentUserStore extends EventEmitterX {
         componentType,
     });
 
+    private _userName = '';
     private _userId = 0;
     private _userRole: UserRole | undefined = void 0;
     private _status: StoreStatus = StoreStatus.pending;
@@ -106,8 +108,16 @@ class CurrentUserStore extends EventEmitterX {
         return this._status;
     }
 
+    get userName() {
+        return this._userName;
+    }
+
     get userId() {
         return this._userId;
+    }
+
+    get userRole() {
+        return this._userRole;
     }
 
     private set status(newStatus: StoreStatus) {
@@ -146,6 +156,7 @@ class CurrentUserStore extends EventEmitterX {
 
             mainProcessJTWStorage.setTokens(response);
 
+            this._userName = response.userName;
             this._userId = response.userId;
             this._userRole = response.userRole;
             this.status = StoreStatus.isAuthenticated;
@@ -175,6 +186,7 @@ class CurrentUserStore extends EventEmitterX {
 
             mainProcessJTWStorage.setTokens(response);
 
+            this._userName = response.userName;
             this._userId = response.userId;
             this._userRole = response.userRole;
             this.status = StoreStatus.isAuthenticated;
@@ -199,7 +211,8 @@ class CurrentUserStore extends EventEmitterX {
 
             mainProcessJTWStorage.setTokens(response);
 
-            this._userId = response.userId;
+            this._userName = '';
+            this._userId = 0;
             this._userRole = void 0;
             this.status = StoreStatus.notAuthenticated;
         }
@@ -229,11 +242,13 @@ class CurrentUserStore extends EventEmitterX {
 
         if (response.success) {
             this.status = StoreStatus.isAuthenticated;
+            this._userName = response.userName;
             this._userRole = response.userRole;
             this._userId = response.userId;
         }
         else {
             this.status = StoreStatus.notAuthenticated;
+            this._userName = '';
             this._userRole = void 0;
             this._userId = 0;
         }

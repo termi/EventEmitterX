@@ -1,6 +1,6 @@
 'use strict';
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
 import { currentUserStore } from "../../../logic/currentUserStore";
@@ -10,56 +10,59 @@ import FormFromSchema from "../components/FormFromSchema";
 import './DashboardPage.css';
 
 export default function DashboardPage() {
-    const [ isModalOpen, setIsModalOpen ] = useState(false);
-    const elementsList = activeRoundsStore.createNewRound.elementsList;
+    const $dialogRef = useRef<HTMLDialogElement>(null);
+    const { elementsList } = activeRoundsStore.createNewRound;
+    const canCreateNewRound = currentUserStore.isAdmin;
 
     useEffect(() => {
         return handleNewRoundFormSubmit.subscribe(() => {
-            setIsModalOpen(false);
+            $dialogRef.current?.close();
         });
     }, []);
+
+    const $newRoundButton = canCreateNewRound ? (
+        <button
+            className="add-card-button"
+            onClick={() => $dialogRef.current?.showModal()}
+        >
+            <span title="Создать новый раунд">+</span>
+        </button>
+    ) : '';
+    const $modalWindow = canCreateNewRound ? (
+        <dialog ref={$dialogRef} className="modal-content" closedby="any">
+            <h3>Создать новый раунд</h3>
+
+            <FormFromSchema
+                onSubmit={handleNewRoundFormSubmit}
+                elements={elementsList}
+                buttons={[
+                    {
+                        label: 'Отмена',
+                        onClick: (event) => {
+                            event.preventDefault();
+                            $dialogRef.current?.close();
+                        },
+                    },
+                    {
+                        label: 'Создать',
+                        type: 'submit',
+                        className: 'primary',
+                    },
+                ]}
+                buttonsClassName={"modal-actions"}
+            />
+        </dialog>
+    ) : '';
 
     return (
         <div className="page-content">
             <h1 className="page-title">
                 <span>Раунды</span>
-                {currentUserStore.isAdmin ? (<button
-                    className="add-card-button"
-                    onClick={() => setIsModalOpen(true)}
-                >
-                    <span title="Создать новый раунд">+</span>
-                </button>) : ''}
+                {$newRoundButton}
             </h1>
             <p className="page-description"></p>
             {activeRoundsStore.signal$}
-            {/* Модальное окно */}
-            {isModalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>Создать новый раунд</h3>
-
-                        <FormFromSchema
-                            onSubmit={handleNewRoundFormSubmit}
-                            elements={elementsList}
-                            buttons={[
-                                {
-                                    label: 'Отмена',
-                                    onClick: (event) => {
-                                        event.preventDefault();
-                                        setIsModalOpen(false);
-                                    },
-                                },
-                                {
-                                    label: 'Создать',
-                                    type: 'submit',
-                                    className: 'primary',
-                                },
-                            ]}
-                            buttonsClassName={"modal-actions"}
-                        />
-                    </div>
-                </div>
-            )}
+            {$modalWindow}
         </div>
     );
 }
