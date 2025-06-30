@@ -10,6 +10,7 @@ import { mainProcessJTWStorage } from "./mainProcessJTWStorage";
 import apiMethods from "../api/methods";
 import { makeRandomString } from "../utils/random";
 import { makeFormElementsList } from "../utils/html";
+import { TIMES } from "../utils/times";
 import { promiseTimeout } from "../utils/promise";
 import { assertIsNonEmptyString } from "../type_guards/string";
 import { StoreStatus } from "./consts";
@@ -152,7 +153,9 @@ class CurrentUserStore extends EventEmitterX {
             assertIsNonEmptyString(props.name);
             assertIsNonEmptyString(props.password);
 
-            const response = await apiMethods.auth_register(props);
+            const response = await apiMethods.auth_register(props, {
+                signal: AbortSignal.timeout(TIMES.SECONDS_30),
+            });
 
             mainProcessJTWStorage.setTokens(response);
 
@@ -182,7 +185,9 @@ class CurrentUserStore extends EventEmitterX {
             assertIsNonEmptyString(props.email);
             assertIsNonEmptyString(props.password);
 
-            const response = await apiMethods.auth_login(props);
+            const response = await apiMethods.auth_login(props, {
+                signal: AbortSignal.timeout(TIMES.SECONDS_30),
+            });
 
             mainProcessJTWStorage.setTokens(response);
 
@@ -207,6 +212,8 @@ class CurrentUserStore extends EventEmitterX {
         try {
             const response = await apiMethods.auth_logout({
                 refreshToken: mainProcessJTWStorage.getRefreshToken(),
+            }, {
+                signal: AbortSignal.timeout(TIMES.SECONDS_30),
             });
 
             mainProcessJTWStorage.setTokens(response);
@@ -238,7 +245,10 @@ class CurrentUserStore extends EventEmitterX {
         // Делаем "асинхронный разрыв", чтобы избежать ошибки `ReferenceError: Cannot access 'apiMethods' before initialization`
         await promiseTimeout(0);
 
-        const response = await apiMethods.auth_check(void 0, { returnErrorResult: true });
+        const response = await apiMethods.auth_check(void 0, {
+            returnErrorResult: true,
+            signal: AbortSignal.timeout(TIMES.SECONDS_30),
+        });
 
         if (response.success) {
             this.status = StoreStatus.isAuthenticated;

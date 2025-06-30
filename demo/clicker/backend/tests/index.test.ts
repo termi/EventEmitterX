@@ -335,7 +335,9 @@ describe('integration tests of backend', function() {
                 const { state$ } = roundsSSEUpdate;
 
                 roundsSSEUpdate.on('message', data => {
-                    incomingMessages.push(data as typeof incomingMessages[0]);
+                    if (data.type !== 'system') {
+                        incomingMessages.push(data as typeof incomingMessages[0]);
+                    }
                 });
                 state$.addListener((newValue) => {
                     // debug me
@@ -348,6 +350,10 @@ describe('integration tests of backend', function() {
 
                 const round = await apiMethods.test__getOrCreateTestRound(void 0, {
                     alwaysCreateNew: true,
+                });
+
+                await apiMethods.makeRoundTap(round.id, {
+                    count: 1,
                 });
 
                 assertIsNonEmptyArray(incomingMessages);

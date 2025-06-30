@@ -572,6 +572,21 @@ export function startSSERoundRouters(app = fastifyApp) {
                 }
                 : (event: SSEEvent) => {
                     if (event.event === 'round-ended') {
+                        //todo:
+                        // const key = event.roundId ? `round-taps#${event.roundId}` : void 0;
+                        // const existedIndex = key ? sendWaitingQueueIndexes.get(key) : void 0;
+                        // if (existedIndex !== void 0) {
+                        //     const roundTapsEvent = sendWaitingQueue[existedIndex];
+                        //     if (roundTapsEvent) {
+                        //         const {
+                        //             roundCount,
+                        //             roundHiddenTapsCount,
+                        //         } = roundTapsEvent.data;
+                        //         event.data.roundCount = roundCount;
+                        //         event.data.roundHiddenTapsCount = roundHiddenTapsCount;
+                        //     }
+                        // }
+
                         reply.sse(event);
 
                         return;
@@ -692,12 +707,12 @@ export function startSSERoundRouters(app = fastifyApp) {
                 for await (const event of EventEmitterX.on(mainProcessChangeDataCapture, 'round-taps', {
                     signal,
                 })) {
-                    const roundInfo = event[0] as RoundDTO;
+                    const roundInfo = event[0] as (RoundDTO & { roundId?: number });
 
                     sendSSEEvent({
                         event: 'round-taps',
                         data: `json::${JSON.stringify(roundInfo)}`,
-                        roundId: roundInfo.id,
+                        roundId: roundInfo.id || roundInfo.roundId,
                     });
                 }
             })().catch(error => {

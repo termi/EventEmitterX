@@ -89,13 +89,16 @@ export class ApiMethods {
         return (this._prevOrigin = new URL(baseURI).origin);
     }
 
-    async auth_register(props: auth_register.Types["Body"]) {
+    async auth_register(props: auth_register.Types["Body"], options?: {
+        signal?: AbortSignal,
+    }) {
         const response = await fetch(pathJoin(this.origin, auth_register.url), {
             method: auth_register.method,
             body: JSON.stringify(props),
             headers: {
                 'Content-Type': 'application/json',
             } as const satisfies auth_register.Types["Headers"],
+            signal: options?.signal,
         });
         const body: auth_register.Types["Reply"] = await response.json();
 
@@ -106,13 +109,16 @@ export class ApiMethods {
         return body;
     }
 
-    async auth_login(props: auth_login.Types["Body"]) {
+    async auth_login(props: auth_login.Types["Body"], options?: {
+        signal?: AbortSignal,
+    }) {
         const response = await fetch(pathJoin(this.origin, auth_login.url), {
             method: auth_login.method,
             body: JSON.stringify(props),
             headers: {
                 'Content-Type': 'application/json',
             } as const satisfies auth_login.Types["Headers"],
+            signal: options?.signal,
         });
 
         const body: auth_login.Types["Reply"] = await response.json();
@@ -127,12 +133,15 @@ export class ApiMethods {
     // noinspection JSUnusedGlobalSymbols
     async auth_check(props?: Partial<auth_check.Types["Querystring"]>, options?: {
         returnErrorResult: false,
+        signal?: AbortSignal,
     }): Promise<ExcluteSuccessFalseResult<auth_check.Types["Reply"]>>;
     async auth_check(props: Partial<auth_check.Types["Querystring"]> | undefined, options: {
         returnErrorResult: true,
+        signal?: AbortSignal,
     }): Promise<auth_check.Types["Reply"]>;
     async auth_check(props?: Partial<auth_check.Types["Querystring"]>, options?: {
         returnErrorResult?: boolean,
+        signal?: AbortSignal,
     }) {
         const allowRefresh = String(props?.allowRefresh ?? true);
         const _allowRefresh = !!allowRefresh && allowRefresh !== 'false';
@@ -147,6 +156,7 @@ export class ApiMethods {
                 'Authorization': `Bearer ${this._getCurrentUserAccessToken()}`,
                 'Content-Type': "application/json",
             } as const satisfies auth_check.Types["Headers"],
+            signal: options?.signal,
         });
 
         const body: auth_check.Types["Reply"] = await response.json();
@@ -162,13 +172,16 @@ export class ApiMethods {
         return body;
     }
 
-    async auth_logout(props: auth_logout.Types["Body"]) {
+    async auth_logout(props: auth_logout.Types["Body"], options?: {
+        signal?: AbortSignal,
+    }) {
         const response = await fetch(pathJoin(this.origin, auth_logout.url), {
             method: auth_logout.method,
             body: JSON.stringify(props),
             headers: {
                 'Content-Type': "application/json",
             } as const satisfies auth_logout.Types["Headers"],
+            signal: options?.signal,
         });
 
         const body: auth_logout.Types["Reply"] = await response.json();
@@ -371,6 +384,8 @@ export class TestApiMethods extends ApiMethods {
             email: testUser.email,
             name: testUser.name,
             password: testUser.password,
+        }, {
+            signal: AbortSignal.timeout(TIMES.SECONDS_30),
         });
 
         testUser.id = body.userId;
@@ -406,6 +421,8 @@ export class TestApiMethods extends ApiMethods {
         const body = await this.auth_login({
             email: testUser.email,
             password: testUser.password,
+        }, {
+            signal: AbortSignal.timeout(TIMES.SECONDS_30),
         });
 
         testUser.id = body.userId;
