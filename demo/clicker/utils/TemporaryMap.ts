@@ -9,7 +9,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
     private readonly _saveMs = MINUTES;
     private readonly _setAtMap = new Map<K, number>();
     private readonly _callDispose: boolean;
-    private readonly _checkObjectIsFreeToDelete: ((item: V, key: K) => boolean) | undefined;
+    private readonly _shouldProlong: ((item: V, key: K) => boolean) | undefined;
     private readonly _onRemove: ((item: V, key: K) => void) | undefined;
     private _interval: ReturnType<typeof setInterval> | undefined;
     #signal?: AbortSignal;
@@ -24,7 +24,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
             this._saveMs = options.saveMs;
         }
         this._callDispose = Boolean(options?.callDispose);
-        this._checkObjectIsFreeToDelete = options?.checkObjectIsFreeToDelete;
+        this._shouldProlong = options?.shouldProlong;
         this._onRemove = options?.onRemove;
 
         this.#signal = options?.signal;
@@ -67,7 +67,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
         }
 
         outdated: if (this._isOutdated(this._setAtMap.get(key))) {
-            if (this._checkObjectIsFreeToDelete?.(value, key)) {
+            if (this._shouldProlong?.(value, key)) {
                 break outdated;
             }
 
@@ -135,13 +135,13 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
             }
         }
 
-        const { _checkObjectIsFreeToDelete } = this;
+        const { _shouldProlong } = this;
 
         for (const key of outdatedKeys) {
-            if (_checkObjectIsFreeToDelete) {
+            if (_shouldProlong) {
                 const value = super.get(key);
 
-                if (value !== void 0 && _checkObjectIsFreeToDelete(value, key)) {
+                if (value !== void 0 && _shouldProlong(value, key)) {
                     this._setAtMap.set(key, now);
 
                     continue;
@@ -159,7 +159,7 @@ export namespace TemporaryMap {
         checkEveryMs?: number,
         saveMs?: number,
         callDispose?: boolean,
-        checkObjectIsFreeToDelete?: (item: V, key: K) => boolean,
+        shouldProlong?: (item: V, key: K) => boolean,
         onRemove?: (item: V, key: K) => void,
     }
 }

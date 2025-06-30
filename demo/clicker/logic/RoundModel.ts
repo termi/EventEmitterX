@@ -5,6 +5,7 @@ import type { Round, RoundTaps } from "@prisma/client";
 import { EventSignal } from "../modules/EventEmitterX/EventSignal";
 import { TemporaryMap } from "../utils/TemporaryMap";
 import { makeRandomString } from "../utils/random";
+import { isWeb } from "../utils/runEnv";
 import { TIMES } from "../utils/times";
 import { MakeOptional, ReplaceDateWithString } from "../types/generics";
 import apiMethods from "../api/methods";
@@ -159,8 +160,8 @@ export class RoundModel {
         }
     }
 
-    checkNoLinks() {
-        return this._links === 0;
+    hasLinks() {
+        return this._links > 0;
     }
 
     private _prevReadyState: RoundModelReadyState = RoundModelReadyState.awaiting;
@@ -387,16 +388,22 @@ export class RoundModel {
     static instancesRoundModelById = new TemporaryMap<Round["id"], RoundModel>({
         signal: mainProcessAbortController.signal,
         callDispose: true,
-        checkObjectIsFreeToDelete(roundModel) {
+        shouldProlong(roundModel) {
             const now = Date.now();
 
-            return !roundModel.checkNoLinks()
-                && roundModel.endedAt.getTime() < (now + TIMES.HOURS)
+            return roundModel.hasLinks()
+                //todo:
+                // Нужно сделать, чтобы можно было разрешать удалять те RoundModel которые отрендерены только в списке (RoundListItem.tsx),
+                //  но не в текущем раунде (SelectedRound.tsx).
+                || roundModel.endedAt.getTime() > (now - (isWeb ? TIMES.HOURS : TIMES.MINUTES_15))
             ;
         },
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         onRemove(_roundModel) {
-            // todo: Сообщать в activeRoundsStore, но тут нельзя импортировать activeRoundsStore, а нужно кидать событие в общую шину данных.
+            // todo:
+            //  1. Сообщать в activeRoundsStore, но тут нельзя импортировать activeRoundsStore, а нужно кидать событие в общую шину данных.
+            //  2. Нужно сделать, чтобы можно было разрешать удалять те RoundModel которые отрендерены только в списке (RoundListItem.tsx),
+            //     но не в текущем раунде (SelectedRound.tsx).
         },
     });
 

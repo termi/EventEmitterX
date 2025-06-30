@@ -246,7 +246,9 @@ export class EventSignal {
     };
     retry = () => {
         if (this.status === 'error') {
-            this._calculateValue();
+            Promise.resolve(this._calculateValue()).catch(error => {
+                this._setErrorState(error);
+            });
         }
     };
     getSafe = () => {
