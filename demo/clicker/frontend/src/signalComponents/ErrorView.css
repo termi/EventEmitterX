@@ -1,7 +1,9 @@
 
-.ErrorView button {
-  background: var(--btn-bg);
-  color: var(--btn-text-color);
+.ErrorView {
+  button {
+    background: var(--btn-bg);
+    color: var(--btn-text-color);
+  }
 }
 
 .ErrorView__error__text {

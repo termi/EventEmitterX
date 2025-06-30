@@ -28,6 +28,18 @@ describe('utils/object', function() {
             expect(result.c).toBe(obj2.c);
         });
 
+        it('should copy props', function() {
+            const obj1 = { test: { value: 1 }, test2: null, test3: void 0 };
+            const obj2 = { test: 'test', test2: 'test2', test3: 'test3' };
+
+            const result = append(null, obj1, obj2, null, void 0);
+
+            expect(result.test).toBe(obj1.test);
+            expect(result.test.value).toBe(1);
+            expect(result.test2).toBeNull();
+            expect(result.test3).toBe('test3');
+        });
+
         it('should copy Symbols', function() {
             const symbol = Symbol('test');
             const obj1 = { test: { value: 1 } };

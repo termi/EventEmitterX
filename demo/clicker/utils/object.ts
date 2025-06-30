@@ -1,12 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any,@typescript-eslint/no-empty-object-type */
 'use strict';
 
+// type NonNullableValues<T> = {
+//     [K in keyof T]: T[K] extends undefined | null ? never : T[K]
+// }[keyof T];
+// type NonNullableKeys<T> = {
+//     [K in keyof T]: T[K] extends undefined | null ? never : K
+// }[keyof T];
+//
+// type NonUndefinedValues<T> = {
+//     [K in keyof T]: Exclude<T[K], undefined>;
+// }[keyof T];
+type NonUndefinedValuesObject<T> = {
+    [K in NonUndefinedKeys<T>]: Exclude<T[K], undefined>;
+};
+type NonUndefinedKeys<T> = {
+    [K in keyof T]: T[K] extends undefined ? never : K
+}[keyof T];
+
 type Spread<T extends readonly any[]> = T extends [infer First, ...infer Rest]
-    ? First extends null | undefined
+    ? First extends (null | undefined)
         ? Spread<Rest> // Пропускаем null/undefined
         : First extends object
             ? Rest extends any[]
-                ? Omit<Spread<Rest>, keyof First> & First
+                ? Omit<Spread<Rest>, NonUndefinedKeys<First>> & NonUndefinedValuesObject<First>
                 : never
             : Spread<Rest> // Если не объект, пропускаем
     : {}
