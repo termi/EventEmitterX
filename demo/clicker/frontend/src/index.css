@@ -20,6 +20,8 @@
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   --nav-link: #334155;
   --nav-link-hover: #6366f1;
+  --btn-bg: #667eea;
+  --btn-text-color: #f8fafc;
   --logout-btn: #ef4444;
 }
 
@@ -33,6 +35,8 @@
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
   --nav-link: #d1d5db;
   --nav-link-hover: #818cf8;
+  --btn-bg: #667eea;
+  --btn-text-color: #f8fafc;
   --logout-btn: #f87171;
 }
 

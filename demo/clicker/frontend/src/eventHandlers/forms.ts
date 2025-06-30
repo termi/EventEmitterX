@@ -9,7 +9,7 @@ import { dateFromHTMLInputDateTimeLocalInput } from "../../../utils/html";
 
 export const handleNewRoundFormSubmit = Object.assign(function(event: React.FormEvent) {
     event.preventDefault();
-    handleNewRoundFormSubmit.emit();
+    handleNewRoundFormSubmit.trigger();
 
     const targetForm = event.currentTarget as HTMLFormElement;
     const title = (targetForm.elements.namedItem(activeRoundsStore.createNewRound.elements.title.name) as HTMLInputElement).value;
@@ -26,7 +26,7 @@ export const handleNewRoundFormSubmit = Object.assign(function(event: React.Form
     });
 }, {
     _s: [] as (() => void)[],
-    emit() {
+    trigger() {
         this._s.forEach(callback => callback());
     },
     subscribe(callback: () => void) {

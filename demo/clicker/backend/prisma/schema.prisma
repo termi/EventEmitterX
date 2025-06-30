@@ -11,7 +11,7 @@ model Round {
   id              Int                @id @default(autoincrement())
   title           String
   description     String?
-  token           String             @default(uuid())
+  token           String             @default(uuidv7())  @db.Uuid
   completed       Boolean            @default(false)
   createdAt       DateTime           @default(now())
   startedAt       DateTime
@@ -25,6 +25,8 @@ model Round {
   taps            RoundTaps[]
   tapsHistory     RoundTapsHistory[]
 
+  // @@index([startedAt(sort: Desc), createdAt(sort: Desc)])
+  @@index([startedAt(sort: Desc)])
   @@index([completed, startedAt(sort: Desc), endedAt(sort: Desc)])
 }
 

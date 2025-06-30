@@ -41,7 +41,7 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
 
         this.on('error', (error: unknown, prefix?: string) => {
             applicationStats.onError(error as string | Error);
-            console.error('MainProcessChangeDataCapture: onerror:', prefix || '', error);
+            console.error('MainProcessChangeDataCapture: onerror:', ...[ prefix, error, (error as Error)?.cause ].filter(a => !!a));
         });
     }
 

@@ -10,6 +10,7 @@ import { makeRandomString } from "../utils/random";
 import { promiseTimeout } from "../utils/promise";
 import { makeFormElementsList, dateToHTMLInputDateTimeLocalValue } from "../utils/html";
 import { TIMES } from "../utils/times";
+import { SyntheticError } from "../utils/SyntheticError";
 import apiMethods from "../api/methods";
 import { FormElementDescription } from "../types/htmlSchema";
 import { currentUserStore } from "./currentUserStore";
@@ -54,6 +55,9 @@ const newRoundElements = {
     } satisfies FormElementDescription,
 }
 
+const showErrorOnFirstTry = localStorage.getItem('DO_NOT_THROW_ERROR_ON_FIRST_TRY') !== 'true';
+let wasErrorOnFirstTry = false;
+
 class ActiveRoundsStore extends EventEmitterX {
     /**
      * Reactive version of CurrentUserStore.
@@ -66,6 +70,12 @@ class ActiveRoundsStore extends EventEmitterX {
                 this.emit('error', error);
                 throw error;
             });
+        }
+
+        if (showErrorOnFirstTry && !wasErrorOnFirstTry) {
+            wasErrorOnFirstTry = true;
+
+            throw _makeFakeError();
         }
 
         return newValue ?? _newVersionValueWithFlags(currentValue);
@@ -92,7 +102,7 @@ class ActiveRoundsStore extends EventEmitterX {
             // this.status = StoreStatus.error;
 
             // todo: Перенаправлять в систему нотификаций
-            console.error(`${this[Symbol.toStringTag]}:`, prefix || '', error);
+            console.error(`${this[Symbol.toStringTag]}:`, ...[ prefix, error, (error as Error)?.cause ].filter(a => !!a));
         });
 
         mainProcessChangeDataCapture.on(`round-created`, this._addNewRound);
@@ -331,6 +341,16 @@ function _newVersionValueWithFlags(currentValue: number, flags?: _ActiveRoundsSi
     const newRawValue = (currentValue >> 8) + 1;
 
     return (newRawValue << 8) | (flags || 0);
+}
+
+function _makeFakeError() {
+    return new SyntheticError('Эта ошибка ознакомительная. Нажмите Retry.', {
+        cause: {
+            error: "Internal Server Error",
+            message: "\nInvalid `prismaClient.round.findMany()` invocation in\nD:\\work\\Projects\\tech-task-for-interview\\backend\\src\\routerHandlers\\roundsRouters.ts:64:52\n\n  61 \n  62 await promiseTimeout(2000);\n  63 \n→ 64 const items = await prismaClient.round.findMany({\n       take: 10,\n       where: undefined,\n       include: {\n         taps: {\n           where: {\n             userId: 4\n           },\n           select: {\n             userId: true,\n             count: true,\n             hiddenCount: true\n           }\n         }\n       },\n       orderBy: {\n         startedAt: \"desc\",\n         createdAt: \"desc\"\n       }\n       ~~~~~~~~~~~~~~~~~~~\n     })\n\nArgument `orderBy`: Invalid value provided. Expected RoundOrderByWithRelationInput[], provided Object.",
+            statusCode: 500,
+        },
+    })
 }
 
 export const activeRoundsStore = ActiveRoundsStore.singleton;

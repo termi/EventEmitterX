@@ -83,6 +83,9 @@ export function startRoundRouters(app = fastifyApp) {
                 },
                 orderBy: {
                     startedAt: 'desc',
+                    // [Order by Multiple Fields #2884](https://github.com/prisma/prisma/discussions/2884#discussioncomment-31791)
+                    // >  Unfortunately this is currently only possible via prisma.queryRaw. There is still an open request for this here that you can follow.
+                    // createdAt: 'desc',
                 },
             });
 

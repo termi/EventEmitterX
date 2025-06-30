@@ -244,6 +244,11 @@ export class EventSignal {
         }
         return this._value;
     };
+    retry = () => {
+        if (this.status === 'error') {
+            this._calculateValue();
+        }
+    };
     getSafe = () => {
         try {
             return this.get();

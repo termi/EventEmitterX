@@ -1,0 +1,17 @@
+
+.ErrorView button {
+  background: var(--btn-bg);
+  color: var(--btn-text-color);
+}
+
+.ErrorView__error__text {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.ErrorView__detailed-dialog {
+  &::backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+  }
+}

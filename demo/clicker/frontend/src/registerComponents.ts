@@ -7,7 +7,7 @@ import { componentTypeForActiveRoundsStore, componentTypeForSelectedRounds } fro
 import { componentTypeForRoundModel } from "../../logic/RoundModel";
 
 import AsyncSpinner from "./components/AsyncSpinner";
-import ErrorView from "./signalComponents/ErrorView";
+import ErrorView, { NoMoreSyntheticErrorsPlease } from "./signalComponents/ErrorView";
 import RoundsList from "./signalComponents/RoundsList";
 import RoundsListItem from "./signalComponents/RoundListItem";
 import SelectedRound from "./signalComponents/SelectedRound";
@@ -24,6 +24,9 @@ EventSignal.initReact({
 
 EventSignal.registerReactComponentForComponentType(componentTypeForActiveRoundsStore, RoundsList);
 EventSignal.registerReactComponentForComponentType(componentTypeForActiveRoundsStore, AsyncSpinner, 'pending');
-EventSignal.registerReactComponentForComponentType(componentTypeForActiveRoundsStore, ErrorView, 'error');
+EventSignal.registerReactComponentForComponentType(componentTypeForActiveRoundsStore, ErrorView, 'error', {
+    addRetry: true,
+    childrenRender: NoMoreSyntheticErrorsPlease,
+});
 EventSignal.registerReactComponentForComponentType(componentTypeForRoundModel, RoundsListItem);
 EventSignal.registerReactComponentForComponentType(componentTypeForSelectedRounds, SelectedRound);

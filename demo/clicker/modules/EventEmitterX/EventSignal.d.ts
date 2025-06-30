@@ -85,6 +85,7 @@ export declare class EventSignal<T, S = T, D = undefined> {
     private _setErrorState;
     private _calculateValue;
     get: () => T;
+    retry: () => void;
     getSafe: () => T;
     getLast: () => T extends Promise<any> ? Awaited<T> : T;
     getSourceValue: () => S | undefined;
