@@ -130,6 +130,46 @@ describe('integration tests of backend', function() {
         });
 
         describe('makeRoundTap', function() {
+            it('each 11th tap should add 10 points to score', async function() {
+                if (!apiMethods.test__adminUser.accessToken) {
+                    await apiMethods.test__loginTestUser(true);
+                }
+
+                const round = await apiMethods.test__getOrCreateTestRound(void 0, {
+                    alwaysCreateNew: true,
+                });
+
+                if (!apiMethods.test__simpleUser.accessToken) {
+                    await apiMethods.test__loginTestUser(apiMethods.test__simpleUser);
+                }
+
+                apiMethods.test__setDefaultAccessToken(apiMethods.test__simpleUser.accessToken);
+
+                const body = await apiMethods.makeRoundTap(round.id, {
+                    count: 10,
+                });
+
+                expect(body.success).toBeTruthy();
+                expect(body.userScore).toBe(10);
+                expect(body.roundScore).toBe(10);
+
+                const body2 = await apiMethods.makeRoundTap(round.id, {
+                    count: 1,
+                });
+
+                expect(body2.success).toBeTruthy();
+                expect(body2.userScore).toBe(21);
+                expect(body2.roundScore).toBe(21);
+
+                const body3 = await apiMethods.makeRoundTap(round.id, {
+                    count: 11,
+                });
+
+                expect(body3.success).toBeTruthy();
+                expect(body3.userScore).toBe(42);
+                expect(body3.roundScore).toBe(42);
+            });
+
             it('with admin user', async function() {
                 if (!apiMethods.test__adminUser.accessToken) {
                     await apiMethods.test__loginTestUser(true);
