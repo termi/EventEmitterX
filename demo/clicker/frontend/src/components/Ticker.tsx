@@ -1,6 +1,6 @@
 'use strict';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const globalTickTimerApi = getGlobalTickTimerApi('tickerGroup');
 
@@ -12,6 +12,7 @@ interface TickerProps {
     timestampOffset?: number;
     tickerGroup?: string;
     tickerGroupIntervalMS?: number;
+    children?: React.ReactNode | ((props: { timestamp: number, currentTimestamp: number }) => React.ReactNode);
 }
 
 type TickerHandler = (now: number) => void;
@@ -42,11 +43,12 @@ export default function Ticker(props: TickerProps) {
     const {
         className = 'ticker',
         isBackward = false,
-        timestamp = void 0,
+        timestamp,
         tickerGroup = void 0,
         alwaysShowHours = false,
         tickerGroupIntervalMS = 1000,
         timestampOffset,
+        children,
     } = props;
 
     const newNowState = useState(0);
@@ -80,11 +82,15 @@ export default function Ticker(props: TickerProps) {
 
     const timeString = durationString(duration, alwaysShowHours);
 
-    return (
+    return (<>
         <span className={className}>
             {timeString}
         </span>
-    );
+        {typeof children === 'function'
+            ? children({ timestamp, currentTimestamp: now })
+            : children
+        }
+    </>);
 }
 
 function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {

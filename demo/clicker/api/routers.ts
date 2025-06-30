@@ -359,6 +359,24 @@ export namespace currentUserInfo {
     };
 }
 
+export const settings = {
+    method: 'get',
+    url: '/settings',
+    description: 'Настройки загружаемые с бекенда',
+} as const satisfies RouterDescription;
+
+export namespace settings {
+    export type Types = {
+        Reply: {
+            success: true,
+            settings: {
+                /** Минимальное время ожидания перед началом раунда в миллисекундах */
+                minimalCooldown: number,
+            },
+        } | RouterErrorResponse,
+    };
+}
+
 export const dev_mode_process_exit = {
     method: 'post',
     url: '/dev_mode_process_exit',

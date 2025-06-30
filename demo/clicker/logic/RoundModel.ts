@@ -40,8 +40,10 @@ export type RoundDTO = ReplaceDateWithString<
 export const enum RoundModelReadyState {
     completed = 1,
     started = 2,
+    /** Раунд доступен в UI. В него можно вступить и начать ожидать начала. */
     awaiting = 3,
-    readyToComplete = 4,
+    // awaitingHidden = 4,
+    readyToComplete = 5,
 }
 
 const tagRoundModel = 'RoundModel';
@@ -197,6 +199,7 @@ export class RoundModel {
             return {
                 timerTitle: 'Раунд завершен',
                 isBackward: true,
+                isProgressBackward: false,
                 timestamp: 0,
             };
         }
@@ -205,6 +208,7 @@ export class RoundModel {
             return {
                 timerTitle: 'Раунд закончится через',
                 isBackward: true,
+                isProgressBackward: false,
                 timestamp: this.endedAt.getTime(),
             };
         }
@@ -215,6 +219,7 @@ export class RoundModel {
             return {
                 timerTitle: 'Раунд начнется через',
                 isBackward: true,
+                isProgressBackward: true,
                 timestamp: this.startedAt.getTime(),
             };
         }
@@ -390,6 +395,11 @@ export class RoundModel {
         callDispose: true,
         shouldProlong(roundModel) {
             const now = Date.now();
+
+            if (roundModel.checkReadyState(now) !== RoundModelReadyState.completed) {
+                // Автоматически удаляем только закрытые раунды
+                return true;
+            }
 
             return roundModel.hasLinks()
                 //todo:

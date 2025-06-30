@@ -31,11 +31,17 @@
 .selected-card-timer {
   padding: 10px;
   border: 1px solid black;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .selected-card-timer__ticker {
-  margin-inline-start: 2em;
   color: var(--nav-link-hover);
+}
+
+.selected-card-timer__ticker-progress {
+  width: 90%;
 }
 
 .selected-card-time {

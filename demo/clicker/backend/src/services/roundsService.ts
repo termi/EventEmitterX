@@ -9,6 +9,8 @@ const kWasGlobalOnRoundEndHook = Symbol('kWasGlobalOnRoundEndHook');
 class RoundsService {
     constructor() {
         RoundModel.registerGlobalOnRoundEndHook(this.globalOnRoundEndHook);
+
+        // todo: Загружать из базы незакрытые раунды и отслеживать их состояние
     }
 
     globalOnRoundEndHook = (roundModel: RoundModel) => {

@@ -22,6 +22,7 @@ import {
     getRound,
     makeRoundTap,
     rounds,
+    settings,
 } from "./routers";
 import { assertIsObject } from "../type_guards/object";
 import { mainProcessJTWStorage } from "../logic/mainProcessJTWStorage";
@@ -306,6 +307,21 @@ export class ApiMethods {
                     'Authorization': `Bearer ${this._getCurrentUserAccessToken()}`,
                     'X-Idempotent-Id': crypto.randomUUID(),
                 } as const satisfies makeRoundTap.Types["Headers"],
+            }
+        );
+
+        if (!response.data?.success) {
+            throw new Error(response.data?.error);
+        }
+
+        return response.data;
+    }
+
+    async loadSettings() {
+        const response = await request<settings.Types["Reply"]>(
+            pathJoin(this.origin, settings.url),
+            {
+                method: settings.method,
             }
         );
 

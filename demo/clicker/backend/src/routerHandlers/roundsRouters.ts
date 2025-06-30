@@ -27,6 +27,7 @@ import {
 } from "../../../logic/RoundModel";
 import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
 import { roundsService } from "../services/roundsService";
+import { DEFAULT_cooldownSec, DEFAULT_roundDuration } from "../common/env";
 
 /** Хранилище закешированных и неизменяемых данных пользователя. Для быстрого доступа.  */
 const usersInfoMap = new Map<number, {
@@ -34,13 +35,6 @@ const usersInfoMap = new Map<number, {
     isHideTaps: boolean,
     // inactive: boolean,
 }>();
-
-const SECONDS = 1000;
-const MINUTES = 60 * SECONDS;
-// const SECONDS_5 = SECONDS * 5;
-// const MINUTES_5 = MINUTES * 5;
-const DEFAULT_cooldownSec = (Number(process.env.COOLDOWN_DURATION) || 30);
-const DEFAULT_roundDuration = (Number(process.env.ROUND_DURATION) || 60) * SECONDS;
 
 mainProcessChangeDataCapture.on('round-ended', roundDTO => {
     // Если получили сообщение из другого Realm
@@ -263,7 +257,7 @@ export function startRoundRouters(app = fastifyApp) {
 
             const timeDiff = now - timestamp;
 
-            if (timeDiff > MINUTES || timeDiff < 0) {
+            if (timeDiff > TIMES.MINUTES || timeDiff < 0) {
                 // Слишком большая разница во времени
                 reply.status(500).send({
                     success: false,

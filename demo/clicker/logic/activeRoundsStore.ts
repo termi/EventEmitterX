@@ -13,17 +13,22 @@ import { TIMES } from "../utils/times";
 import { SyntheticError } from "../utils/SyntheticError";
 import apiMethods from "../api/methods";
 import { FormElementDescription } from "../types/htmlSchema";
+import { assertIsDefined } from "../type_guards/base";
 import { currentUserStore } from "./currentUserStore";
 import { RoundDTO, RoundModel, sortRounds } from "./RoundModel";
 import { StoreStatus } from "./consts";
 import mainProcessChangeDataCapture from "./mainProcessChangeDataCapture";
-import { assertIsDefined } from "../type_guards/base";
 
 const tagCurrentUserStore = 'CurrentUserStore';
 
 export const componentTypeForActiveRoundsStore = makeRandomString(tagCurrentUserStore, true);
 export const componentTypeForSelectedRounds = makeRandomString(tagCurrentUserStore, '_selectedRound', true);
 
+let minimalCooldown = TIMES.SECONDS_5;
+
+/**
+ * @see {@link ActiveRoundsStore.createNewRound}
+ */
 const newRoundElements = {
     title: {
         order: 1,
@@ -42,11 +47,13 @@ const newRoundElements = {
         label: 'Время начала:',
         name: 'startedAt',
         type: 'datetime-local',
+        // todo: использовать компонент Ticker, для того, чтобы обновлять значение в форме, чтобы всегда было значение по-умолчанию не меньше допустимого
         get defaultValue() {
-            return dateToHTMLInputDateTimeLocalValue(Date.now() + TIMES.SECONDS_5/* + TIMES.MINUTES_5*/);
+            return dateToHTMLInputDateTimeLocalValue(activeRoundsStore.getNewRoundMinTimestamp());
         },
+        // todo: использовать компонент Ticker, для того, чтобы обновлять значение в форме, чтобы всегда было значение min не меньше допустимого
         get min() {
-            return dateToHTMLInputDateTimeLocalValue(Date.now()/* + TIMES.MINUTES_5*/);
+            return dateToHTMLInputDateTimeLocalValue(activeRoundsStore.getNewRoundMinTimestamp());
         },
         get max() {
             return dateToHTMLInputDateTimeLocalValue(Date.now() + TIMES.HOURS_4);
@@ -66,6 +73,8 @@ class ActiveRoundsStore extends EventEmitterX {
         currentUserStore.signal$.get();
 
         if (((newValue || 0) & _ActiveRoundsSignalUpdateFlags.withoutLoadingItems) === 0) {
+            await this.loadSettings();
+
             await this.loadActiveRounds().catch((error: unknown) => {
                 this.emit('error', error);
                 throw error;
@@ -144,6 +153,27 @@ class ActiveRoundsStore extends EventEmitterX {
         return this._status === StoreStatus.pending;
     }
 
+    private _settingsLoaded = false;
+
+    // todo: Вынести в settingsStore
+    async loadSettings() {
+        if (this._settingsLoaded) {
+            return;
+        }
+
+        this._settingsLoaded = true;
+
+        const response = await apiMethods.loadSettings();
+
+        if (response.success) {
+            minimalCooldown = response.settings?.minimalCooldown ?? minimalCooldown;
+        }
+    }
+
+    getNewRoundMinTimestamp() {
+        return Date.now() + minimalCooldown;
+    }
+
     startLoadingRoutineSync() {
         currentUserStore.signal$.addListener(this._loadingRoutineSync);
     }
@@ -217,6 +247,15 @@ class ActiveRoundsStore extends EventEmitterX {
 
     createNewRound = Object.assign(async (props: Parameters<typeof apiMethods.createRound>[0]) => {
         if (currentUserStore.isAuthenticated) {
+            const startedAt = props?.startedAt;
+
+            if (startedAt) {
+                const startedAtDate = new Date(startedAt);
+                const minStatedAtDate = new Date(this.getNewRoundMinTimestamp());
+
+                props.startedAt = Math.max(startedAtDate.getTime(), minStatedAtDate.getTime());
+            }
+
             const response = await apiMethods.createRound(props);
 
             // console.log('Раунд успешно создан', response);

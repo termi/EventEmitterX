@@ -11,19 +11,28 @@ export function makeFormElementsList(elements: Record<string, FormElementDescrip
     });
 }
 
-export function dateToHTMLInputDateTimeLocalValue(value?: number | string | Date) {
+export function dateToHTMLInputDateTimeLocalValue(value?: number | string | Date, skipSeconds = false) {
     const isoString = localISOString(value);
-    const lastIndex = isoString.lastIndexOf(':');
 
-    if (isoString.endsWith('Z')) {
-        // "2025-06-27T00:56:56.573Z" -> "2025-06-27T00:56"
-        return isoString.substring(0, lastIndex);
+    if (skipSeconds) {
+        const lastIndex = isoString.lastIndexOf(':');
+
+        if (isoString.endsWith('Z')) {
+            // "2025-06-27T00:56:13.573Z" -> "2025-06-27T00:56"
+            return isoString.substring(0, lastIndex);
+        }
+
+        const nextIndex = isoString.lastIndexOf(':', lastIndex - 1);
+
+        // '2025-06-27T04:10:39.313+03:00' -> '2025-06-27T04:10'
+        return isoString.substring(0, nextIndex);
     }
 
-    const nextIndex = isoString.lastIndexOf(':', lastIndex - 1);
+    const lastIndex = isoString.lastIndexOf('.');
 
-    // '2025-06-27T04:10:39.313+03:00' -> '2025-06-27T04:10'
-    return isoString.substring(0, nextIndex);
+    // "2025-06-27T00:56:13.573Z" -> "2025-06-27T00:56:13"
+    // '2025-06-27T04:10:39.313+03:00' -> '2025-06-27T04:10:39'
+    return isoString.substring(0, lastIndex);
 }
 
 export function dateFromHTMLInputDateTimeLocalInput(input: HTMLInputElement) {

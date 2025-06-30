@@ -10,7 +10,7 @@ import '../../../polyfills';
 
 import { initFastifyApp } from "./fastifyInit";
 import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
-import { cliArgs } from "../cli/args";
+import { cliArgs } from "../common/cliArgs";
 import { startAllRoutersHandling } from "../routerHandlers/routers";
 import { startDevRoutersHandling } from "../routerHandlers/devRouters";
 import { applicationStats } from "../../../develop/ApplicationStats";
