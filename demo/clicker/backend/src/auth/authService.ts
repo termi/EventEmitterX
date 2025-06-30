@@ -8,15 +8,17 @@ import { promisify } from "node:util";
 
 import jwt from 'jsonwebtoken';
 
-import { prismaClient } from "../orm/prismaClient";
 import { makeRandomInteger } from "../../../utils/random";
 import { promiseTimeout } from "../../../utils/promise";
 import { currentAuthUser } from "../../types/auth";
 import { isTest } from "../../../utils/runEnv";
+import { prismaClient } from "../orm/prismaClient";
+import {
+    JWT_EXPIRES_IN,
+    JWT_REFRESH_TOKEN_EXPIRES_IN,
+    JWT_SECRET,
+} from "../common/env";
 
-const JWT_SECRET = process.env.JWT_SECRET || '0cb3ce53-1ec6-46d5-8737-2b5bb74fda28';
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
-const JWT_REFRESH_TOKEN_EXPIRES_IN = process.env.JWT_REFRESH_TOKEN_EXPIRES_IN || '7d';
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {

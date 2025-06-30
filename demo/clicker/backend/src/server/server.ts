@@ -8,18 +8,20 @@ import ms, { StringValue } from "ms";
 
 import '../../../polyfills';
 
-import { initFastifyApp } from "./fastifyInit";
 import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
-import { cliArgs } from "../common/cliArgs";
-import { startAllRoutersHandling } from "../routerHandlers/routers";
-import { startDevRoutersHandling } from "../routerHandlers/devRouters";
 import { applicationStats } from "../../../develop/ApplicationStats";
 import { assertIsInValidNwtPortsRange } from "../../../type_guards/net";
 import { makeRandomInteger } from "../../../utils/random";
 import { isIDEDebugger } from "../../../utils/runEnv";
 import { createAbortSignalTimeout } from "../../../utils/timers";
 import { localISOString } from "../../../utils/date";
+import { TIMES } from "../../../utils/times";
 import { setDefaultBaseURI } from "../../../api/methods";
+import { cliArgs } from "../common/cliArgs";
+import { DEFAULT_HTTP_PORT } from "../common/env";
+import { startAllRoutersHandling } from "../routerHandlers/routers";
+import { startDevRoutersHandling } from "../routerHandlers/devRouters";
+import { initFastifyApp } from "./fastifyInit";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const packageJSON = require('../../package.json');
@@ -27,10 +29,6 @@ const packageJSON = require('../../package.json');
 console.log(localISOString(), `Start`, __filename, 'with pid =', process.pid, 'with ppid =', process.ppid, 'with name =', packageJSON.name);
 
 const fastifyApp = initFastifyApp();
-const SECONDS = 1000;
-const MINUTES = 60 * SECONDS;
-const SECONDS_5 = SECONDS * 5;
-const MINUTES_5 = MINUTES * 5;
 
 if (cliArgs.DETECT_ACTIVITY) {
     const { DETECT_ACTIVITY } = cliArgs;
@@ -64,7 +62,7 @@ const DEFAULT_PORT = 3001;
 export async function asyncStart(listenPort?: number) {
     startAllRoutersHandling(fastifyApp);
 
-    const HTTP_PORT = String(listenPort ?? (process.env.HTTP_PORT || '3001')).toLowerCase();
+    const HTTP_PORT = String(listenPort ?? DEFAULT_HTTP_PORT).toLowerCase();
     // todo: Определение занятости порта freePortAsync не всегда срабатывает. Поэтому, нужно написать собственную функцию.
     const port = HTTP_PORT === 'default' ? await freePortAsync.freePortAsync(DEFAULT_PORT)
         : HTTP_PORT === 'random' ? await freePortAsync.freePortAsync(DEFAULT_PORT + makeRandomInteger(20, 1000))
@@ -74,7 +72,7 @@ export async function asyncStart(listenPort?: number) {
     assertIsInValidNwtPortsRange(port);
 
     // 5 секунд на старт по-умолчанию
-    const startTimeout = isIDEDebugger ? MINUTES_5 : SECONDS_5;
+    const startTimeout = isIDEDebugger ? TIMES.MINUTES_5 : TIMES.SECONDS_5;
 
     console.log(localISOString(), `Start listening port`, port, startTimeout);
 

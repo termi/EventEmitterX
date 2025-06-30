@@ -4,7 +4,7 @@ import React from 'react';
 
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
 import { RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
-import { isNumber } from "../../../type_guards/number.ts";
+import { isNumber } from "../../../type_guards/number";
 
 export const onRoundCardSelectClick: React.MouseEventHandler = function(event) {
     const { currentTarget } = event;
