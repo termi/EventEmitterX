@@ -9,10 +9,12 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
     private readonly _saveMs = MINUTES;
     private readonly _setAtMap = new Map<K, number>();
     private readonly _callDispose: boolean;
+    private readonly _checkObjectIsFreeToDelete: ((item: V, key: K) => boolean) | undefined;
+    private readonly _onRemove: ((item: V, key: K) => void) | undefined;
     private _interval: ReturnType<typeof setInterval> | undefined;
     #signal?: AbortSignal;
 
-    constructor(options?: TemporaryMap.Options) {
+    constructor(options?: TemporaryMap.Options<K, V>) {
         super();
 
         if (options?.checkEveryMs) {
@@ -22,6 +24,8 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
             this._saveMs = options.saveMs;
         }
         this._callDispose = Boolean(options?.callDispose);
+        this._checkObjectIsFreeToDelete = options?.checkObjectIsFreeToDelete;
+        this._onRemove = options?.onRemove;
 
         this.#signal = options?.signal;
 
@@ -62,7 +66,11 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
             return void 0;
         }
 
-        if (this._isOutdated(this._setAtMap.get(key))) {
+        outdated: if (this._isOutdated(this._setAtMap.get(key))) {
+            if (this._checkObjectIsFreeToDelete?.(value, key)) {
+                break outdated;
+            }
+
             this.delete(key);
             this._setAtMap.delete(key);
 
@@ -75,15 +83,29 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
     }
 
     delete(key: K) {
+        let value: V | undefined;
+
         if (this._callDispose) {
-            const value = super.get(key);
+            value = super.get(key);
 
             value?.[Symbol.dispose]?.();
         }
 
         this._setAtMap.delete(key);
 
-        return super.delete(key);
+        const result = super.delete(key);
+
+        if (this._onRemove) {
+            if (value === void 0) {
+                value = super.get(key);
+            }
+
+            if (value) {
+                this._onRemove(value, key)
+            }
+        }
+
+        return result;
     }
 
     clear() {
@@ -97,33 +119,47 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
         this._setAtMap.clear();
     }
 
-    private _isOutdated(setAt: number | undefined) {
-        const now = Date.now();
+    private _isOutdated(setAt: number | undefined, now = Date.now()) {
         const timePassed = now - (setAt ?? now);
 
         return timePassed > this._saveMs;
     }
 
     private _checkOutdatedValues = () => {
+        const now = Date.now();
         const outdatedKeys: K[] = [];
 
         for (const { 0: key, 1: setAt } of this._setAtMap) {
-            if (this._isOutdated(setAt)) {
+            if (this._isOutdated(setAt, now)) {
                 outdatedKeys.push(key);
             }
         }
 
+        const { _checkObjectIsFreeToDelete } = this;
+
         for (const key of outdatedKeys) {
+            if (_checkObjectIsFreeToDelete) {
+                const value = super.get(key);
+
+                if (value !== void 0 && _checkObjectIsFreeToDelete(value, key)) {
+                    this._setAtMap.set(key, now);
+
+                    continue;
+                }
+            }
+
             this.delete(key);
         }
     };
 }
 
 export namespace TemporaryMap {
-    export type Options = {
+    export type Options<K, V extends { [Symbol.dispose]?: () => void }> = {
         signal?: AbortSignal,
         checkEveryMs?: number,
         saveMs?: number,
         callDispose?: boolean,
+        checkObjectIsFreeToDelete?: (item: V, key: K) => boolean,
+        onRemove?: (item: V, key: K) => void,
     }
 }

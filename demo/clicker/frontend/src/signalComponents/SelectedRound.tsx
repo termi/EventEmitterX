@@ -1,5 +1,7 @@
 'use strict';
 
+import { useEffect } from "react";
+
 import { type RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
 import type { activeRoundsStore } from "../../../logic/activeRoundsStore";
 
@@ -13,6 +15,14 @@ import './SelectedRound.css';
 
 export default function SelectedRound({ eventSignal }: { eventSignal: typeof activeRoundsStore.selectedRound$ }) {
     const roundModel = eventSignal.data.selectedRound;
+
+    useEffect(() => {
+        roundModel?.link();
+
+        return () => {
+            roundModel?.unlink();
+        };
+    }, [ roundModel ]);
 
     if (!roundModel) {
         return (

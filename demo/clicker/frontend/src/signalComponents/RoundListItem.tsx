@@ -1,5 +1,7 @@
 'use strict';
 
+import { useEffect } from "react";
+
 import type { RoundModel } from "../../../logic/RoundModel";
 
 import { currentUserStore } from "../../../logic/currentUserStore";
@@ -33,8 +35,16 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
     } = timerInfo;
     const isCurrentUserIsWinner = winnerUserInfo?.id === currentUserStore.userId;
 
+    useEffect(() => {
+        roundModel.link();
+
+        return () => {
+            roundModel.unlink();
+        };
+    }, [ roundModel ]);
+
     return (
-        <div data-round-id={id}
+        <div data-round-id={id} data-id-destroyed={eventSignal.isDestroyed}
              onClick={onRoundCardSelectClick}
              className={`
                 card ${isSelected ? ' card--selected' : ''}

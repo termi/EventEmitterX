@@ -166,11 +166,20 @@ class ActiveRoundsStore extends EventEmitterX {
             const response = await apiMethods.getActiveRounds();
 
             const serverNow = response.now;
+            const existedRoundsIds = new Set(this._rounds.map(roundModel => roundModel.id));
 
             this._rawRounds = response.items;
             this._rawRounds.sort(sortRounds);
-            this._rounds = response.items.map(roundDTO => RoundModel.makeById(roundDTO.id, roundDTO, serverNow));
+            this._rounds = response.items.map(roundDTO => {
+                existedRoundsIds.delete(roundDTO.id);
+
+                return RoundModel.makeById(roundDTO.id, roundDTO, serverNow);
+            });
             this._rounds.sort(sortRounds);
+
+            for (const oldRoundId of existedRoundsIds) {
+                RoundModel.deleteById(oldRoundId);
+            }
         }
         else {
             // todo: На данный момент, нужен "асинхронный разрыв", иначе будет ошибка `Error: Depends on own value`

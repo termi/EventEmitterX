@@ -84,6 +84,7 @@ export class RoundModel {
         make(): MinimalRoundInfo_UserInfo,
     }) | undefined;
     private _winnerUserInfo: WinnerUserInfo | null = null;
+    private _links = 0;
 
     constructor(roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
         this.id = roundDTO.id;
@@ -144,6 +145,22 @@ export class RoundModel {
         }
 
         return 0;
+    }
+
+    link() {
+        this._links++;
+    }
+
+    unlink() {
+        const links = --this._links;
+
+        if (links < 0) {
+            this._links = 0;
+        }
+    }
+
+    checkNoLinks() {
+        return this._links === 0;
     }
 
     private _prevReadyState: RoundModelReadyState = RoundModelReadyState.awaiting;
@@ -370,10 +387,25 @@ export class RoundModel {
     static instancesRoundModelById = new TemporaryMap<Round["id"], RoundModel>({
         signal: mainProcessAbortController.signal,
         callDispose: true,
+        checkObjectIsFreeToDelete(roundModel) {
+            const now = Date.now();
+
+            return !roundModel.checkNoLinks()
+                && roundModel.endedAt.getTime() < (now + TIMES.HOURS)
+            ;
+        },
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        onRemove(_roundModel) {
+            // todo: Сообщать в activeRoundsStore, но тут нельзя импортировать activeRoundsStore, а нужно кидать событие в общую шину данных.
+        },
     });
 
     static getById(id: Round["id"]) {
         return this.instancesRoundModelById.get(id) || null;
+    }
+
+    static deleteById(id: Round["id"]) {
+        this.instancesRoundModelById.delete(id);
     }
 
     static makeById(id: Round["id"], roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
