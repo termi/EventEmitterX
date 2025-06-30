@@ -8,6 +8,8 @@
   border: 1px solid var(--header-border);
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 0;
 }
 
 .selected-card-content {
