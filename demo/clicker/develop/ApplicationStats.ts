@@ -44,7 +44,7 @@ export class ApplicationStats {
         return timePassed < this.timeForRecentRequest;
     }
 
-    static #singleton: ApplicationStats;
+    static #singleton: ApplicationStats | undefined;
 
     static get singleton() {
         return this.#singleton ??= new ApplicationStats();

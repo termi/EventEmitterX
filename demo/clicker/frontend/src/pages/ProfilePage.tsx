@@ -1,9 +1,9 @@
 'use strict';
 
-import { currentUserStore } from "../../../logic/currentUserStore.ts";
+import { useAuth } from "../hooks/useAuth";
 
 export default function ProfilePage() {
-    const { userName, userId, userRole } = currentUserStore;
+    const { userName, userId, userRole } = useAuth();
 
     return (
         <div className="page-content">

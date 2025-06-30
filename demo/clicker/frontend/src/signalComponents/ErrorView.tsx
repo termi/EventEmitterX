@@ -12,11 +12,11 @@ import './ErrorView.css';
 
 export default function ErrorView({ eventSignal, children, childrenRender, addRetry }: {
     eventSignal: EventSignal<any, any, any>,
-    childrenRender?: ({ eventSignal }: { eventSignal: EventSignal<any, any, any> }) => React.ReactNode,
+    childrenRender?: (props: { eventSignal: EventSignal<any, any, any>, className?: string }) => React.ReactNode,
     children: React.ReactNode,
     addRetry?: boolean
 }) {
-    const popoverRef = useRef<HTMLDialogElement>(null);
+    const $popoverRef = useRef<HTMLDialogElement>(null);
     const { lastError } = eventSignal;
 
     if (!lastError) {
@@ -26,19 +26,19 @@ export default function ErrorView({ eventSignal, children, childrenRender, addRe
     const isInstanceOfError = lastError instanceof Error;
     const hint = String((isInstanceOfError ? lastError.stack : void 0) || '');
     const $popoverHist = hint ? (
-        <dialog className="ErrorView__detailed-dialog" ref={popoverRef} closedby="any">
-            <ErrorDetails error={lastError} usingErrorsSet={new Set()} />
+        <dialog className="ErrorView__detailed-dialog" ref={$popoverRef} closedby="any">
+            <ErrorDetails error={lastError} usingErrorsSet={new Set()} doClose={() => { $popoverRef.current?.close(); }} />
         </dialog>
     ) : '';
 
     return (<div className="ErrorView" style={{ color: 'red' }}>
-        <p className="ErrorView__error" onClick={() => { popoverRef.current?.showModal(); }} title={hint}>
+        <p className="ErrorView__error" onClick={() => { $popoverRef.current?.showModal(); }} title={hint}>
             <span className="ErrorView__error__sign">⚠️</span><span className="ErrorView__error__text">{stringifyError(lastError)}</span>
         </p>
         {$popoverHist}
         {addRetry ? (<button className="ErrorView__retry" onClick={eventSignal.retry}>Retry</button>) : null}
         {children ? (<span className="ErrorView__children">️{children}</span>) : null}
-        {childrenRender ? childrenRender({ eventSignal }) : null}
+        {childrenRender ? childrenRender({ eventSignal, className: 'ErrorView__children' }) : null}
     </div>);
 }
 
@@ -46,14 +46,18 @@ function ErrorDetails({
     error,
     currentDeep = 1,
     usingErrorsSet = new Set(),
+    doClose,
 }: {
     error: Error | unknown,
     currentDeep?: number,
     usingErrorsSet?: Set<unknown>,
+    doClose?: () => void,
 }) {
     if (!error) {
         return '';
     }
+
+    const showCloseBtn = !!doClose;
 
     if (typeof error !== 'object') {
         error = {
@@ -79,7 +83,8 @@ function ErrorDetails({
     const hasStack = !!stack && stackLines.length > 0;
 
     return (
-        <div>
+        <div className="ErrorView__details">
+            {showCloseBtn ? <button  className="ErrorView__details__closeBtn" onClick={doClose}>X</button> : ''}
             {constructorName ? <p>Type: {error?.constructor?.name}</p> : ''}
             {messageLines.length > 1
                 ? (<div>Message: <pre dangerouslySetInnerHTML={{ __html: messageLines.map((line) => {
@@ -101,7 +106,7 @@ function ErrorDetails({
     );
 }
 
-export function NoMoreSyntheticErrorsPlease({ eventSignal }: { eventSignal: EventSignal<any, any, any> }) {
+export function NoMoreSyntheticErrorsPlease({ eventSignal, className }: { eventSignal: EventSignal<any, any, any>, className?: string }) {
     const reRenderState = useState(0);
     const { lastError } = eventSignal;
 
@@ -112,7 +117,7 @@ export function NoMoreSyntheticErrorsPlease({ eventSignal }: { eventSignal: Even
         return null;
     }
 
-    return (<div>
+    return (<div className={className}>
         <button onClick={() => {
             localStorage.setItem('DO_NOT_THROW_ERROR_ON_FIRST_TRY', 'true');
             reRenderState[1](a => ++a);

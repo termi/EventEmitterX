@@ -52,19 +52,13 @@ export default function Ticker(props: TickerProps) {
     const newNowState = useState(0);
 
     useEffect(() => {
-        const onGlobalTick = newNowState[1];
-
-        globalTickTimerApi.addTickerHandler(
-            onGlobalTick,
+        return globalTickTimerApi.addTickerHandler(
+            newNowState[1],
             tickerGroup,
             tickerGroupIntervalMS,
         );
-
-        return () => {
-            globalTickTimerApi.removeTickerInstance(onGlobalTick, tickerGroup);
-        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [ tickerGroup, tickerGroupIntervalMS ]);
 
     if (!timestamp) {
         return <span/>;
@@ -149,7 +143,10 @@ function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {
     };
 
     const addTickerHandler = function(
-        tickerHandler: TickerHandler, tickerGroup: string | undefined, tickerGroupIntervalMS = 1000) {
+        tickerHandler: TickerHandler,
+        tickerGroup: string | undefined,
+        tickerGroupIntervalMS = 1000,
+    ) {
         if (!globalTickInterval || globalTickInterval_ms !== tickerGroupIntervalMS) {
             if (globalTickInterval) {
                 clearTimeout(globalTickInterval);
@@ -174,6 +171,10 @@ function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {
         else {
             globalTickersList.add(tickerHandler);
         }
+
+        return () => {
+            removeTickerInstance(tickerHandler, tickerGroup);
+        };
     };
 
     const removeTickerInstance = function(tickerHandler: TickerHandler, tickerGroup: string | undefined) {

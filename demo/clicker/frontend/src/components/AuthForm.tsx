@@ -13,12 +13,7 @@ import './AuthForm.css';
 
 export default function AuthForm() {
     const { 0: isRegistration, 1: setIsRegistration } = useState(false);
-    const currentUserStore = useAuth();
-    const { isAuthenticated, lastError, isPending, login, register } = currentUserStore;
-    const elementsList = isRegistration
-        ? register.elementsList
-        : login.elementsList
-    ;
+    const { isAuthenticated, lastError, isPending, login, register } = useAuth();
 
     if (isAuthenticated) {
         // console.warn('Something went wrong: AuthForm rendered with already isAuthenticated', currentUserStore);
@@ -32,7 +27,10 @@ export default function AuthForm() {
             <FormFromSchema
                 onSubmit={handleAuthFormSubmit} data-is-registration={isRegistration}
                 className="auth-form" disabled={isPending}
-                elements={elementsList}
+                elements={isRegistration
+                    ? register.elementsList
+                    : login.elementsList
+                }
                 buttons={[
                     {
                         id: 'submit',

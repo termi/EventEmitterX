@@ -4,6 +4,7 @@ import React from 'react';
 
 import { activeRoundsStore } from "../../../logic/activeRoundsStore";
 import { RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
+import { isNumber } from "../../../type_guards/number.ts";
 
 export const onRoundCardSelectClick: React.MouseEventHandler = function(event) {
     const { currentTarget } = event;
@@ -23,9 +24,11 @@ export const onSelectedCardClicked: React.MouseEventHandler = function(event) {
 
     const { currentTarget } = event;
     const roundIdAsString = (currentTarget as HTMLElement).dataset?.roundId;
+    // can be NaN
     const id = Number(roundIdAsString);
 
-    if (id) {
+    // check for NaN
+    if (isNumber(id)) {
         const roundModel = RoundModel.getById(id);
 
         if (roundModel) {

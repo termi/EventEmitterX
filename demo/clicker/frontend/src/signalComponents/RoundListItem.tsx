@@ -66,7 +66,7 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
                  data-hidden-taps-count={hiddenTapsCount} data-user-hidden-taps-count={userHiddenTapsCount}
                  className={'card-score-info' + (isCurrentUserIsWinner ? ' card-score-info--you-are-the-winner' : '')}
             >
-                <span className="card-score-info__total">Счет: {score}</span>
+                <span className="card-score-info__total">Счет всего: {score}</span>
                 <span className="card-score-info__user">Ваш счет: {userScore}</span>
             </div>
         </div>

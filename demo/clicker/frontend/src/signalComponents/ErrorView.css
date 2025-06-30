@@ -15,3 +15,17 @@
     backdrop-filter: blur(3px);
   }
 }
+
+.ErrorView__details {
+  position: relative;
+
+  .ErrorView__details__closeBtn {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  & > p:nth-of-type(1) {
+    margin-block-start: 0;
+  }
+}
