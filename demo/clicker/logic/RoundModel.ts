@@ -468,7 +468,8 @@ export function scoreFromTapsCount(tapsCount: number) {
         return 0;
     }
 
-    return tapsCount + Math.floor((tapsCount - 1) / 10);
+    //  каждый одиннадцатый тап дает 10 очков
+    return tapsCount + (Math.floor((tapsCount - 1) / 10) * 10);
 }
 
 export function calculateIsRoundCompleted(round: Round | RoundModel | RoundDTO, now = Date.now()) {
