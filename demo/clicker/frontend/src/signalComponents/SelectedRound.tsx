@@ -10,6 +10,7 @@ import { calculatePercent } from "../../../utils/number";
 
 import { onSelectedCardClicked } from "../eventHandlers/clicks";
 
+import Meter from "../components/Meter";
 import Ticker from "../components/Ticker";
 
 import './SelectedRound.css';
@@ -70,37 +71,34 @@ function SelectedRoundTimerInfo({ eventSignal }: { eventSignal: RoundModel["sign
         timestamp,
         timerTitle,
     } = roundModel.timerInfo;
+    const $ticker = timestamp ? (
+        <Ticker
+            className="selected-card-timer__ticker"
+            timestamp={timestamp}
+            isBackward={isBackward}
+        >{(props) => {
+            const timeDiff = props.timestamp - props.currentTimestamp;
+            const percentValue = calculatePercent(roundDuration, timeDiff);
+            const displayValue = percentValue.toFixed(3);
+            const value = isProgressBackward ? percentValue : -1 * percentValue;
+            const min = isProgressBackward ? 0 : -100;
+            const max = isProgressBackward ? 100 : 0;
+            const low = isProgressBackward ? 10 : -35;
+            const optimum = isProgressBackward ? 60 : -60;
+            const high = isProgressBackward ? 35 : -10;
+
+            return (
+                <Meter min={min} max={max} low={low} optimum={optimum} high={high} value={value} displayValue={displayValue}
+                       className={'selected-card-timer__ticker-progress' + (isProgressBackward ? ' selected-card-timer__ticker-progress--backward' : '')}
+                />
+            );
+        }}</Ticker>
+    ) : '';
 
     return (
         <div className="selected-card-timer">
             <span>{timerTitle}</span>
-            {timestamp
-                ? (
-                    <Ticker
-                        className="selected-card-timer__ticker"
-                        timestamp={timestamp}
-                        isBackward={isBackward}
-                    >{(props) => {
-                        const value = props.timestamp - props.currentTimestamp;
-
-                        if (isProgressBackward) {
-                            const percentValue = calculatePercent(roundDuration, value);
-
-                            return <meter data-value={value} data-round-duration={roundDuration} data-timestamp={props.timestamp} data-currentTimestamp={props.currentTimestamp}
-                                className={'selected-card-timer__ticker-progress' + (isProgressBackward ? ' selected-card-timer__ticker-progress--backward' : '')}
-                                low={10} high={35} optimum={60} max={100}
-                                value={percentValue}
-                            >{percentValue}%</meter>;
-                        }
-
-                        return <progress data-value={value} data-round-duration={roundDuration} data-timestamp={props.timestamp} data-currentTimestamp={props.currentTimestamp}
-                            className={'selected-card-timer__ticker-progress' + (isProgressBackward ? ' selected-card-timer__ticker-progress--backward' : '')}
-                            max={roundDuration} value={roundDuration - value}
-                        />;
-                    }}</Ticker>
-                )
-                : ''
-            }
+            {$ticker}
         </div>
     );
 }
