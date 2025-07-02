@@ -11,7 +11,10 @@ model Round {
   id              Int                @id @default(autoincrement())
   title           String
   description     String?
-  token           String             @default(uuidv7())  @db.Uuid
+  // error: Unknown function in @default(): `uuidv7` is not known. You can read about the available functions here
+  // error: Native type Uuid is not supported for sqlite connector.
+  // token           String             @default(uuidv7())  @db.Uuid
+  token           String             @default(uuid())
   completed       Boolean            @default(false)
   createdAt       DateTime           @default(now())
   startedAt       DateTime
