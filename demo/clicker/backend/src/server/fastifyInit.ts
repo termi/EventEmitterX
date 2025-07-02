@@ -6,6 +6,7 @@ import { FastifySSEPlugin } from "fastify-sse-v2";
 import { stringifyError } from "../../../utils/error";
 import { applicationStats } from "../../../develop/ApplicationStats";
 import { localISOString } from "../../../utils/date";
+import { isTest } from "../../../utils/runEnv";
 
 // ReturnType не работает с перегруженными функциями, которой и является fastify.
 //  [Typescript: ReturnType of overloaded function](https://stackoverflow.com/questions/52760509/typescript-returntype-of-overloaded-function/52761156#52761156)
@@ -59,7 +60,7 @@ export function initFastifyApp() {
 
     // https://fastify.dev/docs/latest/Reference/Hooks/#onrequest
     fastifyApp.addHook('onRequest', (request, _reply, done) => {
-        if (debug) {
+        if (debug && !isTest) {
             console.log(localISOString(), 'fastifyApp.onRequest', request.url);
         }
 

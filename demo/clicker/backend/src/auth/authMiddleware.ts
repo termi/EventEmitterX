@@ -13,6 +13,7 @@ import { TemporaryMap } from "../../../utils/TemporaryMap";
 import { TIMES } from "../../../utils/times";
 import { jwtExpiresInMs } from "../common/env";
 import { getJWTInfo } from './authService';
+import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
 
 const JWT_SECRET = getJWTInfo().JWT_SECRET;
 
@@ -22,6 +23,7 @@ assertIsNonEmptyString(JWT_SECRET);
 export const invalidAccessTokensMap = new TemporaryMap<string, true>({
     checkEveryMs: TIMES.HOURS,
     saveMs: jwtExpiresInMs,
+    signal: mainProcessAbortController.signal,
 });
 
 export function getAuthorizedResponse(req: FastifyRequest) {
