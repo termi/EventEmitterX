@@ -1,11 +1,13 @@
 'use strict';
 
-import { fastifyApp } from "../server/fastifyInit";
-import { authService } from "../auth/authService";
+import type { FastifyReply, FastifyRequest } from "fastify";
+
 import { auth_check, auth_login, auth_logout, auth_refresh, auth_register } from "../../../api/routers";
 import { stringifyError } from "../../../utils/error";
-import { getAuthorizedResponse } from "../auth/authMiddleware";
-import { FastifyReply, FastifyRequest } from "fastify";
+import { fastifyApp } from "../server/fastifyInit";
+import { authService } from "../auth/authService";
+import { getAuthorizedResponse, invalidAccessTokensMap } from "../auth/authMiddleware";
+
 
 export function startAuthRouters(app = fastifyApp) {
     app[auth_register.method]<auth_register.Types>(
@@ -111,6 +113,12 @@ export function startAuthRouters(app = fastifyApp) {
         auth_logout.url,
         async (req, reply) => {
             try {
+                const accessToken = req.headers.authorization?.split(' ')[1];
+
+                if (accessToken) {
+                    invalidAccessTokensMap.set(accessToken, true);
+                }
+
                 const { refreshToken } = req.body;
 
                 const response = await authService.logout(refreshToken);

@@ -163,6 +163,7 @@ export namespace auth_logout {
         },
         Headers: {
             'Content-Type': ApplicationJsonHeader,
+            'Authorization'?: `Bearer ${string}`,
         },
         Reply: {
             success: true,

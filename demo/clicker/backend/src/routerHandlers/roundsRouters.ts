@@ -459,10 +459,7 @@ export function startRoundRouters(app = fastifyApp) {
             }
 
             {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const { userId, userCount, userHiddenCount, userScore, ...otherResult } = result;
-
-                mainProcessChangeDataCapture.emit('round-taps', otherResult);
+                mainProcessChangeDataCapture.emit('round-taps', result);
             }
 
             return result;

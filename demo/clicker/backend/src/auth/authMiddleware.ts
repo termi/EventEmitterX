@@ -3,27 +3,39 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 
-import { getJWTInfo } from './authService';
 import { assertIsNonEmptyString, assertIsString } from "../../../type_guards/string";
 import { assertIsPositiveNumber } from "../../../type_guards/number";
 import { assertIsObject } from "../../../type_guards/object";
 // import { prismaClient } from '../orm/prismaClient';
 import { currentAuthUser } from "../../types/auth";
 import { stringifyError } from "../../../utils/error";
+import { TemporaryMap } from "../../../utils/TemporaryMap";
+import { TIMES } from "../../../utils/times";
+import { jwtExpiresInMs } from "../common/env";
+import { getJWTInfo } from './authService';
 
 const JWT_SECRET = getJWTInfo().JWT_SECRET;
 
 assertIsNonEmptyString(JWT_SECRET);
 
+// todo: Подписываться на канал в Redis который сообщает об logout произошедших в другой ноде
+export const invalidAccessTokensMap = new TemporaryMap<string, true>({
+    checkEveryMs: TIMES.HOURS,
+    saveMs: jwtExpiresInMs,
+});
+
 export function getAuthorizedResponse(req: FastifyRequest) {
     const token = req.headers.authorization?.split(' ')[1];
 
-    if (!token) {
+    if (!token || invalidAccessTokensMap.has(token)) {
         return {
             success: false,
             status: void 0 as number | undefined,
             error: 'Invalid token',
-            errorMessage: 'Token missing in "Authorization" header',
+            errorMessage: !token
+                ? 'Token missing in "Authorization" header'
+                : 'Invalid token in "Authorization" header'
+            ,
         } as const;
     }
 

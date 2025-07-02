@@ -6,6 +6,7 @@ const MINUTES = 60 * SECONDS;
 export class ApplicationStats {
     lastRequestAt = 0;
     requestsCounter = 0;
+    openRequestsSet = new Set();
     lastErrorAt = 0;
     errorsCounter = 0;
     errors: (string|Error)[] = [];
@@ -24,9 +25,14 @@ export class ApplicationStats {
         //
     }
 
-    onRequest() {
+    onRequest(id: string) {
         this.lastRequestAt = Date.now();
         this.requestsCounter++;
+        this.openRequestsSet.add(id);
+    }
+
+    onResponse(id: string) {
+        this.openRequestsSet.delete(id);
     }
 
     onError(error: string | Error) {
@@ -41,7 +47,9 @@ export class ApplicationStats {
         const now = Date.now()
         const timePassed = now - this.lastRequestAt;
 
-        return timePassed < this.timeForRecentRequest;
+        return timePassed < this.timeForRecentRequest
+            || this.openRequestsSet.size > 0
+        ;
     }
 
     static #singleton: ApplicationStats | undefined;

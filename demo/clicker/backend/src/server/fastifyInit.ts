@@ -51,16 +51,19 @@ export function initFastifyApp() {
     fastifyApp.addHook('onSend', (request, reply, payload, done) => {
         reply.header('X-Request-ID', request.id);
         reply.header('X-Response-Time', reply.elapsedTime);
+
+        applicationStats.onResponse(request.id);
+
         done(null, payload);
     });
 
     // https://fastify.dev/docs/latest/Reference/Hooks/#onrequest
-    fastifyApp.addHook('onRequest', (_request, _reply, done) => {
+    fastifyApp.addHook('onRequest', (request, _reply, done) => {
         if (debug) {
-            console.log(localISOString(), 'fastifyApp.onRequest', _request.url);
+            console.log(localISOString(), 'fastifyApp.onRequest', request.url);
         }
 
-        applicationStats.onRequest();
+        applicationStats.onRequest(request.id);
 
         // Some code
         done();

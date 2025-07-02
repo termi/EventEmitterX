@@ -102,6 +102,24 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
         await this.createConnection(true);
     }
 
+    pause() {
+        if ((this._flags & (SSEClientFlags.isConnected | SSEClientFlags.isInReconnection)) === 0) {
+            return;
+        }
+
+        this.disconnect();
+    }
+
+    resume() {
+        if ((this._flags & (SSEClientFlags.isConnected | SSEClientFlags.isInReconnection)) !== 0) {
+            return;
+        }
+
+        this.connect().catch(error => {
+            this.emit('error', error);
+        });
+    }
+
     awaitEvent<K extends keyof SSEClientEvents>(
         eventName: K, options?: { signal?: AbortSignal }): Promise<SSEClientEvents[K]> {
         const signal = options?.signal

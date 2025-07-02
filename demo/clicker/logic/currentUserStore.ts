@@ -84,6 +84,12 @@ class CurrentUserStore extends EventEmitterX {
 
         this.startAuthRoutineSync();
 
+        mainProcessJTWStorage.on('tokens', () => {
+            this.checkExistedTokens().catch(error => {
+                this.emit('error', error);
+            });
+        });
+
         this.on('error', (error: unknown) => {
             this._lastError = error as string | Error;
             this.status = StoreStatus.error;

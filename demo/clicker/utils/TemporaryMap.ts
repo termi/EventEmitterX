@@ -4,7 +4,7 @@ const SECONDS = 1000;
 const MINUTES = 60 * SECONDS;
 const MINUTES_5 = MINUTES * 5;
 
-export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extends Map<K, V> {
+export class TemporaryMap<K, V extends ({ [Symbol.dispose]?: () => void } | unknown)> extends Map<K, V> {
     private readonly _checkEveryMs = MINUTES_5;
     private readonly _saveMs = MINUTES;
     private readonly _setAtMap = new Map<K, number>();
@@ -88,7 +88,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
         if (this._callDispose) {
             value = super.get(key);
 
-            value?.[Symbol.dispose]?.();
+            (value as ({ [Symbol.dispose]?: () => void }))?.[Symbol.dispose]?.();
         }
 
         this._setAtMap.delete(key);
@@ -111,7 +111,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
     clear() {
         if (this._callDispose) {
             for (const value of this.values()) {
-                value?.[Symbol.dispose]?.();
+                (value as ({ [Symbol.dispose]?: () => void }))?.[Symbol.dispose]?.();
             }
         }
 
@@ -154,7 +154,7 @@ export class TemporaryMap<K, V extends { [Symbol.dispose]?: () => void }> extend
 }
 
 export namespace TemporaryMap {
-    export type Options<K, V extends { [Symbol.dispose]?: () => void }> = {
+    export type Options<K, V extends ({ [Symbol.dispose]?: () => void } | unknown)> = {
         signal?: AbortSignal,
         checkEveryMs?: number,
         saveMs?: number,

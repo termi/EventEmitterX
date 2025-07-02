@@ -147,7 +147,7 @@ namespace MainProcessChangeDataCapture {
         [eventName: `round-created#${number}`]: (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
         'round-ended': (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
         [eventName: `round-ended#${number}`]: (roundInfo: RoundDTO, isDetailedEvent?: boolean) => void,
-        'round-taps': (roundInfo: Omit<Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, 'userId'>, isDetailedEvent?: boolean) => void,
+        'round-taps': (roundInfo: Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, isDetailedEvent?: boolean) => void,
         [eventName: `round-taps#${number}`]: (roundInfo: Awaited<ReturnType<typeof apiMethods.makeRoundTap>>, isDetailedEvent?: boolean) => void,
     };
 }

@@ -317,11 +317,13 @@ export class RoundModel {
             this.hiddenTapsCount = data.roundHiddenTapsCount;
         }
 
-        if (data.userCount && data.userCount > this.userTapsCount) {
-            this.userTapsCount = data.userCount;
-        }
-        if (data.userHiddenCount && data.userHiddenCount > this.userHiddenTapsCount) {
-            this.userHiddenTapsCount = data.userHiddenCount;
+        if (data.userId === currentUserStore.userId) {
+            if (data.userCount && data.userCount > this.userTapsCount) {
+                this.userTapsCount = data.userCount;
+            }
+            if (data.userHiddenCount && data.userHiddenCount > this.userHiddenTapsCount) {
+                this.userHiddenTapsCount = data.userHiddenCount;
+            }
         }
 
         this.signal$.set(currentValue => ++currentValue);

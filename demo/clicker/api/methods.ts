@@ -15,7 +15,8 @@ import { assertIsNonEmptyString } from "../type_guards/string";
 import { assertIsPositiveNumber } from "../type_guards/number";
 import {
     auth_check,
-    auth_login, auth_logout,
+    auth_login,
+    auth_logout,
     auth_refresh,
     auth_register,
     createRound,
@@ -180,6 +181,7 @@ export class ApiMethods {
             method: auth_logout.method,
             body: JSON.stringify(props),
             headers: {
+                'Authorization': `Bearer ${this._getCurrentUserAccessToken()}`,
                 'Content-Type': "application/json",
             } as const satisfies auth_logout.Types["Headers"],
             signal: options?.signal,

@@ -25,13 +25,28 @@ export class SSEChannels {
     }
 
     roundsSSEUpdate(options?: SSEChannels.Options) {
-        return new SSEClient({
+        const getJWTToken = options?.getJWTToken || this.getJWTToken || mainProcessJTWStorage.getAccessToken;
+
+        const sseClient =  new SSEClient({
             url: createRouteWithQuery(options?.baseURI ?? this.baseURI, roundsSSEUpdate.url, {
                 forceDelays: String(options?.forceDelays ?? ''),
             }),
-            getJWTToken: options?.getJWTToken || this.getJWTToken || mainProcessJTWStorage.getAccessToken,
+            getJWTToken,
             signal: options?.signal || this._outerSignal,
         });
+
+        if (getJWTToken === mainProcessJTWStorage.getAccessToken) {
+            mainProcessJTWStorage.on('tokens', () => {
+                if (mainProcessJTWStorage.hasTokens()) {
+                    sseClient.resume();
+                }
+                else {
+                    sseClient.pause();
+                }
+            });
+        }
+
+        return sseClient;
     }
 
     static setDefaultBaseURI(newDefaultBaseURI: string | undefined) {
