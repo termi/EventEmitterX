@@ -10,6 +10,8 @@ cd "$script_dir" || {
   exit 1
 }
 
+source ../libs/get_package_name.sh
+
 # Функция для завершения
 cleanup_after_all_done() {
   # Возвращаемся в исходную директорию
@@ -25,6 +27,8 @@ trap cleanup_after_all_done EXIT TERM INT
 
 if [ ! -f "../../backend/prisma/migrations" ]; then
   cd ../../backend
+
+  print_package_name "Init prisma in:"
 
   npm run prisma_init
 fi

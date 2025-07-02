@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo 'Очень бы хотелось, чтобы этот скрипт заработал, но к сожалению, он не работает' && {
-  echo 'Запускайте backend и frontend по отдельности'
-  exit 1;
-}
+# Данный скрипт:
+#  1. запустит и дождется запуска backend
+#  2. получит из вывода backend номер порта на котором стартанул fastify
+#  3. запустил frontend передав в переменной окружения порт на котором стартанул fastify
 
 #echo "current dir: $(pwd)"
 
@@ -19,13 +19,16 @@ cd "$script_dir" || {
   exit 1
 }
 
+source ./libs/get_package_name.sh
+
 #echo "current dir: $(pwd)"
 
 # Создаём именованный канал для чтения вывода backend
 fifo_backend=$(mktemp -u)
 mkfifo "$fifo_backend"
-
-# echo "OUT: 1: $original_dir / $script_dir / $fifo_backend"
+# Создаём именованный канал для получения порта backend. Не можем читать из $fifo_backend, чтобы ненароком не закрыть канал $fifo_backend.
+fifo_port=$(mktemp -u)
+mkfifo "$fifo_port"
 
 relative__backend_path="../backend"
 
@@ -34,6 +37,8 @@ cd "$relative__backend_path" || {
   echo "Error: can't change dir to $relative__backend_path"
   exit 1
 }
+
+print_package_name "Run:"
 
 # run backend dev script in background
 # Запускаем script в новой группе процессов, перенаправляем вывод в канал
@@ -52,6 +57,7 @@ cleanup_after_all_done() {
   # Отрицательный PID означает всю группу
   kill -- -$backend_npm_pgid 2>/dev/null
   rm -f "$fifo_backend"
+  rm -f "$fifo_port"
 
   # Возвращаемся в исходную директорию
   cd "$original_dir" || {
@@ -64,34 +70,49 @@ cleanup_after_all_done() {
 # Перехватываем сигналы завершения
 trap cleanup_after_all_done EXIT TERM INT
 
-echo "Ожидаем запуск сервера (PID: $backend_npm_pgid)..."
+echo "Ожидаем запуск сервера (PID: $backend_npm_pgid): $(get_package_name)"
 
-# Читаем вывод из канала в реальном времени
-while read -r line; do
+found=0
+# Читаем вывод из канала в реальном времени и перенаправляем вывод в основной stdout.
+(
+  while read -r line; do
     echo "$line"
 
     # Проверяем, содержит ли строка адрес сервера
-    if [[ "$line" =~ http://localhost:([0-9]+) ]]; then
-        port="${BASH_REMATCH[1]}"
-        echo "Сервер запущен на порту: $port"
-
-        # Основной код скрипта продолжается здесь
-        echo "Фоновый процесс продолжает работать (PID: $backend_npm_pgid)"
-        echo "current dir: $(pwd)"
-
-        relative__frontend_path="../frontend"
-
-        # change dir to frontend directory
-        cd "$relative__frontend_path" || {
-          echo "Error: can't change dir to $relative__frontend_path";
-          exit 1;
-        }
-
-        echo "current dir: $(pwd)"
-
-        # Запускаем WEB-приложение
-        VITE_BACKEND_PORT="$port" npx vite
+    if [[ $found -eq 0 && "$line" =~ http://localhost:([0-9]+) ]]; then
+      # Записываем полученный порт в одноразовый $fifo_port
+      echo "${BASH_REMATCH[1]}" > "$fifo_port"
+      found=1
     fi
-done < "$fifo_backend"
+  done <"$fifo_backend"
+) &
 
+port=''
 
+# Дожидаемся самой первой строки в отдельном $fifo_port.
+# После получения данных и выхода из цикла $fifo_port закроется автоматически.
+while read -r line; do
+  port="$line"
+  break
+done <"$fifo_port"
+
+# Основной код скрипта продолжается здесь
+echo "Фоновый процесс продолжает работать (PID: $backend_npm_pgid)"
+#echo "current dir: $(pwd)"
+
+relative__frontend_path="../frontend"
+
+# change dir to frontend directory
+cd "$relative__frontend_path" || {
+  echo "Error: can't change dir to $relative__frontend_path"
+  exit 1
+}
+
+#echo "current dir: $(pwd)"
+# shellcheck disable=SC2031
+echo "backend port: $port"
+
+print_package_name "Run:"
+
+# Запускаем WEB-приложение
+VITE_BACKEND_PORT="$port" npx vite

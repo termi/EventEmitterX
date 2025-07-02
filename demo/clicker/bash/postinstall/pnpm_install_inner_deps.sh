@@ -10,6 +10,8 @@ cd "$script_dir" || {
   exit 1
 }
 
+source ../libs/get_package_name.sh
+
 # Функция для завершения
 cleanup_after_all_done() {
   # Возвращаемся в исходную директорию
@@ -28,7 +30,8 @@ cd ../../backend || {
   exit 1
 }
 
-echo "Installing deps for: $(pwd)"
+
+print_package_name "Installing deps for:"
 pnpm i
 
 cd ../frontend || {
@@ -36,5 +39,5 @@ cd ../frontend || {
   exit 1
 }
 
-echo "Installing deps for: $(pwd)"
+print_package_name "Installing deps for:"
 pnpm i

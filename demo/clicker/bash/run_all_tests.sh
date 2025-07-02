@@ -12,6 +12,8 @@ cd "$script_dir" || {
   exit 1
 }
 
+source ./libs/get_package_name.sh
+
 # Функция для завершения
 cleanup_after_all_done() {
   # Возвращаемся в исходную директорию
@@ -27,6 +29,9 @@ trap cleanup_after_all_done EXIT TERM INT
 
 cd ../
 
+# project_name=$(get_package_name) && echo "Run tests for: $project_name"
+print_package_name "Run tests for:"
+
 jest
 
 cd "$script_dir" || {
@@ -39,11 +44,15 @@ cd ../backend || {
   exit 1
 }
 
+print_package_name "Run tests for:"
+
 npm run test
 
 cd ../frontend || {
   echo "Error: can't change dir to frontend"
   exit 1
 }
+
+print_package_name "Run tests for:"
 
 npm run test
