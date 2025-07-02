@@ -2,18 +2,11 @@
 
 ## Как запустить
 
-Нужно выполнить две команды, каждую в своём терминале:
-
-### Запуск `backend`
-
-```bash
-cd ./backend && npm run dev
-```
-
-### Запуск `frontend`
+Запуск `backend` и `frontend` производиться одной [командой](./bash/run_dev_backend_frontend.sh).
+При этом, порт на котором запущен `backend` будет передан в параметры `frontend`.
 
 ```bash
-cd ./frontend && npm run dev
+./bash/run_dev_backend_frontend.sh
 ```
 
 ### Как тестировать
@@ -44,8 +37,6 @@ cd ./frontend && npm run dev
 
 Реализация клиентской части на `React` + `EventSignal`
 
-**В процессе**
-
 ### `./bash`
 
 Вспомогательные скрипты на bash
@@ -70,7 +61,7 @@ cd ./frontend && npm run dev
   * На фронтенде и в тестах, открывает SSE-каналы для получения обновления
 * `./logic/mainProcessJTWStorage` - главная стора для хранение я JWT-токенов.
   * На фронтенде, обеспечивает загрузку и сохранение в `localStorage`
-* `./logic/*Model` - заготовки для будущей реализации моделек для объектов системы
+* `./logic/*Model` - модели для объектов системы. Сейчас реализована только `RoundModel`. В будущем возможно добавиться `UserModel`.
 
 ### `./modules`
 
