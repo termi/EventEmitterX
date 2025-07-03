@@ -1,9 +1,11 @@
 #!/bin/bash
 
 # Данный скрипт:
-#  1. запустит и дождется запуска backend
-#  2. получит из вывода backend номер порта на котором стартанул fastify
-#  3. запустил frontend передав в переменной окружения порт на котором стартанул fastify
+#  1. Проверит, что pnpm установлен, если он выставлен в package.json в "packageManager"
+#  2. Проверит, была ли выполнена установка зависимостей через `pnpm install` и выполнит, если нет
+#  3. Запустит backend и дождется инициализации web-сервера fastify
+#  4. Получит из вывода backend номер порта на котором стартанул fastify
+#  5. Запустил frontend передав в переменной окружения порт на котором стартанул fastify
 
 #echo "current dir: $(pwd)"
 
@@ -20,6 +22,31 @@ cd "$script_dir" || {
 }
 
 source ./libs/get_package_name.sh
+source ./libs/check_nodejs.sh
+
+# Поднимемся в корень проекта
+cd "../" || {
+  echo "Error: can't change dir to ../"
+  exit 1
+}
+
+# Проверим, что pnpm установлен
+if ! auto_check_pnpm_is_installed; then
+  echo -e "\e[31m✖ Ошибка: pnpm не установлен\e[0m"
+  exit 1
+fi
+
+# Сначала проверим, что `pnpm install` был выполнен и выполним, если нет
+if ! check_was_nodejs_deps_installed; then
+  print_package_name "Installing deps for:"
+  pnpm install
+fi
+
+# change pwd
+cd "$script_dir" || {
+  echo "Error: can't change dir to $script_dir"
+  exit 1
+}
 
 #echo "current dir: $(pwd)"
 
@@ -81,7 +108,7 @@ found=0
     # Проверяем, содержит ли строка адрес сервера
     if [[ $found -eq 0 && "$line" =~ http://localhost:([0-9]+) ]]; then
       # Записываем полученный порт в одноразовый $fifo_port
-      echo "${BASH_REMATCH[1]}" > "$fifo_port"
+      echo "${BASH_REMATCH[1]}" >"$fifo_port"
       found=1
     fi
   done <"$fifo_backend"
@@ -109,7 +136,6 @@ cd "$relative__frontend_path" || {
 }
 
 #echo "current dir: $(pwd)"
-# shellcheck disable=SC2031
 echo "backend port: $port"
 
 print_package_name "Run:"

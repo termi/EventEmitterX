@@ -2,12 +2,17 @@
 
 ## Как запустить
 
-Запуск `backend` и `frontend` производиться одной [командой](./bash/run_dev_backend_frontend.sh).
-При этом, порт на котором запущен `backend` будет передан в параметры `frontend`.
-
 ```bash
 ./bash/run_dev_backend_frontend.sh
 ```
+
+Запуск `backend` и `frontend` производиться одной [командой](./bash/run_dev_backend_frontend.sh).
+При этом скрипт выполнит:
+1. Проверит, что pnpm установлен, если он выставлен в package.json в "packageManager"
+2. Проверит, была ли выполнена установка зависимостей через `pnpm install` и выполнит, если нет
+3. Запустит backend и дождется инициализации web-сервера fastify
+4. Получит из вывода backend номер порта на котором стартанул fastify
+5. Запустил frontend передав в переменной окружения порт на котором стартанул fastify
 
 ## Тестирование
 
@@ -42,7 +47,7 @@
 
 Реализация серверной части на `fastify` + `prisma`
 
-### `./frontend` - Work In Progress
+### `./frontend`
 
 Реализация клиентской части на `React` + `EventSignal`
 

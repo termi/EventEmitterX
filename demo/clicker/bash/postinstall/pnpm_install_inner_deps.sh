@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # save current pwd
 original_dir=$(pwd)
 
@@ -29,7 +31,6 @@ cd ../../backend || {
   echo "Error: can't change dir to backend"
   exit 1
 }
-
 
 print_package_name "Installing deps for:"
 pnpm i

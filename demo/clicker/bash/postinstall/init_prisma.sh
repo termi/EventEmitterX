@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # save current pwd
 original_dir=$(pwd)
 
