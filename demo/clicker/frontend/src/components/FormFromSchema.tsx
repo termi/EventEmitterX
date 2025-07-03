@@ -1,6 +1,6 @@
 'use strict';
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useMemo } from "react";
 
 import type { FormButtonDescription, FormElementDescription } from "../../../types/htmlSchema";
 
@@ -26,25 +26,28 @@ export default function FormFromSchema(props: {
         buttonsClassName,
         ...otherProps
     } = props;
-    let actual_onSubmit = onSubmit;
-
-    if (isResetOnSubmit) {
+    const actual_onSubmit = useMemo(() => {
+        let actual_onSubmit = onSubmit;
         const resetOnSubmit = () => {
             $formRef.current?.reset();
         };
 
-        if (actual_onSubmit) {
-            const _onSubmit = actual_onSubmit;
+        if (isResetOnSubmit) {
+            if (actual_onSubmit) {
+                const _onSubmit = actual_onSubmit;
 
-            actual_onSubmit = (...args) => {
-                _onSubmit(...args);
-                resetOnSubmit();
-            };
+                actual_onSubmit = (event) => {
+                    _onSubmit(event);
+                    resetOnSubmit();
+                };
+            }
+            else {
+                actual_onSubmit = resetOnSubmit;
+            }
         }
-        else {
-            actual_onSubmit = resetOnSubmit;
-        }
-    }
+
+        return actual_onSubmit;
+    }, [ $formRef, onSubmit, isResetOnSubmit ]);
 
     // todo: Убедится, что вызов form.reset сразу после первого рендера и монтирования ничего не ломает.
     useLayoutEffect(() => {
@@ -55,7 +58,7 @@ export default function FormFromSchema(props: {
         // Этот хук должен отработать только один раз, после монтирования элемента. А при рендерах будет уже работать
         //  логика isResetOnSubmit.
         $formRef.current?.reset();
-    }, []);
+    }, [ $formRef ]);
 
     return (<form ref={$formRef} onSubmit={actual_onSubmit} aria-disabled={disabled} {...otherProps}>
         {(elements.map(elementDescription => {

@@ -16,6 +16,9 @@
   "bugs": {
     "url": "https://github.com/termi/tech-task-for-interview/issues"
   },
+  "originalIdea": {
+    "url": "https://github.com/round-squares/tech-task-for-interview/wiki"
+  },
   "homepage": "https://github.com/termi/tech-task-for-interview#readme",
   "description": "",
   "packageManager": "pnpm@6.32.1+",

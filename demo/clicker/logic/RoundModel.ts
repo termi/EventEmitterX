@@ -22,7 +22,7 @@ export type RoundWinnerUserInfo = {
     winnerUser?: WinnerUserInfo | null,
 };
 
-export type RoundWithTaps = Round & RoundWinnerUserInfo & {
+export type ExtendedRoundInfo = Round & RoundWinnerUserInfo & {
     taps?: {
         userId: RoundTaps["userId"],
         count: RoundTaps["count"],
@@ -32,7 +32,7 @@ export type RoundWithTaps = Round & RoundWinnerUserInfo & {
 
 export type RoundDTO = ReplaceDateWithString<
     Omit<
-        MakeOptional<RoundWithTaps, 'tapsCount' | 'hiddenTapsCount'>,
+        MakeOptional<ExtendedRoundInfo, 'tapsCount' | 'hiddenTapsCount'>,
         'token' | 'createdAt' | 'authorId'
     >
 > & RoundWinnerUserInfo;
@@ -89,7 +89,7 @@ export class RoundModel {
     private _winnerUserInfo: WinnerUserInfo | null = null;
     private _links = 0;
 
-    constructor(roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
+    constructor(roundDTO: RoundDTO | ExtendedRoundInfo, now = Date.now()) {
         this.id = roundDTO.id;
         this.title = roundDTO.title;
         this.description = roundDTO.description;
@@ -427,7 +427,7 @@ export class RoundModel {
         this.instancesRoundModelById.delete(id);
     }
 
-    static makeById(id: Round["id"], roundDTO: RoundDTO | RoundWithTaps, now = Date.now()) {
+    static makeById(id: Round["id"], roundDTO: RoundDTO | ExtendedRoundInfo, now = Date.now()) {
         let instance = this.getById(id);
 
         if (instance) {

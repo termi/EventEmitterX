@@ -3,8 +3,8 @@
 import fastify from 'fastify';
 import { FastifySSEPlugin } from "fastify-sse-v2";
 
-import { stringifyError } from "../../../utils/error";
 import { applicationStats } from "../../../develop/ApplicationStats";
+import { stringifyError } from "../../../utils/error";
 import { localISOString } from "../../../utils/date";
 import { isTest } from "../../../utils/runEnv";
 

@@ -2,6 +2,7 @@
 
 import type { FormElementDescription } from "../types/htmlSchema";
 
+import { assertIsPositiveNumber } from "../type_guards/number";
 import { localISOString } from "./date";
 import { TIMES } from "./times";
 
@@ -11,6 +12,9 @@ export function makeFormElementsList(elements: Record<string, FormElementDescrip
     });
 }
 
+/**
+ * @see [Using native `date`/`time` inputs with non UTC timeZone](https://developer.mozilla.org/en-US/play?id=Ewfyn5EGRqObAKbOaR%2BYiM9hIhODY9YLRgKn26uEelRYN3Yaq%2BvdABxw%2BpvWp%2BUSafFgHXMAalObi%2FrL)
+ */
 export function dateToHTMLInputDateTimeLocalValue(value?: number | string | Date, skipSeconds = false) {
     const isoString = localISOString(value);
 
@@ -40,7 +44,10 @@ export function dateFromHTMLInputDateTimeLocalInput(input: HTMLInputElement) {
         throw new Error('Invalid input element');
     }
 
-    const gtmValue = input.valueAsNumber;
+    const gtmValue = input.valueAsNumber ?? new Date(input.value).getTime();
+
+    assertIsPositiveNumber(gtmValue);
+
     const offset = new Date().getTimezoneOffset();
     const offsetInMs = offset * TIMES.MINUTES;
 

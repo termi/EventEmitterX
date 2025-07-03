@@ -1,8 +1,8 @@
 'use strict';
 
-import { prismaClient } from "../orm/prismaClient";
 import { kRoundModelFriendWinnerUserInfoSet, RoundModel } from "../../../logic/RoundModel";
 import mainProcessChangeDataCapture from "../../../logic/mainProcessChangeDataCapture";
+import { prismaClient } from "../orm/prismaClient";
 
 const kWasGlobalOnRoundEndHook = Symbol('kWasGlobalOnRoundEndHook');
 
