@@ -3,7 +3,6 @@
 import 'dotenv/config';
 
 import cors from '@fastify/cors';
-import freePortAsync from 'freeport-async';
 import ms, { StringValue } from "ms";
 
 import '../../../polyfills';
@@ -21,6 +20,7 @@ import { cliArgs } from "../common/cliArgs";
 import { DEFAULT_HTTP_PORT } from "../common/env";
 import { startAllRoutersHandling } from "../routerHandlers/routers";
 import { startDevRoutersHandling } from "../routerHandlers/devRouters";
+import { getFreePort } from "../utils/net";
 import { initFastifyApp } from "./fastifyInit";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -63,9 +63,8 @@ export async function asyncStart(listenPort?: number) {
     startAllRoutersHandling(fastifyApp);
 
     const HTTP_PORT = String(listenPort ?? DEFAULT_HTTP_PORT).toLowerCase();
-    // todo: Определение занятости порта freePortAsync не всегда срабатывает. Поэтому, нужно написать собственную функцию.
-    const port = HTTP_PORT === 'default' ? await freePortAsync.freePortAsync(DEFAULT_PORT)
-        : HTTP_PORT === 'random' ? await freePortAsync.freePortAsync(DEFAULT_PORT + makeRandomInteger(20, 1000))
+    const port = HTTP_PORT === 'default' ? await getFreePort(DEFAULT_PORT)
+        : HTTP_PORT === 'random' ? await getFreePort(DEFAULT_PORT + makeRandomInteger(20, 1000))
         : Number(HTTP_PORT)
     ;
 

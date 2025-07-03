@@ -19,7 +19,6 @@
     "dotenv": "^16.5.0",
     "fastify": "^5.4.0",
     "fastify-sse-v2": "4.2.1",
-    "freeport-async": "^2.0.0",
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
