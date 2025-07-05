@@ -90,3 +90,21 @@ export function arrayContentStringify(
 
     return result;
 }
+
+export function isRunningInWebDevMode() {
+    const global = globalThis as unknown as {
+        // from: 'vite'
+        $RefreshReg$?: Function,
+        // from: 'vite'
+        $RefreshSig$?: Function,
+        // from: '@react-refresh'
+        __REACT_DEVTOOLS_GLOBAL_HOOK__?: Object,
+        // from: '@react-refresh'
+        __registerBeforePerformReactRefresh?: Object,
+    };
+
+    return Boolean(
+        global["$RefreshReg$"] && global["$RefreshSig$"]
+        || global["__REACT_DEVTOOLS_GLOBAL_HOOK__"] && global["__registerBeforePerformReactRefresh"]
+    );
+}

@@ -16,7 +16,7 @@ import type { EventEmitter } from "node:events";
 import { isTest } from 'termi@runEnv';
 import { isUniqueSymbol } from 'termi@type_guards';
 import { EventEmitterX } from "../events";
-import { arrayContentStringify, stringifyWithCircularHandle } from "./utils";
+import { arrayContentStringify, stringifyWithCircularHandle, isRunningInWebDevMode } from "./utils";
 
 // todo:
 //  1. Использовать версию EventEmitterX с WeakMap в качестве _events, чтобы не "держать" сигналы от удаления GC.
@@ -31,8 +31,7 @@ const subscribersEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
 
-// eslint-disable-next-line prefer-const
-let isDev = true;
+const isDev = isRunningInWebDevMode();
 let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
@@ -619,6 +618,23 @@ export class EventSignal<T, S=T, D=undefined> {
         }
     }
 
+    retry = () => {
+        if (this.status === 'error') {
+            // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
+            Promise.resolve(this._calculateValue()).catch(error => {
+                this._setErrorState(error);
+            });
+        }
+    };
+
+    private _innerGet() {
+        if (this.isDestroyed) {
+            return this._value;
+        }
+
+        return this._value;
+    }
+
     get = () => {
         if (this.isDestroyed) {
             if (currentSignal && currentSignal !== this) {
@@ -677,7 +693,10 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         if (typeof newSourceValue === 'function') {
-            const currentValue = this.get();
+            // note: Вызывает тут _innerGet а не get, чтобы исключить ситуацию, когда при вызове .set сигнала B
+            //  в функции-обработчике изменения (или в computation) сигнала А, получается, что сигнал A подписывается на сигнал B.
+            //  todo: Тесты нужны
+            const currentValue = this._innerGet();
             const { _sourceValue } = this;
             const currentSourceValue = (_sourceValue !== void 0 ? _sourceValue : currentValue) as S;
             const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(currentValue, currentSourceValue, this.data);
@@ -938,6 +957,7 @@ export class EventSignal<T, S=T, D=undefined> {
             return {
                 unsubscribe: _noop,
                 closed: true,
+                __proto__: null,
             };
         }
 
@@ -993,6 +1013,7 @@ export class EventSignal<T, S=T, D=undefined> {
             get closed() {
                 return closed;
             },
+            __proto__: null,
         };
     }
 
@@ -1264,8 +1285,8 @@ export class EventSignal<T, S=T, D=undefined> {
         computationOrOptions?: EventSignal.ComputationWithSource<T, S, D> | EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>,
         options?: EventSignal.NewOptions<T, S, D>,
     ): EventSignal<T, S, D> {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore
         return new EventSignal(initialValue, computationOrOptions, options);
     }
     // static createSignal<T>(computation: NonNullable<EventSignal.NewOptionsWithComputation<T>["computation"]>): EventSignal<T>;
@@ -1313,6 +1334,7 @@ export class EventSignal<T, S=T, D=undefined> {
             useSyncExternalStore: UseSyncExternalStore,
             createElement?: typeof _React_createElement,
             memo?: typeof _React_createElement,
+            version?: string,
         }) {
             if ('useSyncExternalStore' in hooks) {
                 _useSyncExternalStore = hooks.useSyncExternalStore;
@@ -1334,6 +1356,24 @@ export class EventSignal<T, S=T, D=undefined> {
 
             _ReactFragment = Symbol.for('react.fragment');
             _ReactProfiler = Symbol.for("react.profiler");
+
+            // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+            if (Number.parseInt(hooks.version || '') >= 19) {
+                Object.defineProperties(this.prototype, {
+                    $$typeof: {
+                        configurable: true,
+                        value: Symbol.for("react.transitional.element"),
+                    },
+                });
+            }
+
+            //todo: Можно детектить StrictMode
+            // Object.defineProperty(React, 'StrictMode', {
+            //     get() {
+            //         console.log('globalThis.__StrictMode', globalThis.__StrictMode);
+            //         return globalThis.__StrictMode;
+            //     },
+            // });
         };
 
         /*//todo: Сейчас не работает
@@ -1388,6 +1428,11 @@ export class EventSignal<T, S=T, D=undefined> {
              * Детектируем рекурсивный вызов EventSignalComponent(), чтобы избежать ситуации, когда внутри
              *  зарегистированного React-компонента в JSX возвращается сам EventSignal и мы опять вызываем EventSignalComponent(),
              *  чтобы вернуть тот же самый зарегистрированный React-компонент.
+             *
+             * todo: Для поддержки StrictMode, нужно Set заменить на Map и разрешать не 1, а 2 срабатывания прежде чем выводить ошибку.
+             *
+             * @see [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
+             * @see [useStrictModeDetector](https://github.com/Oblosys/react-hook-tracer/blob/e3108d8d5c6db0e919cebb164644ed2c70f15421/packages/react-hook-tracer/src/hooks/hookUtil.ts#L16)
              */
             const _isInReactRenders = isDev ? (eventSignal._isInReactRenders ??= new Set()) : void 0;
             // Вызовем get/getSafe:
@@ -1411,7 +1456,9 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 renderReactComponent: if (has_reactFC) {
                     if (isDev) {
+                        // Awaiting [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
                         if (_isInReactRenders?.has(reactFC)) {
+                            // todo: Это не работает в React strict mode!!!
                             console.warn(`warning: recursive render detected while rendering "${reactFC.name}". You may need \`.get()\` to eventSignal?`);
 
                             break renderReactComponent;
@@ -1474,6 +1521,13 @@ export class EventSignal<T, S=T, D=undefined> {
 
             return signalValue;
         }
+
+        Object.defineProperty(EventSignalComponent, 'name', {
+            value: 'EventSignalComponent',
+            enumerable: false,
+            configurable: true,
+            writable: false,
+        });
 
         // Decorate Signals so React renders them as <EventSignalComponent> components. - https://github.com/preactjs/signals/blob/10e13d3a67e796873c2d4ddc6d04cd8d8705194b/packages/react/runtime/src/index.ts#L354
         // See "_useSignalsImplementation" in preactjs/signals https://github.com/preactjs/signals/blob/10e13d3a67e796873c2d4ddc6d04cd8d8705194b/packages/react/runtime/src/index.ts#L323
@@ -1656,6 +1710,7 @@ export namespace EventSignal {
         unsubscribe: () => void,
         // A boolean value indicating whether the subscription is closed
         closed: boolean,
+        __proto__?: null,
     };
 }
 
