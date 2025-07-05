@@ -25,6 +25,9 @@ import {
     AbortSignal,
 } from 'termi@abortable';
 import {
+    checkIsPropertyEditable,
+} from '../utils/object';
+import {
     eventsAsyncIterator,
 } from "./EventEmitterEx/eventsAsyncIterator";
 
@@ -2184,7 +2187,7 @@ export {
 function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = false) {
     let { stack = '' } = error;
 
-    if (!_isPropertyEditable(error, 'stack')) {
+    if (!checkIsPropertyEditable(error, 'stack')) {
         return error;
     }
 
@@ -3754,30 +3757,4 @@ function _argumentsClone2(_arguments: IArguments, fromIndex = 0) {
     }
 
     return Array.prototype.slice.call(_arguments, fromIndex);
-}
-
-/**
- * @private
- * @example
- * // Check for error
- * "Uncaught TypeError: Cannot assign to read only property 'stack' of object '[object DOMException]'"
- */
-function _isPropertyEditable(obj: Object, propertyName: string, options: { isUseDefineProperty?: boolean } = {}): boolean {
-    if (Object.isFrozen(obj) || Object.isSealed(obj)) {
-        return false;
-    }
-
-    const propertyDescriptors = Object.getOwnPropertyDescriptor(obj, propertyName);
-
-    // No descriptor + object is not frozen/sealed, so 100% we can add property
-    if (!propertyDescriptors) {
-        return true;
-    }
-
-    // Can't use Object.defineProperty for props with configurable === false
-    if (options.isUseDefineProperty && !propertyDescriptors.configurable) {
-        return false;
-    }
-
-    return !!propertyDescriptors.writable;
 }
