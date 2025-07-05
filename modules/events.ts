@@ -511,6 +511,9 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         }
     }
 
+    protected _emitWithListenersHook: (<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) => void) | undefined = void 0;
+    protected _emitWithNoListenersHook: (<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) => void) | undefined = void 0;
+
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
     emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>): boolean;
@@ -590,6 +593,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     return;
                 }
             }
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore `Argument of type 'IArguments' is not assignable to parameter of type A`
+            this._emitWithListenersHook?.apply(this, arguments);// eslint-disable-line prefer-spread,prefer-rest-params
 
             if (isFn) {
                 const func_handler = handler as Function;
@@ -730,6 +737,11 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 throw error;
             }
+        }
+        else {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore `Argument of type 'IArguments' is not assignable to parameter of type A`
+            this._emitWithNoListenersHook?.apply(this, arguments);// eslint-disable-line prefer-spread,prefer-rest-params
         }
 
         if (!!emitCounter && typeof emitCounter.count === 'function') {
