@@ -42,7 +42,7 @@ export default function SelectedRound({ eventSignal }: { eventSignal: typeof act
     } = roundModel;
 
     return (
-        <div key={id} className="selected-card" data-round-id={id}>
+        <div key={id} data-round-id={id} className="selected-card" data-owner-signal-key={eventSignal.key} data-signal-key={signal$.key}>
             <div className="selected-card-content">
                 <h2 className="selected-card-title">{title}</h2>
                 {description && (

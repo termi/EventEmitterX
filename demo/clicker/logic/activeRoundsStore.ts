@@ -18,6 +18,7 @@ import { currentUserStore } from "./currentUserStore";
 import { RoundDTO, RoundModel, sortRounds } from "./RoundModel";
 import { StoreStatus } from "./consts";
 import mainProcessChangeDataCapture from "./mainProcessChangeDataCapture";
+import { assertIsNonEmptyString } from "../type_guards/string";
 
 const tagCurrentUserStore = 'CurrentUserStore';
 
@@ -247,6 +248,8 @@ class ActiveRoundsStore extends EventEmitterX {
 
     createNewRound = Object.assign(async (props: Parameters<typeof apiMethods.createRound>[0]) => {
         if (currentUserStore.isAuthenticated) {
+            assertIsNonEmptyString(props.title);
+
             const startedAt = props?.startedAt;
 
             if (startedAt) {

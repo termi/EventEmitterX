@@ -68,5 +68,23 @@ describe('utils/path', function() {
             expect(createRouteWithQuery(origin, '/:id/?type=:type', { id: 10, type: 'hidden' })).toBe(origin + '/10/?type=hidden');
             expect(createRouteWithQuery(origin, '/:id?type=:type', { id: 10, type: 'hidden' })).toBe(origin + '/10?type=hidden');
         });
+
+        it('with mixed params and GET params', function() {
+            const route1 = createRouteWithQuery(
+                origin,
+                '/path/:userId/?id=:id&sort=?:sort&:test',
+                { userId: 1, test: 'test', id: '777' }
+            );
+
+            expect(typeof (route1 as unknown) === 'string').toBe(true);
+
+            const route2 = createRouteWithQuery(
+                origin,
+                '/path/:userId?id=:id&sort=?:sort&:test',
+                { userId: 1, test: 'test', id: '777' }
+            );
+
+            expect(typeof (route2 as unknown) === 'string').toBe(true);
+        });
     });
 });

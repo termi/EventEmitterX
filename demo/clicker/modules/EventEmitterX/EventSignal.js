@@ -573,6 +573,13 @@ export class EventSignal {
             return "object" == typeof g && g ? Array.isArray(g) ? n(g, c) : c(g) ? g : o(g) : g;
         }
 
+        Object.defineProperty(h, 'name', {
+            value: 'EventSignalComponent',
+            enumerable: false,
+            configurable: true,
+            writable: false,
+        });
+
         Object.defineProperties(this.prototype, {
             $$typeof: { configurable: !0, value: Symbol.for("react.transitional.element") },
             type: { configurable: !0, value: h },

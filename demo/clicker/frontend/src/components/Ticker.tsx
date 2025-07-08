@@ -33,10 +33,10 @@ function durationString(duration: number, alwaysShowHours?: boolean) {
     date.setHours(0, 0, 0, duration);
 
     if (alwaysShowHours || date.getHours() > 0) {
-        return df1.format(duration);
+        return df1.format(date);
     }
 
-    return df2.format(duration);
+    return df2.format(date);
 }
 
 export default function Ticker(props: TickerProps) {

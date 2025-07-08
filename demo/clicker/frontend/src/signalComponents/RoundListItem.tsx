@@ -50,7 +50,7 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
     }, [ roundModel ]);
 
     return (
-        <div data-round-id={id} data-id-destroyed={eventSignal.isDestroyed}
+        <div data-round-id={id} data-signal-key={eventSignal.key} data-id-destroyed={eventSignal.isDestroyed}
              onClick={onRoundCardSelectClick}
              className={`
                 card ${isSelected ? ' card--selected' : ''}

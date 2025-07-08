@@ -6,9 +6,9 @@ import { activeRoundsStore } from "../../../logic/activeRoundsStore";
 import { RoundModel, RoundModelReadyState } from "../../../logic/RoundModel";
 import { isNumber } from "../../../type_guards/number";
 
-export const onRoundCardSelectClick: React.MouseEventHandler = function(event) {
+export const onRoundCardSelectClick: React.MouseEventHandler<HTMLElement> = function(event) {
     const { currentTarget } = event;
-    const roundIdAsString = (currentTarget as HTMLElement).dataset?.roundId;
+    const roundIdAsString = currentTarget.dataset?.roundId;
     const id = Number(roundIdAsString);
 
     if (id) {
@@ -16,14 +16,14 @@ export const onRoundCardSelectClick: React.MouseEventHandler = function(event) {
     }
 }
 
-export const onSelectedCardClicked: React.MouseEventHandler = function(event) {
+export const onSelectedCardClicked: React.MouseEventHandler<HTMLElement> = function(event) {
     if (!event.isTrusted) {
         // Наивная версия защиты от программных авто-кликов
         return;
     }
 
     const { currentTarget } = event;
-    const roundIdAsString = (currentTarget as HTMLElement).dataset?.roundId;
+    const roundIdAsString = currentTarget.dataset?.roundId;
     // can be NaN
     const id = Number(roundIdAsString);
 

@@ -135,9 +135,9 @@ export function createRouteWithQuery<Path extends string>(
 export namespace createRouteWithQuery {
     export type ExtractParams<Path extends string> =
         Path extends `${string}/:${infer Param}/${infer Rest}`
-            ? { [K in Param | keyof ExtractParams<`/${Rest}`>]: string | number }
+            ? { [K in Param]: string | number } & ExtractParams<`/${Rest}`>
             : Path extends `${string}/:${infer Param}?${infer Query}`
-                ? { [K in Param | keyof ExtractQueryParams<Query>]: string | number }
+                ? { [K in Param]: string | number } & ExtractQueryParams<Query>
                 : Path extends `${string}/:${infer Param}`
                     ? { [K in Param]: string | number }
                     : Path extends `${string}?${infer Query}`
