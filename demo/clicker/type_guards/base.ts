@@ -48,3 +48,13 @@ export function assertIsDefined<T extends {}>(value: T | null | undefined, expec
         }
     }
 }
+
+export function isDateObject(value: Date | unknown): value is Date {
+    return value instanceof Date;
+}
+
+export function assertIsDateObject(value: Date | unknown): asserts value is Date {
+    if (!isDateObject(value)) {
+        throw new TypeError(`value should be instanceof "Date", but ${displayValueForTypeGuard(value)} found.`);
+    }
+}

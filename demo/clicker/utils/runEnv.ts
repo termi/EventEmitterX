@@ -194,12 +194,14 @@ function _hiddenRequire(moduleName: string) {
 }
 
 const IS_TEST_ENV = _IS_PROCESS && _nodeProcessEnv?.NODE_ENV === 'test';
+const IS_DEV_ENV = _IS_PROCESS && _nodeProcessEnv?.NODE_ENV === 'development';
 const IS_WEB_STORM_DEBUGGER = _IS_PROCESS
     && (!!_nodeProcessEnv?.JB_IDE_HOST || !!_nodeProcessEnv?.JB_IDE_PORT)
 ;
 const IS_VSCODE_INSPECTOR = _IS_PROCESS
     && !!_nodeProcessEnv?.VSCODE_INSPECTOR_OPTIONS
 ;
+
 // -----------============================== WEB details ==============================-----------
 /**
  * Is this code running in **WEB** environment?
@@ -212,6 +214,11 @@ export const isWeb: boolean = ENVIRONMENT_IS_WEB;
  * Is this code running in **WEB** environment and it is a **common web Window** process (**non-Worker** environment)?
  */
 export const isWebMainThread: boolean = ENVIRONMENT_IS_WEB && ENVIRONMENT_IS_MAIN_THREAD;
+
+/**
+ * Is this code running in **Worker** environment? For browser (worker and worklet) and nodejs (worker).
+ */
+export const isWorkerThread: boolean = ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD;
 // -----------============================== NodeJS details ==============================-----------
 
 /**
@@ -225,6 +232,11 @@ export const isNodeJS: boolean = ENVIRONMENT_IS_NODE;
 export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS_NODE_MAIN_THREAD;
 
 // -----------============================== testing details ==============================-----------
+
+/**
+ * Is this code running in development environments?
+ */
+export const isDev: boolean = IS_DEV_ENV;
 
 /**
  * Is this code running in testing environments?
