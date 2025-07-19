@@ -32,7 +32,11 @@ cd ../
 # project_name=$(get_package_name) && echo "Run tests for: $project_name"
 print_package_name "Run tests for:"
 
-jest
+if command -v bun &> /dev/null; then
+  bun test ./tests/
+else
+  jest
+fi
 
 cd "$script_dir" || {
   echo "Error: can't change dir to $script_dir"
@@ -46,7 +50,7 @@ cd ../backend || {
 
 print_package_name "Run tests for:"
 
-npm run test
+jest
 
 cd ../frontend || {
   echo "Error: can't change dir to frontend"

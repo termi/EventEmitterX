@@ -6,7 +6,11 @@ import { describe, it, expect } from "@jest/globals";
 // @ts-ignore ignore `TS2790: The operand of a 'delete' operator must be optional.`
 delete Object.groupBy;
 
-import "../../polyfills/Object";
+// Тут обязательно require: для Jest сработает транспиляция других import -> CommonJS, а для Bun можно миксовать import/require.
+// Это сделано для того, чтобы гарантировано выполнить подключение скрипта после `delete Object.groupBy`, хотя
+//  по спецификации EcmaScript modules все import должны быть выполнены перед всем остальным кодом (так и делает Bun).
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require("../../polyfills/Object");
 
 describe('polyfills/Object', function() {
     describe('Object.groupBy', function() {

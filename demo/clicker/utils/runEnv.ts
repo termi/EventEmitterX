@@ -19,6 +19,16 @@ const _IS_NAVIGATOR = typeof navigator === 'object' && !!navigator;
 
 const _toString = Object.prototype.toString;
 
+type BunGlobalObject = {
+    /** @see [Bun / Utils / Bun.version]{@link https://bun.sh/docs/api/utils#bun-version} */
+    version: string,
+    /** @see [Bun / Workers / Bun.isMainThread]{@link https://bun.sh/docs/api/workers#bun-ismainthread} */
+    isMainThread: boolean,
+};
+
+const bunGlobalObject = (_global as unknown as { Bun: BunGlobalObject | undefined }).Bun;
+const _IS_BUN = !!bunGlobalObject;
+
 let ENVIRONMENT_IS_NODE = _IS_PROCESS
     // Don't get fooled by e.g. browserify environments.
     // Only Node.JS has a process variable that is of [[Class]] process
@@ -31,9 +41,8 @@ let ENVIRONMENT_IS_NODE = _IS_PROCESS
 ;
 let ENVIRONMENT_IS_NODE_MAIN_THREAD = false;
 
-
 if (_IS_PROCESS) {
-    if (ENVIRONMENT_IS_NODE) {// Maybe this is Node.js
+    if (ENVIRONMENT_IS_NODE) { // Maybe this is Node.js
         if (_IS_WINDOW) {
             // global `window` is defined
             // if (ENVIRONMENT_IS_ELECTRON) {
@@ -49,7 +58,7 @@ if (_IS_PROCESS) {
             //     ENVIRONMENT_IS_NODE = true;
             // }
             // todo: use ENVIRONMENT_ISDOM in this check
-            /*else*/ if (!String(window.print).includes('[native code]')) {
+            /* else */ if (!String(window.print).includes('[native code]')) {
                 // This is workaround for jest+JSDOM due jsdom is used automatically (https://github.com/facebook/jest/issues/3692#issuecomment-304945928)
                 ENVIRONMENT_IS_NODE = true;
             }
@@ -96,6 +105,12 @@ if (_IS_PROCESS) {
         }
     }
 }
+/**
+ * [Bun APIs]{@link https://bun.sh/docs/runtime/bun-apis}
+ */
+const ENVIRONMENT_IS_BUN = _IS_BUN
+    && typeof bunGlobalObject.version === 'string'
+;
 
 /**
  * Can be Web Worker or Deno Worker.
@@ -156,7 +171,7 @@ const ENVIRONMENT_IS_WORKER_OR_WORKLED_THREAD = ENVIRONMENT_IS_NODE
     : (ENVIRONMENT_IS_WEB_WORKER || ENVIRONMENT_IS_WEB_WORKLED)
 ;
 const ENVIRONMENT_IS_WEB = ENVIRONMENT_IS_WEB_PROCESS
-    || (ENVIRONMENT_IS_WEB_WORKER/* && !ENVIRONMENT_IS_DENO*/)
+    || (ENVIRONMENT_IS_WEB_WORKER/* && !ENVIRONMENT_IS_DENO */)
     || ENVIRONMENT_IS_WEB_WORKLED
 ;
 
@@ -182,7 +197,7 @@ function _stringJoin(leftSide: string, rightSide: string) {
 function _hiddenRequire(moduleName: string) {
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
     // @ts-ignore
-    const _module = typeof module === 'object' && module || void 0;
+    const _module = (typeof module === 'object' && module) || void 0;
 
     if (!_module) {
         return;
@@ -230,6 +245,20 @@ export const isNodeJS: boolean = ENVIRONMENT_IS_NODE;
  * Is this code running in nodejs **non-Worker** environment?
  */
 export const isNodeJSMainThread: boolean = ENVIRONMENT_IS_NODE && ENVIRONMENT_IS_NODE_MAIN_THREAD;
+
+// -----------============================== Bun details ==============================-----------
+
+/**
+ * Is this code running in Bun runtime?
+ *
+ * Bun is a fast JavaScript all-in-one toolkit.
+ *
+ * Develop, test, run, and bundle JavaScript & TypeScript projects—all with Bun. Bun is an all-in-one JavaScript
+ * runtime & toolkit designed for speed, complete with a bundler, test runner, and Node.js-compatible package manager.
+ *
+ * @see [What is Bun?]{@link https://bun.sh/docs}
+ */
+export const isBun: boolean = ENVIRONMENT_IS_BUN;
 
 // -----------============================== testing details ==============================-----------
 

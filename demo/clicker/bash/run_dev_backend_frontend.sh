@@ -80,7 +80,7 @@ cleanup_after_all_done() {
   #  единственным простым решением, будет поддержка на стороне backend метода для завершения процесса
   curl --silent -o /dev/null "http://localhost:$port/dev_mode_process_exit" || true
 
-  echo "Завершаем фоновый процесс $backend_npm_pgid и все порожденные им процессы (всю группу)..."
+  echo "Завершаем фоновый процесс backend $backend_npm_pgid и все порожденные им процессы (всю группу)..."
   # Отрицательный PID означает всю группу
   kill -- -$backend_npm_pgid 2>/dev/null
   rm -f "$fifo_backend"

@@ -6,11 +6,12 @@
 import { describe, it, expect } from "@jest/globals";
 
 import { dateToHTMLInputDateTimeLocalValue, formAsObject } from "../../utils/html";
+import { isBun } from "../../utils/runEnv";
 import { assertIsDateObject } from "../../type_guards/base";
 
 const formatDateOptions: Intl.DateTimeFormatOptions = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-const formatTimeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit' };
-const formatDateTimeOptions: Intl.DateTimeFormatOptions = { ...formatDateOptions, ...formatTimeOptions };
+const formatTimeWithoutSecondsOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+const formatDateTimeOptions: Intl.DateTimeFormatOptions = { ...formatDateOptions, ...formatTimeWithoutSecondsOptions };
 
 describe('utils/html', function() {
     const date = new Date('2025-07-01T02:30:45.249+03:00');
@@ -23,15 +24,24 @@ describe('utils/html', function() {
         });
 
         it('with seconds', function() {
-            const value = dateToHTMLInputDateTimeLocalValue(date);
+            const value = dateToHTMLInputDateTimeLocalValue(date, {
+                allowSeconds: true,
+            });
 
             expect(value).toBe('2025-07-01T02:30:45');
         });
 
-        it('without seconds', function() {
+        it('with milliseconds', function() {
             const value = dateToHTMLInputDateTimeLocalValue(date, {
-                skipSeconds: true,
+                allowSeconds: true,
+                allowMilliseconds: true,
             });
+
+            expect(value).toBe('2025-07-01T02:30:45.249');
+        });
+
+        it('without seconds (default)', function() {
+            const value = dateToHTMLInputDateTimeLocalValue(date);
 
             expect(value).toBe('2025-07-01T02:30');
         });
@@ -91,6 +101,8 @@ describe('utils/html', function() {
             const dateForMonth = new Date('2020-10-01T21:00:00.000Z');
             const dateForWeek = new Date('2020-10-04T21:00:00.000Z');
             const value = dateToHTMLInputDateTimeLocalValue(dateForDateTime);
+            const localISOMonthString = _toLocalISOMonthString(dateForMonth);
+            const localISOWeekString = _toLocalISOWeekString(dateForWeek);
 
             document.body.innerHTML = (
                 `<form id="::test-form::">
@@ -108,16 +120,20 @@ describe('utils/html', function() {
                     </label>
                     <label>
                         <span>month input</span>
-                        <input name="month" type="month" value="${_toLocalISOMonthString(dateForMonth)}" />
+                        <input name="month" type="month" value="${localISOMonthString}" />
                     </label>
                     <label>
                         <span>month input</span>
-                        <input name="week" type="week" value="${_toLocalISOWeekString(dateForWeek)}" />
+                        <input name="week" type="week" value="${localISOWeekString}" />
                     </label>
                 </form>`
             );
 
             const $formEl = document.getElementById('::test-form::') as HTMLFormElement;
+            const $weekEl = $formEl.elements.namedItem('week') as HTMLInputElement;
+            const weekInputValue = $weekEl.value;
+            const weekInputValueAsNumber = $weekEl.valueAsNumber;
+            const weekInputValueAsDate = $weekEl.valueAsDate;
             const result = formAsObject($formEl) as {
                 date: unknown,
                 time: unknown,
@@ -133,10 +149,27 @@ describe('utils/html', function() {
             assertIsDateObject(result.week);
 
             expect(result.date.toLocaleDateString('en', formatDateOptions)).toBe(dateForDateTime.toLocaleDateString('en', formatDateOptions));
-            expect(result.time.toLocaleTimeString('en', formatTimeOptions)).toBe(dateForDateTime.toLocaleTimeString('en', formatTimeOptions));
+            expect(result.time.toLocaleTimeString('en', formatTimeWithoutSecondsOptions)).toBe(dateForDateTime.toLocaleTimeString('en', formatTimeWithoutSecondsOptions));
             expect(result.datetime.toLocaleString('en', formatDateTimeOptions)).toBe(dateForDateTime.toLocaleString('en', formatDateTimeOptions));
             expect(_toLocalISOMonthString(result.month)).toBe(_toLocalISOMonthString(dateForMonth));
-            expect(_toLocalISOWeekString(result.week)).toBe(_toLocalISOWeekString(dateForWeek));
+            expect(weekInputValue).toBe(_toLocalISOWeekString(dateForWeek));
+
+            if (!isBun) {
+                // В библиотеке "happy-dom" есть баг в getter HTMLInputElement.valueAsNumber:
+                // Код на строке https://github.com/capricorn86/happy-dom/blob/cf74f5f63ca562e075c9c14b77ecfbb8fbc43dea/packages/happy-dom/src/nodes/html-input-element/HTMLInputElement.ts#L1049
+                //  не соответствует функции https://github.com/capricorn86/happy-dom/blob/cf74f5f63ca562e075c9c14b77ecfbb8fbc43dea/packages/happy-dom/src/nodes/html-input-element/HTMLInputElementDateUtility.ts#L34
+                expect(_toLocalISOWeekString(result.week)).toBe(_toLocalISOWeekString(dateForWeek));
+            }
+
+            // debug me
+            void [
+                weekInputValueAsNumber,
+                weekInputValueAsDate,
+                dateForWeek,
+            ];
+
+            // expect(weekInputValueAsNumber).toEqual(dateForWeek.getTime());
+            // expect(weekInputValueAsDate).toEqual(dateForWeek);
         });
     });
 });

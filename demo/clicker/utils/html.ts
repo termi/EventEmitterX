@@ -19,12 +19,15 @@ export function makeFormElementsList(elements: Record<string, FormElementDescrip
  * @see [Using native `date`/`time` inputs with non UTC timeZone](https://developer.mozilla.org/en-US/play?id=Ewfyn5EGRqObAKbOaR%2BYiM9hIhODY9YLRgKn26uEelRYN3Yaq%2BvdABxw%2BpvWp%2BUSafFgHXMAalObi%2FrL)
  */
 export function dateToHTMLInputDateTimeLocalValue(value?: Date | number | string, options?: {
-    skipSeconds?: boolean,
+    allowSeconds?: boolean,
     allowMilliseconds?: boolean,
 }) {
     const isoString = localISOString(value);
 
-    if (options?.skipSeconds) {
+    if (!options?.allowSeconds) {
+        // По результатам тестирования в Chrome 138, применение секунд и миллисекунд в html input "datetime-local"
+        //  оказалось забагованым: если выставлены значения min/max, то любое выбранное значение секунд инвалидирует
+        //  текущее выбранное значение в input, даже если оно соответствует диапазону min/max.
         const lastIndex = isoString.lastIndexOf(':');
 
         if (isoString.endsWith('Z')) {
@@ -50,7 +53,7 @@ export function dateToHTMLInputDateTimeLocalValue(value?: Date | number | string
             lastIndex = isoString.lastIndexOf('-');
         }
 
-        if (lastIndex === -1) {
+        if (lastIndex !== -1) {
             // "2025-06-27T00:56:13.573Z" -> "2025-06-27T00:56:13"
             // '2025-06-27T04:10:39.313+03:00' -> '2025-06-27T04:10:39'
             return isoString.substring(0, lastIndex);
