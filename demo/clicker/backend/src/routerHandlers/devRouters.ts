@@ -11,9 +11,11 @@ export function startDevRoutersHandling(app = fastifyApp, options?: {
         dev_mode_process_exit.url,
         {},
         async (_req, reply) => {
+            console.log('Было запрошено завершение процесса. 1');
             options?.mainProcessAbortController?.abort();
             reply.code(200);
             reply.send('dev_mode_process_exit');
+            console.log('Было запрошено завершение процесса. 2');
 
             setTimeout(() => {
                 console.log('Было запрошено завершение процесса.');

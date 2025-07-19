@@ -18,7 +18,11 @@ export const fastifyApp = fastify();
 
 let _inited = false;
 // eslint-disable-next-line
-let debug = true;
+let isDebug = true;
+const isRunningInDevWatchMode = process.env?.npm_lifecycle_event === 'dev'
+    // test for: 'tsx watch src/server/server.ts'
+    && String(process.env.npm_lifecycle_script).includes(' watch ')
+;
 
 export function initFastifyApp() {
     if (_inited) {
@@ -60,8 +64,21 @@ export function initFastifyApp() {
 
     // https://fastify.dev/docs/latest/Reference/Hooks/#onrequest
     fastifyApp.addHook('onRequest', (request, _reply, done) => {
-        if (debug && !isTest) {
+        if (isDebug && !isTest) {
             console.log(localISOString(), 'fastifyApp.onRequest', request.url);
+        }
+
+        // todo: Проверять, что `backend/src/routerHandlers/devRouters.ts` был проинициализирован
+        if (isRunningInDevWatchMode && request.url === '/dev_mode_process_exit') {
+            // Запрос может быть отменен быстрее, чем он дойдёт до роута
+            setTimeout(() => {
+                console.log('Было запрошено завершение процесса. (FALLBACK)');
+
+                // process.ppid - предполагается, что pid процесса, который запустил данный сервер.
+                // Убиваем процесс `/tsx/dist/cli.mjs watch src/server.ts`
+                process.kill(process.ppid);
+                process.exit(0);
+            }, 1000);
         }
 
         applicationStats.onRequest(request.id);
