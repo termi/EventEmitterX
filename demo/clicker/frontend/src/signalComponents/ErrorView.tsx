@@ -27,7 +27,7 @@ export default function ErrorView({ eventSignal, children, childrenRender, addRe
     const hint = String((isInstanceOfError ? lastError.stack : void 0) || '');
     const $popoverHist = hint ? (
         <dialog className="ErrorView__detailed-dialog" ref={$popoverRef} closedby="any">
-            <ErrorDetails error={lastError} usingErrorsSet={new Set()} doClose={() => { $popoverRef.current?.close(); }} />
+            <ErrorDetails error={lastError} doClose={() => { $popoverRef.current?.close(); }} />
         </dialog>
     ) : '';
 
@@ -44,13 +44,11 @@ export default function ErrorView({ eventSignal, children, childrenRender, addRe
 
 function ErrorDetails({
     error,
-    currentDeep = 1,
-    usingErrorsSet = new Set(),
+    usingErrorsMap,
     doClose,
 }: {
     error: Error | unknown,
-    currentDeep?: number,
-    usingErrorsSet?: Set<unknown>,
+    usingErrorsMap?: Map<unknown, number>,
     doClose?: () => void,
 }) {
     if (!error) {
@@ -68,40 +66,53 @@ function ErrorDetails({
 
     const { message, stack, cause } = (error as Error);
     const constructorName = error?.constructor?.name;
-    const messageLines = message.split('\n');
-    const stackLines = String(((error as unknown) instanceof Error ? stack : void 0) || '').split('\n');
+    const messageLines = message.trim().split('\n');
+    const stackLines = String(((error as unknown) instanceof Error ? stack : void 0) || '')
+        .trim()
+        .split('\n')
+    ;
+    const renderCount = usingErrorsMap?.get(cause) || 0;
     /**
      * Предотвращает "зацикленный ре-рендер" если у error.cause.cause ссылается на error.
      *
-     * Проверка на `usingErrorsSet.size !== currentDeep` добавлена для рендера в StrictMode.
+     * Проверяется значение 2 из-за рендера в StrictMode. Если научиться определять включенность StrictMode, то
+     *  по-умолчанию нужно проверять на значение 1 и только в StrictMode на значение 2.
      *
-     * todo: Протестировать.
+     * @see [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
      */
-    const hasCause = !!cause
-        && (!usingErrorsSet.has(cause) || usingErrorsSet.size !== currentDeep)
-    ;
+    const hasCyclicLinks = renderCount >= 2;
+    const hasCause = !!cause && !hasCyclicLinks;
     const hasStack = !!stack && stackLines.length > 0;
+
+    if (hasCause) {
+        usingErrorsMap ??= new Map<unknown, number>();
+
+        usingErrorsMap.set(error, (usingErrorsMap.get(error) || 0) + 1);
+        usingErrorsMap.set(cause, renderCount + 1);
+    }
 
     return (
         <div className="ErrorView__details">
-            {showCloseBtn ? <button  className="ErrorView__details__closeBtn" onClick={doClose}>X</button> : ''}
+            {showCloseBtn ? <button className="ErrorView__details__closeBtn" onClick={doClose}>X</button> : ''}
             {constructorName ? <p>Type: {error?.constructor?.name}</p> : ''}
             {messageLines.length > 1
                 ? (<div>Message: <pre dangerouslySetInnerHTML={{ __html: messageLines.map((line) => {
-                        return `${line}<br />`;
-                    }).join('') }}/></div>)
+                    return `${line}<br />`;
+                }).join('') }} /></div>)
                 : <p>Message: {message}</p>
             }
-            {hasStack ? <div>
+            {hasStack ? (<div>
                 <p>Stack:</p>
                 <pre dangerouslySetInnerHTML={{ __html: stackLines.map((line) => {
                     return `${line}<br />`;
                 }).join('') }} />
-            </div> : ''}
-            {hasCause ? (<div>
-                <p>Cause:</p>
-                <ErrorDetails error={cause} usingErrorsSet={usingErrorsSet} currentDeep={currentDeep + 1} />
             </div>) : ''}
+            {hasCause ? (<div>
+                <hr />
+                <h4>error.cause</h4>
+                <ErrorDetails error={cause} usingErrorsMap={usingErrorsMap} />
+            </div>) : ''}
+            {hasCyclicLinks ? <p style={{ color: 'red' }}>Циклический ре-рендер предотвращён (свойство <code>error.cause</code> ссылается на объект который уже отрендерен выше по цепочке компонентов</p> : ''}
         </div>
     );
 }
@@ -122,5 +133,5 @@ export function NoMoreSyntheticErrorsPlease({ eventSignal, className }: { eventS
             localStorage.setItem('DO_NOT_THROW_ERROR_ON_FIRST_TRY', 'true');
             reRenderState[1](a => ++a);
         }}>Не эмулировать ошибку больше</button>
-    </div>)
+    </div>);
 }

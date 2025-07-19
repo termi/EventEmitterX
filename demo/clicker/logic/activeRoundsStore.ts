@@ -395,13 +395,20 @@ function _newVersionValueWithFlags(currentValue: number, flags?: _ActiveRoundsSi
 }
 
 function _makeFakeError() {
-    return new SyntheticError('Эта ошибка ознакомительная. Нажмите Retry.', {
+    const error = new SyntheticError('Эта ошибка ознакомительная. Нажмите Retry.', {
         cause: {
             error: "Internal Server Error",
             message: "\nInvalid `prismaClient.round.findMany()` invocation in\nD:\\work\\Projects\\tech-task-for-interview\\backend\\src\\routerHandlers\\roundsRouters.ts:64:52\n\n  61 \n  62 await promiseTimeout(2000);\n  63 \n→ 64 const items = await prismaClient.round.findMany({\n       take: 10,\n       where: undefined,\n       include: {\n         taps: {\n           where: {\n             userId: 4\n           },\n           select: {\n             userId: true,\n             count: true,\n             hiddenCount: true\n           }\n         }\n       },\n       orderBy: {\n         startedAt: \"desc\",\n         createdAt: \"desc\"\n       }\n       ~~~~~~~~~~~~~~~~~~~\n     })\n\nArgument `orderBy`: Invalid value provided. Expected RoundOrderByWithRelationInput[], provided Object.",
             statusCode: 500,
         },
-    })
+    });
+
+    if (error.cause) {
+        // "Зацикливаем" ошибку (такое вполне может быть в production)
+        (error.cause as Error).cause = error;
+    }
+
+    return error;
 }
 
 export const activeRoundsStore = ActiveRoundsStore.singleton;
