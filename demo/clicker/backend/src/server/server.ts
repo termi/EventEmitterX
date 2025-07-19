@@ -11,7 +11,6 @@ import { mainProcessAbortController } from "../../../logic/mainProcessAbortContr
 import { applicationStats } from "../../../develop/ApplicationStats";
 import { assertIsInValidNwtPortsRange } from "../../../type_guards/net";
 import { makeRandomInteger } from "../../../utils/random";
-import { isIDEDebugger } from "../../../utils/runEnv";
 import { createAbortSignalTimeout } from "../../../utils/timers";
 import { localISOString } from "../../../utils/date";
 import { TIMES } from "../../../utils/times";
@@ -71,13 +70,11 @@ export async function asyncStart(listenPort?: number) {
     assertIsInValidNwtPortsRange(port);
 
     // 5 секунд на старт по-умолчанию
-    const startTimeout = isIDEDebugger ? TIMES.MINUTES_5 : TIMES.SECONDS_5;
+    const startTimeout = TIMES.SECONDS_5;
 
     console.log(localISOString(), `Start listening port`, port, startTimeout);
 
-    const timeoutSignalDescription = createAbortSignalTimeout(startTimeout);
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-    // @ts-ignore
+    using timeoutSignalDescription = createAbortSignalTimeout(startTimeout);
     const signal = AbortSignal.any([
         mainProcessAbortController.signal,
         timeoutSignalDescription.signal,
@@ -98,8 +95,6 @@ export async function asyncStart(listenPort?: number) {
         signal,
     });
 
-    timeoutSignalDescription.cancel();
-
     const origin = `http://localhost:${port}`;
 
     setDefaultBaseURI(origin);
@@ -107,6 +102,7 @@ export async function asyncStart(listenPort?: number) {
     // Строка очень важная, она грепается в скиптах запуска приложения для получения порта
     console.log(localISOString(), `Server is running on ${origin}`);
 
+    // timeoutSignalDescription.cancel will be called via Symbol.dispose
     return {
         fastifyApp,
         mainProcessAbortController,

@@ -250,6 +250,8 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
 
     private async processStream(_reader: ReadableStreamDefaultReader<Uint8Array>) {
         using reader = append(_reader, {
+            // see https://github.com/tc39/proposal-explicit-resource-management
+            //  > ReadableStreamDefaultReader — Either @@dispose() as an alias or wrapper for releaseLock(), or @@asyncDispose() as a wrapper for cancel() (but probably not both).
             [Symbol.dispose]() {
                 reader.releaseLock();
             },
