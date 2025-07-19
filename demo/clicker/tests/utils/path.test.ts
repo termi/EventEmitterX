@@ -1,11 +1,11 @@
 'use strict';
 
-import { describe, it } from "@jest/globals";
+import { describe, it, expect } from "@jest/globals";
 
 import { createRoute, createRouteWithQuery, pathJoin } from "../../utils/path";
 
 describe('utils/path', function() {
-    const origin = 'http://localhost/pathname'
+    const origin = 'http://localhost/pathname';
 
     describe('createRoute', function() {
         it('cases', function() {

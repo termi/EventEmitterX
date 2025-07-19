@@ -74,7 +74,7 @@ interface DebugTimerInfo {
     args: unknown[];
     callStack: string;
 
-    __proto__: null,
+    __proto__: null;
 }
 
 const debugTimersInfo: Partial<Record<number, DebugTimerInfo>> = Object.create(null);
@@ -236,7 +236,7 @@ export function getDebugTimersInfo() {
 }
 
 export async function getDebugTimersInfoAsync(awaitTime?: number) {
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
         originalMethodsTimers.setTimeout(() => {
             resolve();
         }, awaitTime);

@@ -54,7 +54,7 @@ export default function DashboardPage() {
                         className: 'primary',
                     },
                 ]}
-                buttonsClassName={"modal-actions"}
+                buttonsClassName="modal-actions"
             />
         </dialog>
     ) : '';

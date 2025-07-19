@@ -16,7 +16,6 @@ export function assertOneOfType<T extends Array<TypeGuard<any>>>(
     }
 }
 
-
 // Warning: this overwrite SHOULD BE without ` | unknown` in "value"
 export function assertIsDefined<T>(value: T | null | undefined): asserts value is NonNullable<T>;
 // Warning: this overwrite SHOULD BE without ` | unknown` in "value"

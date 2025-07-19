@@ -2,7 +2,7 @@
 
 import type * as net from 'node:net';
 
-import { afterAll, beforeAll } from "@jest/globals";
+import { afterAll, beforeAll, describe, it, expect } from "@jest/globals";
 import {
     useDebugTimers,
     // dontUseDebugTimers,
@@ -266,7 +266,7 @@ describe('integration tests of backend', function() {
                 expect(body.success).toBeTruthy();
                 expect(body.userCount).toBe(0);
                 expect(body.userScore).toBe(0);
-                expect(body.roundCount).toBeGreaterThan(0)
+                expect(body.roundCount).toBeGreaterThan(0);
                 expect(body.roundScore).toBe(scoreFromTapsCount(body.roundCount));
 
                 const body2 = await apiMethods.makeRoundTap(round.id, {
@@ -276,7 +276,7 @@ describe('integration tests of backend', function() {
                 expect(body2.success).toBeTruthy();
                 expect(body2.userCount).toBe(0);
                 expect(body2.userScore).toBe(0);
-                expect(body2.roundCount).toBeGreaterThan(0)
+                expect(body2.roundCount).toBeGreaterThan(0);
                 expect(body2.roundScore).toBe(scoreFromTapsCount(body2.roundCount));
 
                 const body3 = await apiMethods.getRoundById(round.id);
@@ -374,7 +374,7 @@ describe('integration tests of backend', function() {
                 const incomingMessages: { type: string, data: { id: number } }[] = [];
                 const { state$ } = roundsSSEUpdate;
 
-                roundsSSEUpdate.on('message', data => {
+                roundsSSEUpdate.on('message', (data) => {
                     if (data.type !== 'system') {
                         incomingMessages.push(data as typeof incomingMessages[0]);
                     }
@@ -421,7 +421,7 @@ describe('integration tests of backend', function() {
                 // emulate open sse channel on web page
                 await webLikeMainProcessChangeDataCapture.openSSEChannelForRoundsUpdate(true);
 
-                const errorHandler = jest.fn(error => {
+                const errorHandler = jest.fn((error) => {
                     // debug me
                     void error;
                 });

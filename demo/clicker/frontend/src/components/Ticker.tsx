@@ -63,7 +63,7 @@ export default function Ticker(props: TickerProps) {
     }, [ tickerGroup, tickerGroupIntervalMS ]);
 
     if (!timestamp) {
-        return <span/>;
+        return <span />;
     }
 
     const now = newNowState[0] || Date.now();
@@ -112,7 +112,7 @@ function getGlobalTickTimerApi(_tickerGroupPropName = 'tickerGroup') {
     ;
     const tickerGroupPropName = _tickerGroupPropName;
     const indexPropName = Symbol('globalIndex');
-    const globalTickersList = new Set<TickerHandler>;
+    const globalTickersList = new Set<TickerHandler>();
     const globalTickersGroups = [] as string[];
     const globalGroupedTickers = new Map<string, Set<TickerHandler>>();
     let globalTickInterval: ReturnType<typeof setInterval> | void;

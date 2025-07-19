@@ -1,6 +1,5 @@
 'use strict';
 
-
 import { displayValueForTypeGuard } from "./type_guards_utils";
 
 function _isArrayFullOfHoles(list: unknown[]) {
@@ -42,7 +41,7 @@ export function isNonEmptyArray<T>(
     }
 
     if (typeof typeGuardForEachItem === 'function') {
-        for (let i = 0, len = list.length ; i < len ; i++) {
+        for (let i = 0, len = list.length; i < len; i++) {
             if (!typeGuardForEachItem(list[i])) {
                 return false;
             }
@@ -67,7 +66,7 @@ export function assertIsNonEmptyArray<T>(
     }
 
     if (typeof typeGuardForEachItem === 'function') {
-        for (let i = 0, len = list.length ; i < len ; i++) {
+        for (let i = 0, len = list.length; i < len; i++) {
             /**
              * * if checkResult is `undefined` that `typeGuardForEachItem` is `(item: T | unknown) => asserts item is T`
              * * if checkResult is typeof `boolean` that `typeGuardForEachItem` is `(item: T | unknown) => item is T`

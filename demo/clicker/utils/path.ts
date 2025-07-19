@@ -93,7 +93,7 @@ export function createRouteWithQuery<Path extends string>(
             const value = parts[1];
 
             if (value != null) {
-                if (value.startsWith('?:')) {// Необязательный параметр (`?:param`)
+                if (value.startsWith('?:')) { // Необязательный параметр (`?:param`)
                     const paramName = value.slice(2);
                     const paramValue = props[paramName];
 
@@ -102,7 +102,7 @@ export function createRouteWithQuery<Path extends string>(
                     }
                     // Если параметр не передан — пропускаем
                 }
-                else if (value.startsWith(':')) {// Обязательный параметр (`:param`)
+                else if (value.startsWith(':')) { // Обязательный параметр (`:param`)
                     const paramName = value.slice(1);
 
                     queryParams.push(`${key}=${String(props[paramName] || '')}`);
@@ -119,7 +119,7 @@ export function createRouteWithQuery<Path extends string>(
                     queryParams.push(`${props[paramName]}`);
                 }
             }
-            else {// Обычный query-параметр (без `:`)
+            else { // Обычный query-параметр (без `:`)
                 queryParams.push(pair);
             }
         }

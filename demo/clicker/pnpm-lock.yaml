@@ -6,7 +6,7 @@ specifiers:
   '@eslint/js': ^9.29.0
   '@jest/globals': 30.0.2
   '@prisma/client': link:./backend/node_modules/@prisma/client
-  '@stylistic/eslint-plugin': ^4.4.1
+  '@stylistic/eslint-plugin': ^5.1.0
   '@types/jest': 30.0.0
   '@types/mitm': 1.3.8
   '@types/react': ^19.1.8
@@ -25,13 +25,15 @@ specifiers:
   typescript: ^5.8.3
   typescript-eslint: ^8.34.1
 
+dependencies:
+  '@prisma/client': link:backend/node_modules/@prisma/client
+
 devDependencies:
   '@babel/core': 7.28.0
   '@babel/plugin-transform-modules-commonjs': 7.27.1_@babel+core@7.28.0
   '@eslint/js': 9.29.0
   '@jest/globals': 30.0.2
-  '@prisma/client': link:backend/node_modules/@prisma/client
-  '@stylistic/eslint-plugin': 4.4.1_eslint@9.29.0+typescript@5.8.3
+  '@stylistic/eslint-plugin': 5.1.0_eslint@9.29.0
   '@types/jest': 30.0.0
   '@types/mitm': 1.3.8
   '@types/react': 19.1.8
@@ -1024,21 +1026,19 @@ packages:
       '@sinonjs/commons': 3.0.1
     dev: true
 
-  /@stylistic/eslint-plugin/4.4.1_eslint@9.29.0+typescript@5.8.3:
-    resolution: {integrity: sha512-CEigAk7eOLyHvdgmpZsKFwtiqS2wFwI1fn4j09IU9GmD4euFM4jEBAViWeCqaNLlbX2k2+A/Fq9cje4HQBXuJQ==}
+  /@stylistic/eslint-plugin/5.1.0_eslint@9.29.0:
+    resolution: {integrity: sha512-TJRJul4u/lmry5N/kyCU+7RWWOk0wyXN+BncRlDYBqpLFnzXkd7QGVfN7KewarFIXv0IX0jSF/Ksu7aHWEDeuw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: '>=9.0.0'
     dependencies:
-      '@typescript-eslint/utils': 8.34.1_eslint@9.29.0+typescript@5.8.3
+      '@eslint-community/eslint-utils': 4.7.0_eslint@9.29.0
+      '@typescript-eslint/types': 8.34.1
       eslint: 9.29.0
       eslint-visitor-keys: 4.2.1
       espree: 10.4.0
       estraverse: 5.3.0
       picomatch: 4.0.2
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
     dev: true
 
   /@tybys/wasm-util/0.9.0:

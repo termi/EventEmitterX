@@ -114,8 +114,8 @@ export async function asyncStart(listenPort?: number) {
 }
 
 if (require.main?.filename === __filename) {
-    // Этот файл запускается отдельно (не через `import/require`)
-    asyncStart().catch(error => {
+    // Этот файл запустился отдельно (не через `import/require`)
+    asyncStart().catch((error) => {
         // fastifyApp.log.error(__filename, 'start(): error:', error);
         console.error(localISOString(), __filename, 'start(): error:', error);
         process.exit(1);

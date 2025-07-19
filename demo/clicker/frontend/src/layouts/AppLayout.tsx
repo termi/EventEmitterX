@@ -76,7 +76,7 @@ export default function AppLayout() {
             )}
 
             <main className="app-main">
-                {isAuthenticated ? <Outlet/> : <Navigate to="/auth" replace/>}
+                {isAuthenticated ? <Outlet /> : <Navigate to="/auth" replace />}
             </main>
         </div>
     );

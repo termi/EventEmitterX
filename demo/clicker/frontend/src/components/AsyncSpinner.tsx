@@ -3,7 +3,9 @@
 import './AsyncSpinner.css';
 
 export default function AsyncSpinner() {
-    return (<span className="AsyncSpinnerLoader">
-        <span className="AsyncSpinnerLoader__spinner"></span>
-    </span>);
+    return (
+        <span className="AsyncSpinnerLoader">
+            <span className="AsyncSpinnerLoader__spinner"></span>
+        </span>
+    );
 }

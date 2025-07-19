@@ -40,7 +40,7 @@ export function append<T extends object | null | undefined, U extends Array<obje
 ): T extends object ? T & Spread<U> : Spread<U> {
     const _target = target ? Object(target) : Object.create(null);
 
-    for (let j = 0, len2 = sources.length ; j < len2 ; j++) {
+    for (let j = 0, len2 = sources.length; j < len2; j++) {
         const source = sources[j] as Record<string, unknown> | null | undefined;
 
         if (!source) {
@@ -49,8 +49,8 @@ export function append<T extends object | null | undefined, U extends Array<obje
 
         const keys = Object.keys(source);
 
-        for (let i = 0, len = keys.length ; i < len ; i++) {
-            const key = keys[i] as NonNullable<typeof keys[number]>;;
+        for (let i = 0, len = keys.length; i < len; i++) {
+            const key = keys[i] as NonNullable<typeof keys[number]>; ;
             const sourceValue = source[key] as unknown;
 
             if (_target[key] === void 0 && sourceValue !== void 0) {
@@ -60,7 +60,7 @@ export function append<T extends object | null | undefined, U extends Array<obje
 
         const symbols = Object.getOwnPropertySymbols(source);
 
-        for (let i = 0, len = symbols.length ; i < len ; i++) {
+        for (let i = 0, len = symbols.length; i < len; i++) {
             const key = symbols[i] as NonNullable<typeof symbols[number]>;
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore `TS7053: Element implicitly has an any type because expression of type symbol can't be used to index type {}`

@@ -23,6 +23,6 @@ export function startDevRoutersHandling(app = fastifyApp, options?: {
                 process.kill(process.ppid);
                 process.exit(0);
             }, 500);
-        }
+        },
     );
 }

@@ -13,7 +13,7 @@ type RequestOptions = Omit<RequestInit, 'body'> & {
     body?: object | RequestInit["body"],
     returnFetchResponse?: boolean,
     doNotUpdateToken?: boolean,
-}
+};
 
 type FetchResponse<T> = {
     readonly data: T,
@@ -27,7 +27,7 @@ type FetchResponse<T> = {
     readonly url: string,
 
     __proto__?: null,
-}
+};
 
 function _isRelativePath(url: string): boolean {
     // Проверяем, что строка не начинается с http://, https://, // или других абсолютных указателей

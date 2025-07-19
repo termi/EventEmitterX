@@ -49,7 +49,7 @@ export class TemporaryMap<K, V extends ({ [Symbol.dispose]?: () => void } | unkn
 
     [Symbol.dispose] = () => {
         this.destructor();
-    }
+    };
 
     set(key: K, value: V) {
         super.set(key, value);
@@ -101,7 +101,7 @@ export class TemporaryMap<K, V extends ({ [Symbol.dispose]?: () => void } | unkn
             }
 
             if (value) {
-                this._onRemove(value, key)
+                this._onRemove(value, key);
             }
         }
 
@@ -161,5 +161,5 @@ export namespace TemporaryMap {
         callDispose?: boolean,
         shouldProlong?: (item: V, key: K) => boolean,
         onRemove?: (item: V, key: K) => void,
-    }
+    };
 }

@@ -47,13 +47,13 @@ export class InterceptOutgoingHTTP extends EventEmitter {
     private _ready = false;
     private _destroyed = false;
     private _matchers: InterceptOutgoingHTTP.InterceptionMatcher[] = [];
-    private _onConnect: NonNullable<InterceptOutgoingHTTP.StartOptions["onConnect"]> = function() {// eslint-disable-line class-methods-use-this
+    private _onConnect: NonNullable<InterceptOutgoingHTTP.StartOptions["onConnect"]> = function() {
         return true;
     };
-    private _onConnection: NonNullable<InterceptOutgoingHTTP.StartOptions["onConnection"]> = function() {// eslint-disable-line class-methods-use-this
+    private _onConnection: NonNullable<InterceptOutgoingHTTP.StartOptions["onConnection"]> = function() {
         return true;
     };
-    private _onRequest: NonNullable<InterceptOutgoingHTTP.StartOptions["onRequest"]> = function() {// eslint-disable-line class-methods-use-this
+    private _onRequest: NonNullable<InterceptOutgoingHTTP.StartOptions["onRequest"]> = function() {
         //
     };
 
@@ -62,7 +62,7 @@ export class InterceptOutgoingHTTP extends EventEmitter {
     requestsCounter = 0;
 
     constructor(props?: InterceptOutgoingHTTP.ConstructorOptions) {
-        super(/*props*/);
+        super(/* props */);
 
         if (props?.matcher) {
             this._matchers.push(props.matcher);
@@ -168,7 +168,7 @@ export class InterceptOutgoingHTTP extends EventEmitter {
         //  положительно выполнился checkMatched.
         let exclusive = false;
 
-        const matched = _matchers.some(filter => {
+        const matched = _matchers.some((filter) => {
             const {
                 isExclusive: filter_isExclusive,
                 protocol: filter_protocol,
@@ -240,7 +240,7 @@ export class InterceptOutgoingHTTP extends EventEmitter {
 }
 
 export namespace InterceptOutgoingHTTP {
-    export type ConstructorOptions = /*EventEmitter.ConstructorOptions & */{
+    export type ConstructorOptions = /* EventEmitter.ConstructorOptions & */{
         matcher?: InterceptionMatcher,
     };
 
@@ -280,7 +280,6 @@ function _matchValueIfExists<T=unknown>(passedValue: T | undefined, expected: Re
     }
 
     if (typeof expected === 'function') {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error ignore `TS2349: This expression is not callable.`
         return Boolean(expected(passedValue));
     }
@@ -423,7 +422,7 @@ function _checkMitmSingletonInstanceAwaitedSockets() {
 
     _awaited_awaitedInterceptOutgoingHTTPsList = [];
 
-    for (let i = 0, len = current_awaited_awaitedInterceptOutgoingHTTPsList.length ; i < len ; i++) {
+    for (let i = 0, len = current_awaited_awaitedInterceptOutgoingHTTPsList.length; i < len; i++) {
         const serverSocket = current_awaited_awaitedInterceptOutgoingHTTPsList[i] as ExtendedWithSymbol<NonNullable<typeof current_awaited_awaitedInterceptOutgoingHTTPsList[0]>>;
 
         // Внутри serverSocket будет помещён в новый _awaited_awaitedInterceptOutgoingHTTPsList, при необходимости

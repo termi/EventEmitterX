@@ -6,9 +6,9 @@ import { EventEmitterX } from "../modules/EventEmitterX/events";
 import { isAbortError } from "../modules/common/abortable";
 import { EventSignal } from "../modules/EventEmitterX/EventSignal";
 import { mainProcessJTWStorage } from "../logic/mainProcessJTWStorage";
-import { request } from "./request";
 import { makeRandomString } from "../utils/random";
 import { append } from "../utils/object";
+import { request } from "./request";
 
 const SECONDS = 1000;
 const SECONDS_30 = 30 * SECONDS;
@@ -74,7 +74,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
 
     [Symbol.dispose] = () => {
         this.destructor();
-    }
+    };
 
     get isDestroyed() {
         return (this._flags & SSEClientFlags.isDestroyed) !== 0;
@@ -115,13 +115,15 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
             return;
         }
 
-        this.connect().catch(error => {
+        this.connect().catch((error) => {
             this.emit('error', error);
         });
     }
 
     awaitEvent<K extends keyof SSEClientEvents>(
-        eventName: K, options?: { signal?: AbortSignal }): Promise<SSEClientEvents[K]> {
+        eventName: K,
+        options?: { signal?: AbortSignal },
+    ): Promise<SSEClientEvents[K]> {
         const signal = options?.signal
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore
@@ -265,6 +267,7 @@ export class SSEClient extends EventEmitterX<SSEClientEvents> {
             buffer += decoder.decode(value, { stream: true });
 
             const events = buffer.split('\n\n');
+
             buffer = events.pop() || '';
 
             for (const event of events) {

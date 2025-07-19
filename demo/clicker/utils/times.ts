@@ -2,7 +2,7 @@
 
 'use strict';
 
-export enum TIMES {
+export const enum TIMES {
     MILLISECONDS = 1,
     SECONDS = 1000,
     MINUTES = 60 * SECONDS,
@@ -14,6 +14,7 @@ export enum TIMES {
     // average amount of days
     YEARS = 365 * DAYS,
 
+    HALF_SECOND = SECONDS / 2,
     SECONDS_5 = SECONDS * 5,
     SECONDS_10 = SECONDS * 10,
     SECONDS_15 = SECONDS * 15,

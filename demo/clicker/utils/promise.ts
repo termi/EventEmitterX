@@ -10,7 +10,7 @@ export function promiseTimeout(ms = 100, options?: { signal?: AbortSignal }) {
             clearTimeout(timer);
             reject();
             signal.removeEventListener('abort', abortPromiseTimeout);
-        }
+        };
 
         signal.addEventListener('abort', abortPromiseTimeout);
         promise.then(() => {

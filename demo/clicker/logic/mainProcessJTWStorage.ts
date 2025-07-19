@@ -42,7 +42,7 @@ class JWTStorage extends EventEmitterX<{
             refreshToken: this.refreshToken,
             __proto__: null,
         };
-    }
+    };
 
     hasTokens() {
         return Boolean(this.accessToken && this.refreshToken);
@@ -52,16 +52,16 @@ class JWTStorage extends EventEmitterX<{
         this.setTokens({
             accessToken: '',
             refreshToken: '',
-        })
+        });
     }
 
     getAccessToken = () => {
         return this.accessToken;
-    }
+    };
 
     getRefreshToken = () => {
         return this.refreshToken;
-    }
+    };
 
     private _parseAndSetTokensJSON(tokensJSON: string) {
         if (tokensJSON) {

@@ -17,7 +17,7 @@ export default function AuthForm() {
 
     if (isAuthenticated) {
         // console.warn('Something went wrong: AuthForm rendered with already isAuthenticated', currentUserStore);
-        return <Navigate to="/" replace/>;
+        return <Navigate to="/" replace />;
     }
 
     return (
@@ -38,19 +38,19 @@ export default function AuthForm() {
                         type: 'submit',
                         className: 'auth-button',
                         disabled: isPending,
-                    }
+                    },
                 ]}
             />
             <div className="auth-switch">
                 {isRegistration
                     ? (<span>Уже зарегистрированы?{' '}
                         <button className="switch-button"
-                                onClick={() => setIsRegistration(!isRegistration)}>Войти</button>
-                        </span>)
+                            onClick={() => setIsRegistration(!isRegistration)}>Войти</button>
+                    </span>)
                     : (<span>Не зарегистрированы?{' '}
                         <button className="switch-button"
-                                onClick={() => setIsRegistration(!isRegistration)}>Регистрация</button>
-                        </span>)
+                            onClick={() => setIsRegistration(!isRegistration)}>Регистрация</button>
+                    </span>)
                 }
             </div>
         </div>

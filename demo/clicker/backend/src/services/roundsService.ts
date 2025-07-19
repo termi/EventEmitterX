@@ -22,10 +22,10 @@ class RoundsService {
 
         _roundModel[kWasGlobalOnRoundEndHook] = true;
 
-        this.makeRoundEnd(roundModel).catch(error => {
+        this.makeRoundEnd(roundModel).catch((error) => {
             mainProcessChangeDataCapture.emit('error', error, 'RoundsService~makeRoundEnd:');
         });
-    }
+    };
 
     async makeRoundEnd(roundModel: RoundModel) {
         const roundId = roundModel.id;
@@ -56,7 +56,7 @@ class RoundsService {
                         name: true,
                     },
                 },
-            }
+            },
         });
 
         if (theWinnerUserTap) {

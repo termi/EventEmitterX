@@ -20,7 +20,9 @@ export default function Meter({
     className?: string,
 }) {
     return (
-        <meter className={className} low={low} high={high} optimum={optimum} min={min} max={max}
+        <meter className={className} low={low}
+            high={high} optimum={optimum}
+            min={min} max={max}
             value={value}
         >
             {displayValue}%

@@ -53,7 +53,7 @@ export const handleAuthFormSubmit = (event: React.FormEvent) => {
     const method = isRegistration ? register : login;
     const params = formAsObject<Parameters<typeof method>[0]>(targetForm);
 
-    method(params as Parameters<typeof register>[0]).catch(error => {
+    method(params as Parameters<typeof register>[0]).catch((error) => {
         // todo: Выводить в систему нотификации
         mainProcessChangeDataCapture.emit('error', error, (isRegistration
             ? 'handleAuthFormSubmit:currentUserStore.register:'

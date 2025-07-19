@@ -3,7 +3,7 @@
 import { EventEmitterX } from "../modules/EventEmitterX/events";
 
 const mainLocalEventBus = new EventEmitterX({
-    listenerOncePerEventType: true
+    listenerOncePerEventType: true,
 });
 
 export default mainLocalEventBus;

@@ -8,7 +8,6 @@ import { fastifyApp } from "../server/fastifyInit";
 import { authService } from "../auth/authService";
 import { getAuthorizedResponse, invalidAccessTokensMap } from "../auth/authMiddleware";
 
-
 export function startAuthRouters(app = fastifyApp) {
     app[auth_register.method]<auth_register.Types>(
         auth_register.url,

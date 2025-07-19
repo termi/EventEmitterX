@@ -1,12 +1,12 @@
-'use strict'
+'use strict';
 
 function parseArgs() {
     const args = process.argv.slice(2);
     const params: Record<string, string | boolean> = Object.create(null);
 
-    args.forEach(arg => {
+    args.forEach((arg) => {
         if (arg.startsWith("--")) {
-            const [key, value] = arg.slice(2).split("=");
+            const { 0: key, 1: value } = arg.slice(2).split("=");
             // Если значение не указано (--debug), то true
             params[key] = value || true;
         }

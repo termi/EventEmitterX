@@ -10,8 +10,9 @@ import jwt from 'jsonwebtoken';
 
 import { makeRandomInteger } from "../../../utils/random";
 import { promiseTimeout } from "../../../utils/promise";
-import { currentAuthUser } from "../../types/auth";
 import { isTest } from "../../../utils/runEnv";
+import { TIMES } from "../../../utils/times";
+import { currentAuthUser } from "../../types/auth";
 import { prismaClient } from "../orm/prismaClient";
 import {
     JWT_EXPIRES_IN,
@@ -80,7 +81,9 @@ export const authService = {
         });
 
         // todo: if origin=='localhost'
-        await promiseTimeout(500);
+        if (!isTest) {
+            await promiseTimeout(TIMES.HALF_SECOND);
+        }
 
         return this.generateTokens(user);
     },
@@ -109,7 +112,9 @@ export const authService = {
         }
 
         // todo: if origin=='localhost'
-        await promiseTimeout(500);
+        if (!isTest) {
+            await promiseTimeout(TIMES.HALF_SECOND);
+        }
 
         return this.generateTokens(user);
     },
@@ -124,7 +129,9 @@ export const authService = {
             });
 
             // todo: if origin=='localhost'
-            await promiseTimeout(500);
+            if (!isTest) {
+                await promiseTimeout(TIMES.HALF_SECOND);
+            }
 
             return {
                 userId: payload.userId,

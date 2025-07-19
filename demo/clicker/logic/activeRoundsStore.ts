@@ -61,7 +61,7 @@ const newRoundElements = {
         },
         required: true,
     } satisfies FormElementDescription,
-}
+};
 
 const showErrorOnFirstTry = localStorage.getItem('DO_NOT_THROW_ERROR_ON_FIRST_TRY') !== 'true';
 let wasErrorOnFirstTry = false;
@@ -183,7 +183,7 @@ class ActiveRoundsStore extends EventEmitterX {
         this.loadActiveRounds().catch((error: unknown) => {
             this.emit('error', error);
         });
-    }
+    };
 
     private _rawRounds: RoundDTO[] = [];
     private _rounds: RoundModel[] = [];
@@ -201,7 +201,7 @@ class ActiveRoundsStore extends EventEmitterX {
 
             this._rawRounds = response.items;
             this._rawRounds.sort(sortRounds);
-            this._rounds = response.items.map(roundDTO => {
+            this._rounds = response.items.map((roundDTO) => {
                 existedRoundsIds.delete(roundDTO.id);
 
                 return RoundModel.makeById(roundDTO.id, roundDTO, serverNow);
@@ -244,7 +244,7 @@ class ActiveRoundsStore extends EventEmitterX {
 
             return round;
         }
-    }
+    };
 
     createNewRound = Object.assign(async (props: Parameters<typeof apiMethods.createRound>[0]) => {
         if (currentUserStore.isAuthenticated) {
@@ -273,7 +273,7 @@ class ActiveRoundsStore extends EventEmitterX {
     }, {
         elements: newRoundElements,
         elementsList: makeFormElementsList(newRoundElements),
-    })
+    });
 
     private _selectedRound: RoundModel | null = null;
 
@@ -323,18 +323,18 @@ class ActiveRoundsStore extends EventEmitterX {
         }
 
         this.#ongoingRoundTapsByRoundId.clear();
-    }
+    };
 
     private _makeRoundTapSync(roundId: Round["id"], count = 1) {
         apiMethods.makeRoundTap(roundId, { count })
-            .then(data => {
+            .then((data) => {
                 const roundModel = RoundModel.getById(roundId);
 
                 if (roundModel) {
                     roundModel.updateTaps(data);
                 }
             })
-            .catch(error => {
+            .catch((error) => {
                 this.emit('error', error, 'makeRoundTap:');
             })
         ;

@@ -26,7 +26,6 @@ export function getIdempotentRequestResponse(request: FastifyRequest, reply: Fas
     requestsIdempotentMap.set(idempotentId, payload);
 }
 
-
 export function setIdempotentRequestResponse(request: FastifyRequest, reply: FastifyReply, payload: MaybeDisposablePayload) {
     const idempotentId = String(request.headers["X-Idempotent-Id"] || '');
 

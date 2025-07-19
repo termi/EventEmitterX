@@ -339,7 +339,7 @@ export namespace ApiMethods {
     export type Options = {
         baseURI?: string,
         getCurrentUserAccessToken?: () => string,
-    }
+    };
 }
 
 /**
@@ -452,7 +452,7 @@ export class TestApiMethods extends ApiMethods {
         return testUser;
     }
 
-    async test__getOrCreateTestRound (
+    async test__getOrCreateTestRound(
         props?: Partial<createRound.Types["Body"]>,
         options?: {
             alwaysCreateNew?: boolean,

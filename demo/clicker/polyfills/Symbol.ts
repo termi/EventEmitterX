@@ -19,7 +19,7 @@ if (typeof (Symbol as unknown as { isRegistered: ((sym: symbol) => boolean) | un
         value(sym: symbol) {
             return typeof (sym as unknown) === 'symbol'
                 && typeof keyFor.call(Symbol, sym) === 'string'
-                ;
+            ;
         },
     });
 }
@@ -44,7 +44,7 @@ if (typeof (Symbol as unknown as { isWellKnown: ((sym: symbol) => boolean) | und
         value(sym: symbol) {
             return typeof (sym as unknown) === 'symbol'
                 && wellKnownSymbols.has(sym)
-                ;
+            ;
         },
     });
 }

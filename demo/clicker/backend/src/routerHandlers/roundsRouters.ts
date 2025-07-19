@@ -2,23 +2,18 @@
 
 import type { Round } from "@prisma/client";
 
-import { requestsIdempotentMap } from "../utils/idempotentCache";
-import { fastifyApp } from "../server/fastifyInit";
-import { prismaClient } from "../orm/prismaClient";
-import { authenticate } from "../auth/authMiddleware";
-import { authService } from "../auth/authService";
 import { createRound, getRound, makeRoundTap, rounds, roundsSSEUpdate } from "../../../api/routers";
 import { assertOneOfType } from "../../../type_guards/base";
 import { assertIsNumberInRange, assertIsPositiveNumber, isPositiveNumber } from "../../../type_guards/number";
 import { isISOString } from "../../../type_guards/string";
 import { ReplaceDateWithString } from "../../../types/generics";
-import mainProcessChangeDataCapture from "../../../logic/mainProcessChangeDataCapture";
 import { EventEmitterX } from "../../../modules/EventEmitterX/events";
+import { isAbortError } from "../../../modules/common/abortable";
 import { makeIntervalTicker } from "../../../utils/timers";
 import { TIMES } from "../../../utils/times";
 import { promiseTimeout } from "../../../utils/promise";
 import { isTest } from "../../../utils/runEnv";
-import { isAbortError } from "../../../modules/common/abortable";
+import mainProcessChangeDataCapture from "../../../logic/mainProcessChangeDataCapture";
 import {
     RoundDTO,
     RoundModel,
@@ -26,6 +21,11 @@ import {
     scoreFromTapsCount,
 } from "../../../logic/RoundModel";
 import { mainProcessAbortController } from "../../../logic/mainProcessAbortController";
+import { requestsIdempotentMap } from "../utils/idempotentCache";
+import { fastifyApp } from "../server/fastifyInit";
+import { prismaClient } from "../orm/prismaClient";
+import { authenticate } from "../auth/authMiddleware";
+import { authService } from "../auth/authService";
 import { roundsService } from "../services/roundsService";
 import { DEFAULT_cooldownSec, DEFAULT_roundDuration } from "../common/env";
 
@@ -36,7 +36,7 @@ const usersInfoMap = new Map<number, {
     // inactive: boolean,
 }>();
 
-mainProcessChangeDataCapture.on('round-ended', roundDTO => {
+mainProcessChangeDataCapture.on('round-ended', (roundDTO) => {
     // Если получили сообщение из другого Realm
     if (!RoundModel.getById(roundDTO.id)) {
         RoundModel.makeById(roundDTO.id, roundDTO);
@@ -47,7 +47,7 @@ export function startRoundRouters(app = fastifyApp) {
     app[rounds.method]<rounds.Types>(
         rounds.url.split('?')[0],
         { preHandler: authenticate },
-            async (req) => {
+        async (req) => {
             const userId = req.user.userId;
             const { isActive: _isActive } = req.query;
             const isActive = !!_isActive && _isActive !== 'false';
@@ -120,7 +120,7 @@ export function startRoundRouters(app = fastifyApp) {
 
             const now = Date.now();
             const idempotentId = String(req.headers["X-Idempotent-Id"] || '');
-            const alreadyHandledResult = idempotentId && requestsIdempotentMap.get(idempotentId) || void 0;
+            const alreadyHandledResult = (idempotentId && requestsIdempotentMap.get(idempotentId)) || void 0;
 
             if (alreadyHandledResult) {
                 const newTask = alreadyHandledResult as NonNullable<Awaited<ReturnType<typeof prismaClient.round.create>>>;
@@ -140,7 +140,7 @@ export function startRoundRouters(app = fastifyApp) {
             const startedAtDate = new Date(startedAt);
 
             if (!endedAt) {
-                endedAt = startedAtDate.getTime() + DEFAULT_roundDuration
+                endedAt = startedAtDate.getTime() + DEFAULT_roundDuration;
             }
 
             assertOneOfType(endedAt, [ isPositiveNumber, isISOString ]);
@@ -172,7 +172,7 @@ export function startRoundRouters(app = fastifyApp) {
                 now,
                 item: newRound,
             } as const;
-        }
+        },
     );
 
     app[getRound.method]<getRound.Types>(
@@ -216,7 +216,7 @@ export function startRoundRouters(app = fastifyApp) {
                 now: Date.now(),
                 item: round,
             };
-        }
+        },
     );
 
     app[makeRoundTap.method]<makeRoundTap.Types>(
@@ -243,7 +243,7 @@ export function startRoundRouters(app = fastifyApp) {
             }
 
             const idempotentId = String(req.headers["X-Idempotent-Id"] || '');
-            const alreadyHandledResult = idempotentId && requestsIdempotentMap.get(idempotentId) || void 0;
+            const alreadyHandledResult = (idempotentId && requestsIdempotentMap.get(idempotentId)) || void 0;
 
             if (alreadyHandledResult) {
                 return alreadyHandledResult as makeRoundTap.Types["Reply"];
@@ -314,7 +314,7 @@ export function startRoundRouters(app = fastifyApp) {
                     roundModel.completed = true;
                     roundModel.usersInfo?.clear();
 
-                    roundsService.makeRoundEnd(roundModel).catch(error => {
+                    roundsService.makeRoundEnd(roundModel).catch((error) => {
                         mainProcessChangeDataCapture.emit('error', error);
                     });
                 }
@@ -517,7 +517,7 @@ export function startSSERoundRouters(app = fastifyApp) {
             const sendWaitingQueue: SSEEvent[] = [];
             const sendWaitingQueueIndexes = new Map<string, number>();
             const abortCallback = () => {
-                const reason = mainProcessAbortController.signal.aborted && mainProcessAbortController.signal.reason || null
+                const reason = (mainProcessAbortController.signal.aborted && mainProcessAbortController.signal.reason) || null;
 
                 mainProcessAbortController.signal.removeEventListener('abort', abortCallback);
 
@@ -613,7 +613,7 @@ export function startSSERoundRouters(app = fastifyApp) {
             ;
 
             // Если клиент разорвал соединение
-            request.socket.on("close", () => {
+            request.socket.on('close', () => {
                 mainProcessAbortController.signal.removeEventListener('abort', abortCallback);
 
                 if (autoCloseTimeout) {
@@ -656,13 +656,13 @@ export function startSSERoundRouters(app = fastifyApp) {
                         roundId: minimalRoundInfo.id,
                     });
                 }
-            })().catch(error => {
+            })().catch((error) => {
                 if (isAbortError(error)) {
                     return;
                 }
 
                 throw error;
-            }).then(result => {
+            }).then((result) => {
                 // debug me
                 void result;
             });
@@ -681,13 +681,13 @@ export function startSSERoundRouters(app = fastifyApp) {
                         roundId: roundInfo.id,
                     });
                 }
-            })().catch(error => {
+            })().catch((error) => {
                 if (isAbortError(error)) {
                     return;
                 }
 
                 throw error;
-            }).then(result => {
+            }).then((result) => {
                 // debug me
                 void result;
             });
@@ -706,13 +706,13 @@ export function startSSERoundRouters(app = fastifyApp) {
                         roundId: roundInfo.id || roundInfo.roundId,
                     });
                 }
-            })().catch(error => {
+            })().catch((error) => {
                 if (isAbortError(error)) {
                     return;
                 }
 
                 throw error;
-            }).then(result => {
+            }).then((result) => {
                 // debug me
                 void result;
             });

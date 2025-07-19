@@ -35,13 +35,13 @@ type RouterDescription = {
     url: string,
     description: string,
     roles?: string[],
-}
+};
 
 type RouterErrorResponse = {
     success: false,
     error: string,
     errorCause?: string,
-}
+};
 
 type ApplicationJsonHeader = 'application/json' | 'application/json; charset=utf-8';
 

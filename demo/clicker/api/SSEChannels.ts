@@ -1,11 +1,11 @@
 'use strict';
 
-import { SSEClient } from "./SSEClient";
-import { roundsSSEUpdate } from "./routers";
-import { getDefaultBaseURI } from "./methods";
 import { createRouteWithQuery } from "../utils/path";
 import { mainProcessAbortController } from "../logic/mainProcessAbortController";
 import { mainProcessJTWStorage } from "../logic/mainProcessJTWStorage";
+import { SSEClient } from "./SSEClient";
+import { roundsSSEUpdate } from "./routers";
+import { getDefaultBaseURI } from "./methods";
 
 let defaultBaseURI: string | undefined;
 
@@ -27,7 +27,7 @@ export class SSEChannels {
     roundsSSEUpdate(options?: SSEChannels.Options) {
         const getJWTToken = options?.getJWTToken || this.getJWTToken || mainProcessJTWStorage.getAccessToken;
 
-        const sseClient =  new SSEClient({
+        const sseClient = new SSEClient({
             url: createRouteWithQuery(options?.baseURI ?? this.baseURI, roundsSSEUpdate.url, {
                 forceDelays: String(options?.forceDelays ?? ''),
             }),
@@ -67,7 +67,7 @@ export namespace SSEChannels {
          * Useful for tests to prevent avoidance of production delays in server router handler
          */
         forceDelays?: boolean,
-    }
+    };
 }
 
 const sseChannels = new SSEChannels();

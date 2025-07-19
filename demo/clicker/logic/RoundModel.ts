@@ -16,7 +16,7 @@ import { currentUserStore } from "./currentUserStore";
 type WinnerUserInfo = {
     id: number,
     name: string,
-}
+};
 
 export type RoundWinnerUserInfo = {
     winnerUser?: WinnerUserInfo | null,
@@ -181,7 +181,7 @@ export class RoundModel {
             return this._prevReadyState = RoundModelReadyState.started;
         }
 
-        /*const startedAtTimestampMinusCooldown = startedAtTimestamp - (this.cooldownSec * TIMES.SECONDS);
+        /* const startedAtTimestampMinusCooldown = startedAtTimestamp - (this.cooldownSec * TIMES.SECONDS);
 
         if (startedAtTimestampMinusCooldown > now) */{
             return this._prevReadyState = RoundModelReadyState.awaiting;
@@ -213,7 +213,7 @@ export class RoundModel {
             };
         }
 
-        /*const startedAtTimestampMinusCooldown = startedAtTimestamp - (this.cooldownSec * TIMES.SECONDS);
+        /* const startedAtTimestampMinusCooldown = startedAtTimestamp - (this.cooldownSec * TIMES.SECONDS);
 
         if (startedAtTimestampMinusCooldown > now) */{
             return {
@@ -246,7 +246,7 @@ export class RoundModel {
 
         this._selected = selected;
         this.signal$.set(currentValue => ++currentValue);
-    }
+    };
 
     get wasRoundTaps() {
         return this._wasRoundTaps;
@@ -268,7 +268,7 @@ export class RoundModel {
 
     readonly [kRoundModelFriendWinnerUserInfoSet] = (winnerUserInfo: WinnerUserInfo) => {
         this._winnerUserInfo = winnerUserInfo;
-    }
+    };
 
     checkReadyState(now = Date.now()) {
         if (this.completed) {
@@ -327,7 +327,7 @@ export class RoundModel {
         }
 
         this.signal$.set(currentValue => ++currentValue);
-    }
+    };
 
     private updateFromDTO = (roundDTO: Partial<RoundDTO | Round>) => {
         let hasChanges = false;
@@ -363,7 +363,7 @@ export class RoundModel {
         if (hasChanges) {
             this.signal$.set(currentValue => ++currentValue);
         }
-    }
+    };
 
     toDTO(noCounts = false): RoundDTO {
         const dto: RoundDTO = {
@@ -404,7 +404,7 @@ export class RoundModel {
             }
 
             return roundModel.hasLinks()
-                //todo:
+                // todo:
                 // Нужно сделать, чтобы можно было разрешать удалять те RoundModel которые отрендерены только в списке (RoundListItem.tsx),
                 //  но не в текущем раунде (SelectedRound.tsx).
                 || roundModel.endedAt.getTime() > (now - (isWeb ? TIMES.HOURS : TIMES.MINUTES_15))

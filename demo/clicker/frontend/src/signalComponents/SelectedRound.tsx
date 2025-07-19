@@ -48,15 +48,15 @@ export default function SelectedRound({ eventSignal }: { eventSignal: typeof act
                 {description && (
                     <p className="selected-card-description">{description}</p>
                 )}
-                <signal$.component sFC={SelectedRoundTimerInfo}/>
-                <signal$.component sFC={SelectedRoundScoreInfo}/>
+                <signal$.component sFC={SelectedRoundTimerInfo} />
+                <signal$.component sFC={SelectedRoundScoreInfo} />
                 <div className="selected-card-time">
                     Дата начала: {roundModel.startedAt.toLocaleString()}
                 </div>
                 <div className="selected-card-time">
                     Дата окончания: {roundModel.endedAt.toLocaleString()}
                 </div>
-                <signal$.component sFC={SelectedRoundClicker}/>
+                <signal$.component sFC={SelectedRoundClicker} />
             </div>
         </div>
     );
@@ -88,8 +88,11 @@ function SelectedRoundTimerInfo({ eventSignal }: { eventSignal: RoundModel["sign
             const high = isProgressBackward ? 35 : -10;
 
             return (
-                <Meter min={min} max={max} low={low} optimum={optimum} high={high} value={value} displayValue={displayValue}
-                       className={'selected-card-timer__ticker-progress' + (isProgressBackward ? ' selected-card-timer__ticker-progress--backward' : '')}
+                <Meter min={min} max={max}
+                    low={low} optimum={optimum}
+                    high={high} value={value}
+                    displayValue={displayValue}
+                    className={'selected-card-timer__ticker-progress' + (isProgressBackward ? ' selected-card-timer__ticker-progress--backward' : '')}
                 />
             );
         }}</Ticker>
@@ -125,9 +128,9 @@ function SelectedRoundScoreInfo({ eventSignal }: { eventSignal: RoundModel["sign
                 Ваш счет: {userScore}
             </span>
         </div>
-        {winnerUserInfo ? <div className="selected-card-winner-info" data-winner-userid={winnerUserId}>
+        {winnerUserInfo ? (<div className="selected-card-winner-info" data-winner-userid={winnerUserId}>
             Победитель: {winnerUserName} {winnerUserId === currentUserStore.userId ? '(Вы)' : ''}
-        </div> : ''}
+        </div>) : ''}
     </>);
 }
 
@@ -144,22 +147,22 @@ function SelectedRoundClicker({ eventSignal }: { eventSignal: RoundModel["signal
 
     return (
         <div className="selected-card-clicker" data-round-id={id}
-             onClick={onSelectedCardClicked}
+            onClick={onSelectedCardClicked}
         >
             <span>Кликайте сюда</span>
             <pre className="selected-card-clicker__zone">
-                ┌───────────────────────────────────────┐<br/>
-                │            ░░░░░░░░░░░░░░░            │<br/>
-                │          ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░           │<br/>
-                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br/>
-                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br/>
-                │      ░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░       │<br/>
-                │    ░░▒▒▒▒░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░▒▒▒▒░░   │<br/>
-                │    ░░▒▒▒▒▒▒▒▒░░░░░░░░░░░░▒▒▒▒▒▒▒▒░░   │<br/>
-                │    ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░   │<br/>
-                │      ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░     │<br/>
-                │        ░░░░░░░░░░░░░░░░░░░░░░░░░░     │<br/>
-                └───────────────────────────────────────┘<br/>
+                ┌───────────────────────────────────────┐<br />
+                │            ░░░░░░░░░░░░░░░            │<br />
+                │          ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░           │<br />
+                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br />
+                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br />
+                │      ░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░       │<br />
+                │    ░░▒▒▒▒░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░▒▒▒▒░░   │<br />
+                │    ░░▒▒▒▒▒▒▒▒░░░░░░░░░░░░▒▒▒▒▒▒▒▒░░   │<br />
+                │    ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░   │<br />
+                │      ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░     │<br />
+                │        ░░░░░░░░░░░░░░░░░░░░░░░░░░     │<br />
+                └───────────────────────────────────────┘<br />
             </pre>
         </div>
     );

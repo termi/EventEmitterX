@@ -23,6 +23,6 @@ export function startCurrentUserRouters(app = fastifyApp) {
                 success: true,
                 item: user,
             };
-        }
+        },
     );
 }

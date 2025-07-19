@@ -6,7 +6,7 @@ export default function AuthPage() {
     return (
         <div className="auth-page">
             <div className="auth-container">
-                <AuthForm/>
+                <AuthForm />
             </div>
         </div>
     );

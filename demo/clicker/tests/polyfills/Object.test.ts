@@ -1,6 +1,6 @@
 'use strict';
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, it, expect } from "@jest/globals";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
 // @ts-ignore ignore `TS2790: The operand of a 'delete' operator must be optional.`

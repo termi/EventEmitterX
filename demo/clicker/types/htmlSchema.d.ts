@@ -19,7 +19,7 @@ export type FormElementDescription = {
     required?: boolean,
     minLength?: number,
     className?: string,
-}
+};
 
 export type FormButtonDescription = {
     id?: string,

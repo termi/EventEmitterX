@@ -1,6 +1,6 @@
 'use strict';
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, it, expect } from "@jest/globals";
 
 import { append, checkIsPropertyEditable } from "../../utils/object";
 
@@ -68,7 +68,9 @@ describe('utils/object', function() {
         });
 
         it('with get/set', function() {
-            const objWithReadonly = Object.defineProperty({}, 'test', { get(){ return 123; } });
+            const objWithReadonly = Object.defineProperty({}, 'test', { get() {
+                return 123;
+            } });
 
             expect(checkIsPropertyEditable(objWithReadonly, 'test')).toBe(false);
 

@@ -101,4 +101,3 @@ polyfillErrorIsError: if (!isFunction(Error.isError)) {
         return arg instanceof Error;
     };
 }
-

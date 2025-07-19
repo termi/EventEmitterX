@@ -61,7 +61,7 @@ export default function FormFromSchema(props: {
     }, [ $formRef ]);
 
     return (<form ref={$formRef} onSubmit={actual_onSubmit} aria-disabled={disabled} {...otherProps}>
-        {(elements.map(elementDescription => {
+        {(elements.map((elementDescription) => {
             const {
                 id,
                 label,
@@ -69,12 +69,12 @@ export default function FormFromSchema(props: {
 
             return (<div key={id} className="form-group">
                 <label htmlFor={id} className="form-label">{label}</label>
-                <input disabled={disabled} {...elementDescription}/>
-            </div>)
+                <input disabled={disabled} {...elementDescription} />
+            </div>);
         }))}
 
         <div className={buttonsClassName}>
-            {buttons.map(buttonDescription => {
+            {buttons.map((buttonDescription) => {
                 const {
                     id,
                     name,
@@ -84,11 +84,12 @@ export default function FormFromSchema(props: {
 
                 // @ts-expect-error todo: Очень странная ошибка от TS нужно разобраться
                 return (<button
-                    key={key} type={buttonDescription.type || 'button'} disabled={disabled}
+                    key={key} type={buttonDescription.type || 'button'}
+                    disabled={disabled}
                     {...buttonDescription}
                 >
                     {label}
-                </button>)
+                </button>);
             })}
         </div>
     </form>);

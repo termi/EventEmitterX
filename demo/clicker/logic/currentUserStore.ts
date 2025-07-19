@@ -85,7 +85,7 @@ class CurrentUserStore extends EventEmitterX {
         this.startAuthRoutineSync();
 
         mainProcessJTWStorage.on('tokens', () => {
-            this.checkExistedTokens().catch(error => {
+            this.checkExistedTokens().catch((error) => {
                 this.emit('error', error);
             });
         });
@@ -180,7 +180,7 @@ class CurrentUserStore extends EventEmitterX {
     }, {
         elements: registerElements,
         elementsList: makeFormElementsList(registerElements),
-    })
+    });
 
     public login = Object.assign(async (props: Parameters<typeof apiMethods.auth_login>[0], options?: {
         doNotThrowError?: boolean,
@@ -212,7 +212,7 @@ class CurrentUserStore extends EventEmitterX {
     }, {
         elements: logicElements,
         elementsList: makeFormElementsList(logicElements),
-    })
+    });
 
     public logout = async () => {
         try {
@@ -232,12 +232,12 @@ class CurrentUserStore extends EventEmitterX {
         catch (error) {
             this.emit('error', error);
         }
-    }
+    };
 
     private startAuthRoutineSync() {
         if (mainProcessJTWStorage.hasTokens()) {
             // todo: Если ошибка, выставлять `this.status = CurrentUserStatus.pending` и запускать retry несколько раз `this.checkExistedTokens()`
-            this.checkExistedTokens().catch(error => {
+            this.checkExistedTokens().catch((error) => {
                 this.emit('error', error);
                 this.status = StoreStatus.notAuthenticated;
             });

@@ -8,12 +8,10 @@ type DateValue = Date | number | string;
  * @returns - string like '2023-09-29T08:44:42' or '2023-09-29T08:44:42.000' with {@link withMilliseconds}==true
  */
 function _dateToISO(date: Date, withoutTime = false, withMilliseconds = false) {
-    // eslint-disable-next-line prefer-template
     const dateString = date.getFullYear()
         + '-' + String(date.getMonth() + 1).padStart(2, '0')
         + '-' + String(date.getDate()).padStart(2, '0')
     ;
-    // eslint-disable-next-line prefer-template
     const timeString = withoutTime ? '00:00:00' : String(date.getHours()).padStart(2, '0')
         + ':' + String(date.getMinutes()).padStart(2, '0')
         + ':' + String(date.getSeconds()).padStart(2, '0')
@@ -78,10 +76,10 @@ type From_0_To_59 =
 type Minutes = From_0_To_59;
 
 type HoursAndMinutes = {
-    hours: Hours;// from 0 to 23
-    minutes: Minutes;// from 0 to 59
-    isNegative?: boolean;
-}
+    hours: Hours, // from 0 to 23
+    minutes: Minutes, // from 0 to 59
+    isNegative?: boolean,
+};
 // '+03:00'
 type TimeZoneHoursMinutesString = `${'-' | '' | '+'}${string}:${string}`;
 

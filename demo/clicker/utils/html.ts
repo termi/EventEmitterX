@@ -90,11 +90,11 @@ export function dateFromHTMLInputDateTimeLocalInput(input: HTMLInputElement, off
     // note:
     //  1. Can't use `input.valueAsDate?.getTime()` due potential "Throws an "InvalidStateError" DOMException if the control isn't date- or time-based."
     //  2. With `input.type === 'month'` value of `input.valueAsNumber` is month number from '1970-01' (input.value = '2000-01', input.valueAsNumber == 360)
-    let gtmValue = /*input.valueAsDate?.getTime()
+    let gtmValue = /* input.valueAsDate?.getTime()
         ?? */(type !== 'month' ? input.valueAsNumber : void 0)
         ?? (type === 'time'
-                ? _parseTimeString(input.value)
-                : null
+            ? _parseTimeString(input.value)
+            : null
         )
     ;
     const offsetInMs = offset * TIMES.MINUTES;
@@ -236,7 +236,7 @@ export function formAsObject<T = Record<string, ReturnType<typeof getFormElement
     const isFilterFn = typeof filterFn === 'function';
     const isMapFn = typeof mapFn === 'function';
 
-    for (let i = 0, array = element.elements, len = array.length ; i < len ; i++) {
+    for (let i = 0, array = element.elements, len = array.length; i < len; i++) {
         const formElement = array[i] as HTMLInputElement;
 
         if (formElement) {

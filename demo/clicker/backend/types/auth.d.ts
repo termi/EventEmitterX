@@ -7,5 +7,5 @@ export namespace currentAuthUser {
         userRole: UserRole,
         userName: string,
         userEmail: string,
-    }
+    };
 }

@@ -97,7 +97,7 @@ export function assertIsPositiveNumber(value: unknown | number): asserts value i
 function _isNumberInRange(value: number, min = _Number_NEGATIVE_INFINITY, max = _Number_POSITIVE_INFINITY) {
     return value >= min
         && value <= max
-        ;
+    ;
 }
 
 export function isNumberInRange(value: number | unknown, min = _Number_NEGATIVE_INFINITY, max = _Number_POSITIVE_INFINITY): value is number {

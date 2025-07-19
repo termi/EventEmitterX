@@ -29,7 +29,7 @@ export type ErrorDTO = {
     className: string,
     stack: string,
     code?: string | number,
-}
+};
 
 export function errorToDTO(error: Error | unknown): ErrorDTO {
     if (!(error instanceof Error)) {

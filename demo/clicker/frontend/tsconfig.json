@@ -1,4 +1,8 @@
 {
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2022"
+  },
   "files": [],
   "references": [
     { "path": "./tsconfig.app.json" },

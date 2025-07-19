@@ -13,7 +13,7 @@ export function calculatePercent(fromValue: number, value: number) {
 
     const result = (value / fromValue) * 100;
 
-    if (!result) {// 0, null, undefined, NaN, etc
+    if (!result) { // 0, null, undefined, NaN, etc
         return 0;
     }
 

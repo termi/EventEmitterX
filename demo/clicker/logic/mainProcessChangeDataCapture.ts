@@ -30,7 +30,7 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
                 return;
             }
 
-            if (!args[1]) {// check isDetailedEvent
+            if (!args[1]) { // check isDetailedEvent
                 this._sendEventToOtherRealms(eventName, ...args);
                 this._sendDetailedEvent(eventName, ...args);
             }
@@ -51,7 +51,7 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
         }
         else if (isWebMainThread) {
             // В главном процессе вкладки браузера, запускаем SSEClient(roundsSSEUpdate) для получения обновлений
-            this.openSSEChannelForRoundsUpdate().catch(error => {
+            this.openSSEChannelForRoundsUpdate().catch((error) => {
                 if (!isAbortError(error)) {
                     console.error(error);
                 }
@@ -79,7 +79,7 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
         }
     };
 
-    private _roundsUpdateSSEChannel: SSEClient | undefined
+    private _roundsUpdateSSEChannel: SSEClient | undefined;
     private _roundsUpdateSSEChannelPromise: Promise<boolean> | undefined;
 
     async openSSEChannelForRoundsUpdate(doNotCheckCurrentUser = false) {
@@ -100,8 +100,8 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
 
         this._roundsUpdateSSEChannel.on('error', (error: unknown) => {
             this.emit('error', error);
-        })
-        this._roundsUpdateSSEChannel.on('message', message => {
+        });
+        this._roundsUpdateSSEChannel.on('message', (message) => {
             this.emit(
                 message.type as keyof MainProcessChangeDataCapture.Events,
                 ...([ message.data ] as Parameters<MainProcessChangeDataCapture.Events[keyof MainProcessChangeDataCapture.Events]>)
@@ -112,7 +112,7 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
             currentUserStore.signal$.addListener(() => {
                 if (currentUserStore.isAuthenticated) {
                     if (!sseClient.isConnected) {
-                        sseClient.connect().catch(error => {
+                        sseClient.connect().catch((error) => {
                             this.emit('error', error, 'sseClient.connect():');
                         });
                     }
@@ -136,7 +136,6 @@ class MainProcessChangeDataCapture extends EventEmitterX<MainProcessChangeDataCa
 
         return promise;
     }
-
 }
 
 namespace MainProcessChangeDataCapture {

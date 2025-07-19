@@ -1,6 +1,6 @@
 'use strict';
 
-import { describe, it } from "@jest/globals";
+import { describe, it, expect } from "@jest/globals";
 
 import { makeRandomInteger, makeRandomString } from "../../utils/random";
 
@@ -51,5 +51,4 @@ describe('utils/random', function() {
             expect(randomString2.startsWith('start')).toBe(true);
         });
     });
-
 });

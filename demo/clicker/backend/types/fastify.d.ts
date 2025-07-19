@@ -6,6 +6,6 @@ import type { currentAuthUser } from "./auth";
 
 declare module 'fastify' {
     interface FastifyRequest {
-        user: currentAuthUser.UserPayload
+        user: currentAuthUser.UserPayload;
     }
 }

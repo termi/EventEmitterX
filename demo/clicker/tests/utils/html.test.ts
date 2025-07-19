@@ -3,7 +3,7 @@
  */
 'use strict';
 
-import { describe, expect, it } from "@jest/globals";
+import { describe, it, expect } from "@jest/globals";
 
 import { dateToHTMLInputDateTimeLocalValue, formAsObject } from "../../utils/html";
 import { assertIsDateObject } from "../../type_guards/base";
@@ -59,7 +59,7 @@ describe('utils/html', function() {
                     </label>
                     <label>
                         <span>Please choose one or more pets:</span>
-                        <select name="pets" multiple >
+                        <select name="pets" multiple>
                             <optgroup label="4-legged pets">
                                 <option value="dog">Dog</option>
                                 <option value="cat" selected>Cat</option>
@@ -138,7 +138,7 @@ describe('utils/html', function() {
             expect(_toLocalISOMonthString(result.month)).toBe(_toLocalISOMonthString(dateForMonth));
             expect(_toLocalISOWeekString(result.week)).toBe(_toLocalISOWeekString(dateForWeek));
         });
-    })
+    });
 });
 
 function _toLocalISOMonthString(date: Date) {

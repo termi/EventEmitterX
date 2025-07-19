@@ -22,3 +22,7 @@ export type ReplaceNumberWithString<T> = T extends number
 ;
 
 export type MakeOptional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+export type MakeNonNullable<T, K extends keyof T> = T & {
+    [P in K]-?: NonNullable<T[P]>;
+};
