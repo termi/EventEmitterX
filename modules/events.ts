@@ -2253,6 +2253,9 @@ function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = fal
 
         if (stackLine.includes('node:internal/process/task_queues:')
             || stackLine.includes('node:async_hooks:')
+            || stackLine.includes(' (node:internal/abort_controller:')
+            || stackLine.includes(' (node:internal/event_target:')
+            || stackLine.includes(' (node:internal/process/task_queues:')
         ) {
             // nodejs lines
             return false;
@@ -3024,6 +3027,10 @@ function _enrichErrorStackToOnceTimeoutError(
     eventNames: EventName | EventName[],
     errorEventNames: EventName | EventName[] | undefined,
 ) {
+    if (!checkIsPropertyEditable(error, 'stack')) {
+        return;
+    }
+
     const onceOptionsString = `{ signal${errorEventNames ? `, errorEventName: ${_typesToArrayStringTag(errorEventNames)}` : ''} }`;
 
     // подмешиваем в "abortError.stack" стек созданные выше, по время вызова `static once`.
