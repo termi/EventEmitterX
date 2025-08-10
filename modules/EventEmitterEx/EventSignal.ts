@@ -1139,6 +1139,10 @@ export class EventSignal<T, S=T, D=undefined> {
      *  }, subscribeOptions?: { signal: AbortSignal }) => {}
      * Alternative for {@link addListener}
      * @returns - unsubscribe callback.
+     * @example React useSignal hook
+     * export function useSignal<T>(signal: EventSignal<T>): T {
+     *   return useSyncExternalStore(signal.subscribe, signal.get);
+     * }
      */
     subscribe = (func: () => void, /*subscribeOptions?: { signal: AbortSignal })*/) => {
         if (!(typeof (func as unknown) === 'function')) {
