@@ -2554,7 +2554,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     // private _eventTarget: DOMEventTarget|void;
     private _allowDirectEmitToTarget: Required<EventEmitterProxy_Options["allowDirectEmitToTarget"]>;
     private _hasProxyHandlers: Partial<Record<EventName, true>> = Object.create(null);
-    private _antiLoopingInfoMap: Partial<Record<EventName, { args: unknown[] }>> = Object.create(null);
+    private _antiLoopingInfoMap: Partial<Record<EventName, { args: unknown[], __proto__: null }>> = Object.create(null);
     private _knownSubscriptions: [
         eventType: EventName,
         eventEmitter: ICompatibleEmitter,
@@ -2688,6 +2688,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
              */
             const antiLoopingInfo = {
                 args,
+                __proto__: null,
             };
 
             if (this._antiLoopingInfoMap[event]) {
@@ -2724,8 +2725,8 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             return;
         }
 
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error `TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'Parameters  [EventName]>'.`
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore `TS2345: Argument of type 'unknown[]' is not assignable to parameter of type 'Parameters  [EventName]>'.`
         super.emit(event, ...args);
 
         if (targetEmitter) {
@@ -3068,7 +3069,7 @@ function _eventTargetAddListener(
 ) {
     let _type = type;
 
-    if (typeof _type === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
+    if (typeof (_type as unknown) === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
         _type = String(_type);
     }
 
@@ -3084,7 +3085,7 @@ function _eventTargetRemoveListener(
 ) {
     let _type = type;
 
-    if (typeof _type === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
+    if (typeof (_type as unknown) === 'symbol' && !_isDOMEventTargetSupportSymbolAsType(eventTarget)) {
         _type = String(_type);
     }
 
@@ -3343,6 +3344,7 @@ type OnceListenerState<EventMap extends DefaultEventMap = DefaultEventMap, Event
     wrapped: EMD<EventMap>[EventKey],
     listener: Listener,
     target: EventEmitterEx,
+    __proto__: null,
 };
 
 const kOnceListenerWrappedHandler = Symbol('kOnceListenerWrappedHandler');
@@ -3384,6 +3386,7 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
         wrapped: void 0 as any as EMD<EventMap>[EventKey],
         listener,
         target,
+        __proto__: null as null,
     };
     const wrapped = _onceWrapper.bind(state) as EMD<EventMap>[EventKey];
 
