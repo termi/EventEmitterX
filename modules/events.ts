@@ -3628,20 +3628,24 @@ function _objectIsConsole(object: Console | any) {
  * Important warning: tools such as UglifyJS/Terser will minify class name and therefore proto.constructor.name
  *
  * @example Workaround for this case:
+```
  if (ClassName.prototype.constructor.name !== 'ClassName') {
     // Fix class name after minification (UglifyJS/Terser or GCC)
     Object.defineProperty(ClassName.prototype.constructor, 'name', { value: 'ClassName', configurable: true });
-}
- *
+ }
+```
  * @param object
  * @param constructorName
  * @private
+ *
+ * todo:
+ *  @deprecated use [hasConstructorInPrototypeChain]{@link import('../common/ObjectTools_new.ts').hasConstructorInPrototypeChain}
  */
 function _findConstructorName(object: Object, constructorName: string) {
     let proto = object && typeof object === 'object' && Object.getPrototypeOf(object) || void 0;
 
     while (proto) {
-        if (proto.constructor.name === constructorName) {
+        if ((proto.constructor as Function | undefined)?.name === constructorName) {
             return true;
         }
 
