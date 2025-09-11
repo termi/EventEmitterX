@@ -1573,14 +1573,14 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
 
                 if (Array.isArray(types)) {
                     for (const type of types) {
-                        if (typeof type === 'symbol') {
+                        if (typeof (type as unknown) === 'symbol') {
                             invalidTypeValue = type;
 
                             break;
                         }
                     }
                 }
-                else if (typeof types === 'symbol') {
+                else if (typeof (types as unknown) === 'symbol') {
                     invalidTypeValue = types;
                 }
 
@@ -1589,7 +1589,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                 }
             }
 
-            if (typeof errorEventName === 'symbol') {
+            if (typeof (errorEventName as unknown) === 'symbol') {
                 return _Promise.reject(new EventsTypeError(`The "${typeof errorEventName}" value type of "errorEventName" option is not supported for EventTarget emitter.`, ERR_INVALID_OPTION_TYPE));
             }
         }
