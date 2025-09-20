@@ -1644,7 +1644,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             _eventTargetRemoveListener((emitter as DOMEventTarget), type, listener, eventTargetListenerOptions);
                         }
                         else {
-                            _emitter.removeListener(type as string | symbol, listener);
+                            (_emitter as IMinimumCompatibleEmitter).removeListener(type as string | symbol, listener);
                         }
 
                         if (hasTiming && type !== winnerEventType) {
@@ -1667,7 +1667,7 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                             }
                         }
                         else {
-                            _emitter.removeListener(errorEventName, errorListener);
+                            (_emitter as IMinimumCompatibleEmitter).removeListener(errorEventName, errorListener);
                         }
                     }
 
@@ -1737,10 +1737,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         _eventTargetAddListener((emitter as DOMEventTarget), type, eventListener, eventTargetListenerOptions);
                     }
                     else if (usePrependListener) {
-                        _emitter.prependListener(type as string | symbol, eventListener);
+                        (_emitter as IMinimumCompatibleEmitter).prependListener(type as string | symbol, eventListener);
                     }
                     else {
-                        _emitter.on(type as string | symbol, eventListener);
+                        (_emitter as IMinimumCompatibleEmitter).on(type as string | symbol, eventListener);
                     }
                 }
 
@@ -1781,10 +1781,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
                 else if (usePrependListener) {
-                    _emitter.prependListener(errorEventName, errorListener);
+                    (_emitter as IMinimumCompatibleEmitter).prependListener(errorEventName, errorListener);
                 }
                 else {
-                    _emitter.on(errorEventName, errorListener);
+                    (_emitter as IMinimumCompatibleEmitter).on(errorEventName, errorListener);
                 }
             });
         }
@@ -1870,10 +1870,10 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                         }
                     }
                     else {
-                        _emitter.removeListener(type as string | symbol, eventListener);
+                        (_emitter as IMinimumCompatibleEmitter).removeListener(type as string | symbol, eventListener);
 
                         if (needErrorListener) {
-                            _emitter.removeListener(errorEventName, errorListener);
+                            (_emitter as IMinimumCompatibleEmitter).removeListener(errorEventName, errorListener);
                         }
                     }
 
@@ -1889,17 +1889,17 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
                     }
                 }
                 else if (usePrependListener) {
-                    _emitter.prependListener(type as string | symbol, eventListener);
+                    (_emitter as IMinimumCompatibleEmitter).prependListener(type as string | symbol, eventListener);
 
                     if (needErrorListener) {
-                        _emitter.prependListener(errorEventName, errorListener);
+                        (_emitter as IMinimumCompatibleEmitter).prependListener(errorEventName, errorListener);
                     }
                 }
                 else {
-                    _emitter.on(type as string | symbol, eventListener);
+                    (_emitter as IMinimumCompatibleEmitter).on(type as string | symbol, eventListener);
 
                     if (needErrorListener) {
-                        _emitter.on(errorEventName, errorListener);
+                        (_emitter as IMinimumCompatibleEmitter).on(errorEventName, errorListener);
                     }
                 }
             });
@@ -2377,7 +2377,7 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
             return false;
         }
 
-        return this._eventEmitter.emit(event as NodeEventName, ...args);
+        return (this._eventEmitter as ICompatibleEmitter).emit(event as NodeEventName, ...args);
     }
 
     emitSelf<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>) {

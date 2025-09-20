@@ -334,13 +334,13 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
             }
         }
         else {
-            emitter.removeListener(event as string | symbol, _onEvent);
+            (emitter as IMinimumCompatibleEmitter).removeListener(event as string | symbol, _onEvent);
 
             if (stopEventName !== void 0 && stopEventName !== null) {
-                emitter.removeListener(stopEventName as string | symbol, _onStop);
+                (emitter as IMinimumCompatibleEmitter).removeListener(stopEventName as string | symbol, _onStop);
             }
             if (errorEventName !== void 0 && errorEventName !== null && errorEventName !== event) {
-                emitter.removeListener(errorEventName as string | symbol, _onError);
+                (emitter as IMinimumCompatibleEmitter).removeListener(errorEventName as string | symbol, _onError);
             }
         }
 
@@ -475,13 +475,13 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
         // todo: Если это EventEmitterX, то передавать параметр option.{ onRemoved: _onStop } чтобы итератор
         //  останавливался если из emitter был удалён его обработчик.
         // todo: Если это EventEmitter, то подписываться на событие 'removeListener' и сравнивать с _onEvent.
-        emitter.on(event as string | symbol, _onEvent);
+        (emitter as IMinimumCompatibleEmitter).on(event as string | symbol, _onEvent);
 
         if (stopEventName !== void 0 && stopEventName !== null) {
-            emitter.on(stopEventName as string | symbol, _onStop);
+            (emitter as IMinimumCompatibleEmitter).on(stopEventName as string | symbol, _onStop);
         }
         if (errorEventName !== void 0 && errorEventName !== null && errorEventName !== event) {
-            emitter.on(errorEventName as string | symbol, _onError);
+            (emitter as IMinimumCompatibleEmitter).on(errorEventName as string | symbol, _onError);
         }
     }
 
