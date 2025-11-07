@@ -1303,6 +1303,7 @@ export class EventSignal<T, S=T, D=undefined> {
     //     return new EventSignal(initialValue, options);
     // }
 
+    static reactIsInited = false;
     declare static initReact;
     //todo: Сейчас не работает
     // declare private static _setComponentOnDestroy;
@@ -1378,6 +1379,8 @@ export class EventSignal<T, S=T, D=undefined> {
             //         return globalThis.__StrictMode;
             //     },
             // });
+
+            this.reactIsInited = true;
         };
 
         /*//todo: Сейчас не работает
