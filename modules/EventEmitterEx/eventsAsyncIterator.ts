@@ -4,7 +4,7 @@
 
 import type { EventEmitter } from 'node:events';
 
-import type { EventEmitterEx, EventName, IMinimumCompatibleEmitter } from "../events";
+import type { EventEmitterX, EventName, IMinimumCompatibleEmitter } from "../events";
 
 import { createAbortError } from 'termi@abortable';
 
@@ -639,7 +639,7 @@ export function eventsAsyncIterator<T extends unknown[] = unknown[], TReturn = v
 }
 
 export namespace eventsAsyncIterator {
-    export type CompatibleEmitter = EventEmitter | EventEmitterEx | EventTarget | IMinimumCompatibleEmitter;
+    export type CompatibleEmitter = EventEmitter | EventEmitterX | EventTarget | IMinimumCompatibleEmitter;
     export type Options<T extends unknown[] = unknown[]> = EventsAsyncIterator_Options<T>;
 }
 
