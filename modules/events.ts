@@ -2084,55 +2084,75 @@ export class EventEmitterEx<EventMap extends DefaultEventMap = DefaultEventMap> 
         return promise;
     }
 
+    static readonly errorMonitor = errorMonitor as typeof import("node:events").errorMonitor;
+    static readonly captureRejectionSymbol = captureRejectionSymbol as typeof import("node:events").captureRejectionSymbol;
+    // domain is not supported
+    static readonly usingDomains = false;
+
+    static EventEmitter = EventEmitterEx;
+    static EventEmitterEx = EventEmitterEx;
+
+    /** alias for global AbortController */
+    static AbortController = AbortController;
+}
+
+export interface EventEmitterEx_2_EventMethodsOptions {
+    /** Сырое событие которое ещё не готово к использованию в GUI (почти такое же событие, но не для GUI) */
+    isRaw?: boolean;
+}
+
+// todo: класс является предложением для внесения корректировок в оригинальный EventEmitterEx,
+//  после одобрения нужно его удалить и в местах использования заменить оригиналом
+export class EventEmitterEx2<EventMap extends DefaultEventMap = DefaultEventMap> extends EventEmitterEx<EventMap> {
     on2<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
         listener: EMD<EventMap>[EventKey],
-        options?: { isRaw?: boolean },
+        options?: EventEmitterEx_2_EventMethodsOptions,
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx._eventToEventRaw(_event)
+            ? EventEmitterEx2._eventToEventRaw(_event)
             : _event
         ;
 
-        return this.on(event as EventKey, listener);
+        return super.on(event as EventKey, listener);
     }
 
     emit2<EventKey extends keyof EMD<EventMap>>(
         _event: EventKey,
-        options?: { isRaw?: boolean },
+        options?: EventEmitterEx_2_EventMethodsOptions,
         ...args: Parameters<EMD<EventMap>[EventKey]>
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx._eventToEventRaw(_event)
+            ? EventEmitterEx2._eventToEventRaw(_event)
             : _event
         ;
 
-        return this.emit(event as EventKey, ...args);
+        return super.emit(event as EventKey, ...args);
     }
 
     removeListener2<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
         listener: EMD<EventMap>[EventKey],
-        options?: { isRaw?: boolean },
+        options?: EventEmitterEx_2_EventMethodsOptions,
     ) {
         const event = options?.isRaw
-            ? EventEmitterEx._eventToEventRaw(_event)
+            ? EventEmitterEx2._eventToEventRaw(_event)
             : _event
         ;
 
-        return this.removeListener(event as EventKey, listener);
+        return super.removeListener(event as EventKey, listener);
     }
 
-    listenerCount2<EventKey extends keyof EMD<EventMap> = EventName>(
+    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(
         _event: EventKey,
-        options?: { isRaw?: boolean },
+        options?: EventEmitterEx_2_EventMethodsOptions,
     ): number {
         const event = options?.isRaw
-            ? EventEmitterEx._eventToEventRaw(_event)
+            ? EventEmitterEx2._eventToEventRaw(_event)
             : _event
         ;
 
-        return this.listenerCount(event as EventKey);
+        return super.listenerCount(event as EventKey);
     }
 
     private static _eventToEventRaw(event: EventName): EventName {
