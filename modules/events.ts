@@ -2097,6 +2097,11 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
 
     /** alias for global AbortController */
     static AbortController = AbortController;
+
+    static {
+        // emulate `class extends null {}`
+        Object.setPrototypeOf(this.prototype, null);
+    }
 }
 
 const tagEventEmitterX = 'EventEmitterX';
@@ -2151,12 +2156,12 @@ function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = fal
     }
 
     if (!error["originalStack"]) {
-        Object.defineProperty(error, "originalStack", {
+        Object.defineProperty(error, "originalStack", Object.setPrototypeOf({
             value: stack,
             configurable: true,
             writable: true,
             enumerable: false,
-        });
+        }, null));
     }
 
     if (autoRemoveErrorMessageFromStach) {
@@ -2246,7 +2251,7 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
         } = options || {};
 
         if (_isEventEmitterCompatible(emitter as ICompatibleEmitter)) {
-            this._eventEmitter = emitter as EventEmitterEx | INodeEventEmitter;
+            this._eventEmitter = emitter as EventEmitterX | INodeEventEmitter;
         }
         /* todo: add EventTarget support
         else if (_isEventTargetCompatible(emitter)) {
@@ -2456,9 +2461,11 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
 
 const tagEventEmitterSimpleProxy = 'EventEmitterSimpleProxy';
 
+EventEmitterSimpleProxy.prototype[Symbol.toStringTag] = tagEventEmitterSimpleProxy;
+
 if (EventEmitterSimpleProxy.constructor.name !== tagEventEmitterSimpleProxy) {
     // Fix class name after minification (UglifyJS/Terser or GCC)
-    Object.defineProperty(EventEmitterSimpleProxy.constructor, 'name', { value: tagEventEmitterSimpleProxy, configurable: true });
+    Object.defineProperty(EventEmitterSimpleProxy.constructor, 'name', Object.setPrototypeOf({ value: tagEventEmitterSimpleProxy, configurable: true, enumerable: false, writable: false }, null));
 }
 
 type EventEmitterProxy_SourceProxyHook = (
@@ -2868,9 +2875,11 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
 const tagEventEmitterProxy = 'EventEmitterProxy';
 
+EventEmitterProxy.prototype[Symbol.toStringTag] = tagEventEmitterProxy;
+
 if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
     // Fix class name after minification (UglifyJS/Terser or GCC)
-    Object.defineProperty(EventEmitterProxy.constructor, 'name', { value: tagEventEmitterProxy, configurable: true });
+    Object.defineProperty(EventEmitterProxy.constructor, 'name', Object.setPrototypeOf({ value: tagEventEmitterProxy, configurable: true, enumerable: false, writable: false }, null));
 }
 
 // noinspection JSUnusedGlobalSymbols
@@ -2919,9 +2928,11 @@ class EventsTypeError extends TypeError {
 
 const tagEventsTypeError = 'EventsTypeError';
 
+EventsTypeError.prototype[Symbol.toStringTag] = tagEventsTypeError;
+
 if (EventsTypeError.constructor.name !== tagEventsTypeError) {
     // Fix class name after minification (UglifyJS/Terser or GCC)
-    Object.defineProperty(EventsTypeError.constructor, 'name', { value: tagEventsTypeError, configurable: true });
+    Object.defineProperty(EventsTypeError.constructor, 'name', Object.setPrototypeOf({ value: tagEventsTypeError, configurable: true, enumerable: false, writable: false }, null));
 }
 
 // see: https://github.com/bjyoungblood/es6-error/blob/master/src/index.js
@@ -2943,9 +2954,11 @@ export class TimeoutError extends Error {
 
 const tagTimeoutError = 'TimeoutError';
 
+TimeoutError.prototype[Symbol.toStringTag] = tagTimeoutError;
+
 if (TimeoutError.constructor.name !== tagTimeoutError) {
     // Fix class name after minification (UglifyJS/Terser or GCC)
-    Object.defineProperty(TimeoutError.constructor, 'name', { value: tagTimeoutError, configurable: true });
+    Object.defineProperty(TimeoutError.constructor, 'name', Object.setPrototypeOf({ value: tagTimeoutError, configurable: true, enumerable: false, writable: false }, null));
 }
 
 function _createOnceTimeoutError({
