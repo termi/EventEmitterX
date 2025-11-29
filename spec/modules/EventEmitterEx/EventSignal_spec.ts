@@ -486,6 +486,32 @@ describe('EventSignal', () => {
             expect(ee.listenerCount('test1')).toBe(0);
             expect(ee.listenerCount('test2')).toBe(0);
         });
+
+        it('EventEmitter - event without arguments', async function() {
+            const ee = new EventEmitterX();
+            const computed$ = new EventSignal(0, () => {
+                return Date.now();
+            }, {
+                description: 'now time',
+                sourceEmitter: ee,
+                sourceEvent: 'update-time',
+            });
+
+            const now1 = computed$.get();
+
+            expect(now1).toBe(computed$.get());
+
+            ee.emit('update-time');
+
+            const now2 = computed$.get();
+
+            expect(now2).not.toBe(now1);
+            expect(now2).toBe(computed$.get());
+
+            computed$.destructor();
+
+            expect(ee.listenerCount('update-time')).toBe(0);
+        });
     });
 
     describe('with computation', function() {
