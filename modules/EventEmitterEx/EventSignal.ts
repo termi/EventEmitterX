@@ -248,12 +248,26 @@ export class EventSignal<T, S=T, D=undefined> {
                             return;
                         }
 
-                        const newSourceValue = this._sourceMapFn
+                        const _newSourceValue = this._sourceMapFn
                             ? this._sourceMapFn.apply(null, args as [event: number | string | symbol, ...args: unknown[]])
                             : args[1] as S
                         ;
+                        // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
+                        const isForceRecomputeWithSameSourceValue = _newSourceValue === void 0;
 
-                        this._setSourceValue(newSourceValue);
+                        if (isForceRecomputeWithSameSourceValue && _sourceMapFn) {
+                            // _sourceMapFn ничего не вернула - ничего делать не нужно
+                            return;
+                        }
+
+                        const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
+
+                        this._setSourceValue(
+                            newSourceValue,
+                            // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
+                            false,
+                            newSourceValue === void 0,
+                        );
                     };
 
                     this._initialComputations.push([
@@ -730,15 +744,22 @@ export class EventSignal<T, S=T, D=undefined> {
     //   }
     // }
 
-    private _setSourceValue(newSourceValue: S | undefined, checkValueIsSame = false) {
+    private _setSourceValue(
+        newSourceValue: S | undefined,
+        checkValueIsSame = false,
+        ignoreUndefinedNewSourceValue = false,
+    ) {
         const { _sourceValue } = this;
+        let isNeedToUpdate = newSourceValue !== void 0 || ignoreUndefinedNewSourceValue;
 
-        if (newSourceValue !== void 0
-            && (!checkValueIsSame || this.status === 'error' || (
+        if (isNeedToUpdate) {
+            isNeedToUpdate = (!checkValueIsSame || this.status === 'error' || (
                 typeof _sourceValue === 'object'
                 || !Object.is(newSourceValue, _sourceValue)
-            ))
-        ) {
+            ));
+        }
+
+        if (isNeedToUpdate) {
             this._updateFlags |= _EventSignal__UpdateFlags__wasSourceSetting;
             this._sourceValue = newSourceValue;
 
