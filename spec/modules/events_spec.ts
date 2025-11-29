@@ -45,13 +45,15 @@ import {
 } from 'node:events';
 import { runInNewContext } from 'node:vm';
 import events, {
+    EventEmitterX,
+    // EventEmitterEx is deprecated
     EventEmitterEx,
     EventEmitterSimpleProxy,
     EventEmitterProxy,
     EventName,
     isEventEmitterCompatible,
     isEventTargetCompatible,
-    isEventEmitterEx,
+    isEventEmitterX,
     getEventListeners,
     Listener,
     kDestroyingEvent,
@@ -131,7 +133,7 @@ describe('events', function() {
 
     let checkEventEmitter;
 
-    describe('EventEmitterEx', checkEventEmitter = (function() {
+    describe('EventEmitterX', checkEventEmitter = (function() {
         if (arguments.length > 0) {
             // eslint-disable-next-line prefer-rest-params
             const EventEmitterClass = arguments[0];
@@ -144,11 +146,17 @@ describe('events', function() {
         const ee = new EventEmitter();
 
         describe('constructor', function() {
+            it('check aliases', function() {
+                expect(EventEmitterX).toBe(events);
+            });
+
             it('instanceof', function() {
-                expect(new EventEmitterEx()).toBeInstanceOf(EventEmitterEx);
+                expect(new EventEmitterX()).toBeInstanceOf(EventEmitterX);
                 expect(new EventEmitter()).toBeInstanceOf(EventEmitter);
                 // noinspection JSPotentiallyInvalidConstructorUsage
-                expect(new events()).toBeInstanceOf(EventEmitterEx);
+                expect(new events()).toBeInstanceOf(EventEmitterX);
+                // EventEmitterEx is deprecated
+                expect(new EventEmitterEx()).toBeInstanceOf(EventEmitterX);
             });
         });
 
@@ -230,9 +238,9 @@ describe('events', function() {
             });
         });
 
-        describe('EventEmitterEx is an alias for EventEmitter', function() {
+        describe('EventEmitterX is an alias for EventEmitter', function() {
             it('instanceof', function() {
-                expect(new EventEmitter()).toBeInstanceOf(EventEmitterEx);
+                expect(new EventEmitter()).toBeInstanceOf(EventEmitterX);
             });
         });
 
@@ -252,7 +260,7 @@ describe('events', function() {
         });
 
         describe('with options.emitCounter', function() {
-            it('should call `emitCounter.count(eventName)` for every `EventEmitterEx#emit`', function() {
+            it('should call `emitCounter.count(eventName)` for every `EventEmitterX#emit`', function() {
                 const event1 = 'test-event1';
                 const event2 = 'test-event2';
                 const numericEventType = 123;
@@ -313,7 +321,7 @@ describe('events', function() {
                 }
             });
 
-            it('should call `emitCounter.count(eventName, hasEnyListener)` for every `EventEmitterEx#emit`', function() {
+            it('should call `emitCounter.count(eventName, hasEnyListener)` for every `EventEmitterX#emit`', function() {
                 const event1 = 'test-event1';
                 const event2 = 'test-event2';
                 const numericEventType = 123;
@@ -453,7 +461,7 @@ describe('events', function() {
                 });
                 let callCounter = 0;
                 const callContexts: undefined[] = [];
-                const onTest = function(this: EventEmitterEx|undefined) {
+                const onTest = function(this: EventEmitterX|undefined) {
                     callCounter++;
                     callContexts.push(this as undefined);
                 };
@@ -477,10 +485,10 @@ describe('events', function() {
                     listenerWithoutThis: false,
                 });
                 let callCounter = 0;
-                const callContexts: EventEmitterEx[] = [];
-                const onTest = function(this: EventEmitterEx|undefined) {
+                const callContexts: EventEmitterX[] = [];
+                const onTest = function(this: EventEmitterX|undefined) {
                     callCounter++;
-                    callContexts.push(this as EventEmitterEx);
+                    callContexts.push(this as EventEmitterX);
                 };
 
                 emitter.on('test', onTest);
@@ -527,13 +535,13 @@ describe('events', function() {
                     listeners_newListener_emitted.push(listener);
                 });
 
-                const onceNewListener = jest.fn(function(this: EventEmitterEx, name, listener) {
+                const onceNewListener = jest.fn(function(this: EventEmitterX, name, listener) {
                     {// additional tests
                         expect(name).toBe('hello_on');
                         expect(listener).toBe(listener1);
 
                         // 'newListener' should call be before `listener` is added in known listeners list
-                        expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
+                        expect((this as EventEmitterX).listenerCount(name)).toBe(0);
                     }
                 });
 
@@ -588,7 +596,7 @@ describe('events', function() {
                 const eventName = 'test123';
                 let newListenerCounter = 0;
 
-                const newListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                const newListener = jest.fn(function(this: EventEmitterX, name, lis) {
                     {// additional tests
                         expect(name).toBe(eventName);
                         expect(lis).toBe(listener);
@@ -750,7 +758,7 @@ describe('events', function() {
             it('call removeListener() in handler', function() {
                 let counter = 0;
                 const eventName = 'test12345';
-                const listener1 = jest.fn(function(this: EventEmitterEx) {
+                const listener1 = jest.fn(function(this: EventEmitterX) {
                     this.removeListener(eventName, listener2);
                 });
                 const listener2 = () => { counter += 1; };
@@ -869,13 +877,13 @@ describe('events', function() {
                         listeners_removeListener_emitted.push(listener);
                     });
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, listener) {
                         {// additional tests
                             expect(name).toBe('hello_on');
                             expect(listener).toBe(listener1);
 
                             // 'removeListener' should call after `listener` is removed from known listeners list
-                            expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
+                            expect((this as EventEmitterX).listenerCount(name)).toBe(0);
                         }
                     });
 
@@ -921,7 +929,7 @@ describe('events', function() {
                     const eventName = 'test123';
                     let removeListenerCounter = 0;
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, lis) {
                         removeListenerCounter--;
 
                         {// additional tests
@@ -986,7 +994,7 @@ describe('events', function() {
                     const listener2 = () => { counter += 2; };
                     const eventName = 'test12345';
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, lis) {
                         if (lis === listener1) {
                             this.removeListener(eventName, listener2);
                         }
@@ -1025,7 +1033,7 @@ describe('events', function() {
             it('call removeAllListeners() in handler', function() {
                 let counter = 0;
                 const eventName = 'test12345';
-                const listener1 = jest.fn(function(this: EventEmitterEx) {
+                const listener1 = jest.fn(function(this: EventEmitterX) {
                     this.removeAllListeners(eventName);
                 });
                 const listener2 = () => { counter += 1; };
@@ -1138,13 +1146,13 @@ describe('events', function() {
                         listeners_removeListener_emitted.push(listener);
                     });
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, listener) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, listener) {
                         {// additional tests
                             expect(name).toBe('hello_on');
                             expect(listener).toBe(listener1);
 
                             // 'removeListener' should call after `listener` is removed from known listeners list
-                            expect((this as EventEmitterEx).listenerCount(name)).toBe(0);
+                            expect((this as EventEmitterX).listenerCount(name)).toBe(0);
                         }
                     });
 
@@ -1189,7 +1197,7 @@ describe('events', function() {
                     const listener = () => { /* nothing to do here */ };
                     const eventName = 'test123';
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, lis) {
                         {// additional tests
                             expect(name).toBe(eventName);
                             expect(lis).toBe(listener);
@@ -1241,7 +1249,7 @@ describe('events', function() {
                     const listener2 = () => { counter += 2; };
                     const eventName = 'test12345';
 
-                    const onceRemoveListener = jest.fn(function(this: EventEmitterEx, name, lis) {
+                    const onceRemoveListener = jest.fn(function(this: EventEmitterX, name, lis) {
                         if (lis === listener1) {
                             this.removeAllListeners(eventName);
                         }
@@ -1825,7 +1833,7 @@ describe('events', function() {
             });
 
             describe('arguments length test', function() {
-                const ee = new EventEmitterEx<{
+                const ee = new EventEmitterX<{
                     'test-args0': () => void,
                     'test-args1': (a: number) => void,
                     'test-args2': (a: number, b: string) => void,
@@ -1835,7 +1843,7 @@ describe('events', function() {
                 }>();
 
                 it('args.length = 0', function() {
-                    const listener = jest.fn(function(this: EventEmitterEx, ...args) {
+                    const listener = jest.fn(function(this: EventEmitterX, ...args) {
                         expect(this).toBe(ee);
                         expect(args).toHaveLength(0);
                     });
@@ -1856,7 +1864,7 @@ describe('events', function() {
                 });
 
                 it('args.length = 1', function() {
-                    const listener = jest.fn(function(this: EventEmitterEx, a) {
+                    const listener = jest.fn(function(this: EventEmitterX, a) {
                         expect(this).toBe(ee);
                         expect(a).toBe(9);
                         // eslint-disable-next-line prefer-rest-params
@@ -1879,7 +1887,7 @@ describe('events', function() {
                 });
 
                 it('args.length = 2', function() {
-                    const listener = jest.fn(function(this: EventEmitterEx, a, b) {
+                    const listener = jest.fn(function(this: EventEmitterX, a, b) {
                         expect(this).toBe(ee);
                         expect(a).toBe(8);
                         expect(b).toBe('b2');
@@ -1903,7 +1911,7 @@ describe('events', function() {
                 });
 
                 it('args.length = 3', function() {
-                    const listener = jest.fn(function(this: EventEmitterEx, a, b, c) {
+                    const listener = jest.fn(function(this: EventEmitterX, a, b, c) {
                         expect(this).toBe(ee);
                         expect(a).toBe(7);
                         expect(b).toBe('b3');
@@ -1928,7 +1936,7 @@ describe('events', function() {
                 });
 
                 it('args.length = 9', function() {
-                    const listener = jest.fn(function(this: EventEmitterEx, n1, n2, n3, n4, n5, n6, n7, n8, n9) {
+                    const listener = jest.fn(function(this: EventEmitterX, n1, n2, n3, n4, n5, n6, n7, n8, n9) {
                         expect(this).toBe(ee);
                         expect(n1).toBe(1);
                         expect(n2).toBe(2);
@@ -1960,7 +1968,7 @@ describe('events', function() {
 
                 it('args.length = N', function() {
                     const expectedArgs = randArr30;
-                    const listener = jest.fn(function(this: EventEmitterEx, ...args) {
+                    const listener = jest.fn(function(this: EventEmitterX, ...args) {
                         expect(this).toBe(ee);
                         expect(args).toEqual(expectedArgs);
                         // eslint-disable-next-line prefer-rest-params
@@ -2278,7 +2286,7 @@ describe('events', function() {
 
         describe('non-standard #hasListener', function() {
             it('should detect without handler', function() {
-                const ee = new EventEmitterEx();
+                const ee = new EventEmitterX();
 
                 const handler1 = () => {};
 
@@ -2296,7 +2304,7 @@ describe('events', function() {
             });
 
             it('should detect with handler', function() {
-                const ee = new EventEmitterEx();
+                const ee = new EventEmitterX();
 
                 const handler1 = () => {};
                 const handler2 = () => {};
@@ -2319,7 +2327,7 @@ describe('events', function() {
 
         describe('error behaviour', function() {
             it('case try/catch', async function() {
-                const ee = new EventEmitterEx;
+                const ee = new EventEmitterX;
 
                 const promise = new Promise((resolve, reject) => {
                     try {
@@ -2351,10 +2359,10 @@ describe('events', function() {
 
         describe('cases', function() {
             it('#on with asyncIterator and "for await ... of"', async function() {
-                const ee = new EventEmitterEx();
+                const ee = new EventEmitterX();
                 const ac = new AbortController();
 
-                const createEventsAsyncIterator = function(ee: EventEmitterEx, event: EventName, signal: AbortSignal) {
+                const createEventsAsyncIterator = function(ee: EventEmitterX, event: EventName, signal: AbortSignal) {
                     let deferred: Deferred | void;
                     let isAborted = false;
                     const eventsPool: (unknown[])[] = [];
@@ -2457,7 +2465,7 @@ describe('events', function() {
     }) as EmptyFunction);
 
     {// https://github.com/nodejs/node/blob/master/test/parallel/test-event-emitter-subclass.js
-        class EventEmitterExSubClass extends EventEmitterEx {
+        class EventEmitterXTestSubClass extends EventEmitterX {
             on(...args: unknown[]) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
@@ -2471,19 +2479,19 @@ describe('events', function() {
             }
         }
 
-        describe('EventEmitter subclass', checkEventEmitter.bind(null, EventEmitterExSubClass));
+        describe('EventEmitter subclass', checkEventEmitter.bind(null, EventEmitterXTestSubClass));
     }
 
     describe('EventEmitterSimpleProxy', function() {
         it('instanceof', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
 
             expect(new EventEmitterSimpleProxy({ emitter })).toBeInstanceOf(EventEmitterSimpleProxy);
-            expect(new EventEmitterSimpleProxy({ emitter })).toBeInstanceOf(EventEmitterEx);
+            expect(new EventEmitterSimpleProxy({ emitter })).toBeInstanceOf(EventEmitterX);
         });
 
         it('destructor', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterSimpleProxy({
                 emitter,
             });
@@ -2514,7 +2522,7 @@ describe('events', function() {
         });
 
         it('example', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterSimpleProxy({
                 emitter,
             });
@@ -2566,7 +2574,7 @@ describe('events', function() {
         });
 
         it('two-way #emit', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterSimpleProxy({
                 emitter,
             });
@@ -2593,11 +2601,11 @@ describe('events', function() {
     describe('EventEmitterProxy', function() {
         it('instanceof', function() {
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
-            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterEx);
+            expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterX);
         });
 
         it('destructor', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterProxy({
                 sourceEmitter: emitter,
             });
@@ -2628,7 +2636,7 @@ describe('events', function() {
         });
 
         it('example', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterProxy({
                 sourceEmitter: emitter,
                 targetEmitter: emitter,
@@ -2681,7 +2689,7 @@ describe('events', function() {
         });
 
         it('options.allowDirectEmitToTarget', function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const proxy = new EventEmitterProxy({
                 sourceEmitter: emitter,
                 targetEmitter: emitter,
@@ -2720,7 +2728,7 @@ describe('events', function() {
         });
 
         it('two-way #emit', function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const proxy = new EventEmitterProxy({
                 sourceEmitter: ee,
                 targetEmitter: ee,
@@ -2746,12 +2754,12 @@ describe('events', function() {
         it.todo('#removeAllListeners() with _proxyHook');
     });
 
-    const _EventEmitterEx_once = once;
+    const _EventEmitterX_once = once;
 
-    // tags: EventEmitter.once, EventEmitterEx.once, static once
+    // tags: EventEmitter.once, EventEmitterX.once, static once
     describe('events.once', function _EventEmitter_once() {
-        let EventEmitter = EventEmitterEx;
-        let once = _EventEmitterEx_once;
+        let EventEmitter = EventEmitterX;
+        let once = _EventEmitterX_once;
 
         {
             // eslint-disable-next-line prefer-rest-params
@@ -3635,9 +3643,9 @@ describe('events', function() {
             return promise;
         });
 
-        describe('abortable EventEmitterEx.once', function() {
+        describe('abortable EventEmitterX.once', function() {
             it('simple case', async function() {
-                await EventEmitterEx.once(ee, 'myevent', {
+                await EventEmitterX.once(ee, 'myevent', {
                     signal: AbortSignal.abort(),
                 }).then(() => {
                     throw new Error('test failed');
@@ -4430,10 +4438,10 @@ describe('events', function() {
         });
     });
 
-    // tags: EventEmitter.on, EventEmitterEx.on, static on
-    describe('events.on', function() {// more tests in test file for cftools/modules/EventEmitterEx/eventsAsyncIterator.ts
+    // tags: EventEmitter.on, EventEmitterX.on, static on
+    describe('events.on', function() {// more tests in test file for cftools/modules/EventEmitterX/eventsAsyncIterator.ts
         it('simple case', async function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const values: string[] = [];
 
             setImmediate(() => {
@@ -4444,7 +4452,7 @@ describe('events', function() {
                 emitter.emit('value', '-invalid-test2');
             });
 
-            for await (const [ value ] of EventEmitterEx.on(emitter, 'value')) {
+            for await (const [ value ] of EventEmitterX.on(emitter, 'value')) {
                 values.push(value as string);
 
                 if (values.length > 2) {
@@ -4460,7 +4468,7 @@ describe('events', function() {
         });
 
         it('aborted by AbortSignal', async function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const ac = new AbortController();
             const values: string[] = [];
 
@@ -4476,7 +4484,7 @@ describe('events', function() {
             });
 
             try {
-                for await (const [ value ] of EventEmitterEx.on(emitter, 'value', {
+                for await (const [ value ] of EventEmitterX.on(emitter, 'value', {
                     signal: ac.signal,
                 })) {
                     values.push(value as string);
@@ -4494,7 +4502,7 @@ describe('events', function() {
         });
 
         it('stop by stopEventName', async function() {
-            const emitter = new EventEmitterEx();
+            const emitter = new EventEmitterX();
             const stopEventName = Symbol('stop-iterator');
             const values: string[] = [];
 
@@ -4509,7 +4517,7 @@ describe('events', function() {
                 emitter.emit('value', '-invalid-test2');
             });
 
-            for await (const [ value ] of EventEmitterEx.on(emitter, 'value', {
+            for await (const [ value ] of EventEmitterX.on(emitter, 'value', {
                 stopEventName,
             })) {
                 values.push(value as string);
@@ -4525,7 +4533,7 @@ describe('events', function() {
 
     describe('TypeScript tests', function() {
         it('types', function() {
-            const ee = new EventEmitterEx<{
+            const ee = new EventEmitterX<{
                 'test1': (a: string, ...args: number[]) => void,
                 'test2': (name: EventName, listener: Listener, a: string, b: number) => void,
             }>();
@@ -4543,7 +4551,7 @@ describe('events', function() {
                     expect((error as unknown) instanceof Error).toBe(true);
                 });
                 /*
-                ee.on(EventEmitterEx.errorMonitor, (error) => {
+                ee.on(EventEmitterX.errorMonitor, (error) => {
                     expect(error instanceof Error).toBe(true);
                 });
                 */
@@ -4652,28 +4660,28 @@ describe('events', function() {
             }
         });
 
-        it('isEventEmitterEx from this context', function() {
-            const eventEmitterEx = new EventEmitterEx();
+        it('isEventEmitterX from this context', function() {
+            const eventEmitterEx = new EventEmitterX();
 
-            expect(isEventEmitterEx(eventEmitterEx)).toBe(true);
+            expect(isEventEmitterX(eventEmitterEx)).toBe(true);
 
             const eventEmitterSimpleProxy = new EventEmitterSimpleProxy({ emitter: eventEmitterEx });
 
-            expect(isEventEmitterEx(eventEmitterSimpleProxy)).toBe(true);
+            expect(isEventEmitterX(eventEmitterSimpleProxy)).toBe(true);
 
             const eventEmitterProxy = new EventEmitterProxy({ targetEmitter: eventEmitterEx });
 
-            expect(isEventEmitterEx(eventEmitterProxy)).toBe(true);
+            expect(isEventEmitterX(eventEmitterProxy)).toBe(true);
         });
 
-        it('isEventEmitterEx from another context', function() {
+        it('isEventEmitterX from another context', function() {
             // eslint-disable-next-line unicorn/no-console-spaces
             // console.info(' ---- ', require.resolve('../../modules/events'));
             const contextObject = {
                 events_module_path: require.resolve('../../modules/events'),
                 __filename,
                 currentRequire: require,
-                EventEmitterEx: void 0 as typeof EventEmitterEx | undefined,
+                EventEmitterX: void 0 as typeof EventEmitterX | undefined,
             };
 
             // Нужно это вызвать, чтобы require который создасться функцией createRequire, не залезал в кеш уже
@@ -4683,17 +4691,17 @@ describe('events', function() {
             // language=js
             runInNewContext(`
             const require = currentRequire('node:module').createRequire(__filename);
-            const { EventEmitterEx } = require(globalThis.events_module_path);
-            globalThis.EventEmitterEx = EventEmitterEx;
+            const { EventEmitterX } = require(globalThis.events_module_path);
+            globalThis.EventEmitterX = EventEmitterX;
             `, contextObject);
 
-            expect(contextObject.EventEmitterEx).toBeDefined();
-            expect(contextObject.EventEmitterEx).not.toBe(EventEmitterEx);
+            expect(contextObject.EventEmitterX).toBeDefined();
+            expect(contextObject.EventEmitterX).not.toBe(EventEmitterX);
 
-            const eeex = new contextObject.EventEmitterEx!();
+            const eeex = new contextObject.EventEmitterX!();
 
             expect(isEventEmitterCompatible(eeex)).toBe(true);
-            expect(isEventEmitterEx(eeex)).toBe(true);
+            expect(isEventEmitterX(eeex)).toBe(true);
         });
     });
 });

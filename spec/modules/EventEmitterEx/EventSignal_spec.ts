@@ -21,7 +21,7 @@ import {
     __test__get_subscribersEventsEmitter,
 } from "../../../modules/EventEmitterEx/EventSignal";
 // import { isAbortError } from "../../../common/AbortController";
-import { EventEmitterEx, once, on } from "../../../modules/events";
+import { EventEmitterX, once, on } from "../../../modules/events";
 import { ProgressControllerX } from 'termi@ProgressControllerX';
 import {
     getEventListeners,
@@ -186,7 +186,7 @@ describe('EventSignal', () => {
         });
 
         it('common case with events-updated Store: simple', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const usersStore = new UsersStore(ee);
             // Firstly unknown user
             const $userName = usersStore.getUserNameSignal(1);
@@ -224,7 +224,7 @@ describe('EventSignal', () => {
         });
 
         it('common case with events-updated Store: complex', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const usersStore = new UsersStore(ee, defaultUsers);
             const $user1Name = usersStore.getUserNameSignal(1);
             const $user2Name = usersStore.getUserNameSignal(2);
@@ -346,7 +346,7 @@ describe('EventSignal', () => {
 
     describe('with options.[sourceMap/sourceFilter]', function() {
         it('EventEmitter - with map', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const $signal1 = new EventSignal(0, {
                 description: 'signal from another emitter',
                 sourceEmitter: ee,
@@ -400,7 +400,7 @@ describe('EventSignal', () => {
         });
 
         it('EventEmitter - with filter', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const $signal1 = new EventSignal(0, {
                 description: 'signal from another emitter',
                 sourceEmitter: ee,
@@ -434,7 +434,7 @@ describe('EventSignal', () => {
         });
 
         it('EventEmitter - with map and filter', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const $signal1 = new EventSignal(0, {
                 description: 'signal from another emitter',
                 sourceEmitter: ee,
@@ -511,7 +511,7 @@ describe('EventSignal', () => {
         });
 
         it('EventEmitter - complex: computation with options.[sourceMap/sourceFilter]', async function() {
-            const ee = new EventEmitterEx();
+            const ee = new EventEmitterX();
             const kSomeEvent = Symbol('kSomeEvent');
             const $signal = new EventSignal(0, {
                 description: '$signal',
@@ -650,7 +650,7 @@ describe('EventSignal', () => {
     // todo: Async computation is experimental!
     describe('with async computation', function() {
         it('async computation1', async function() {
-            const usersStore = new UsersStore(new EventEmitterEx(), defaultUsers);
+            const usersStore = new UsersStore(new EventEmitterX(), defaultUsers);
             const user1 = usersStore.getUserSync(1);
             const user2 = usersStore.getUserSync(2);
 
@@ -710,7 +710,7 @@ describe('EventSignal', () => {
         });
 
         it('async computation2', async function() {
-            const usersStore = new UsersStore(new EventEmitterEx(), defaultUsers);
+            const usersStore = new UsersStore(new EventEmitterX(), defaultUsers);
             const $currentUser = new EventSignal<UserOrNull, number>(null, (prevValue, userId) => {
                 if ($currentUser.computationsCount < 3) {
                     if (prevValue !== null) {
@@ -1146,7 +1146,7 @@ describe('EventSignal', () => {
                 }));
             });
 
-            it('should work with EventEmitterEx.on *1', async () => {
+            it('should work with EventEmitterX.on *1', async () => {
                 const $source = new EventSignal(0, {
                     description: '$source',
                 });
@@ -1177,7 +1177,7 @@ describe('EventSignal', () => {
 
                     values.push(value);
 
-                    // todo: Сейчас нет "правильного" способа остановить asyncIterator генерируемый EventEmitterEx.on.
+                    // todo: Сейчас нет "правильного" способа остановить asyncIterator генерируемый EventEmitterX.on.
                     //  Нужно что-то придумать.
                     if (index === 5) {
                         break;
@@ -1192,7 +1192,7 @@ describe('EventSignal', () => {
                 ]);
             });
 
-            it('should work with EventEmitterEx.on *2', async () => {
+            it('should work with EventEmitterX.on *2', async () => {
                 const $firstName = new EventSignal('...', {
                     description: '$firstName',
                 });
@@ -1836,7 +1836,7 @@ class UsersStore {
     users: User[] = [];
     userNameSignalSignals: Record<number, EventSignal<string, number, { userId: number, computationCounter: number }>> = Object.create(null);
 
-    constructor(public emitter: EventEmitterEx, users?: User[]) {
+    constructor(public emitter: EventEmitterX, users?: User[]) {
         emitter.addListener('user-add', (user: User) => {
             const { id: userId } = user;
 
