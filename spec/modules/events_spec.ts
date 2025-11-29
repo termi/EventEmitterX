@@ -57,7 +57,7 @@ import events, {
     kDestroyingEvent,
     ABORT_ERR,
 
-    once,
+    once, EventEmitterEx2,
 } from '../../modules/events';
 import { assertIsDefined, assertIsString } from 'termi@type_guards';
 import ServerTiming from 'termi@ServerTiming';
@@ -2457,7 +2457,7 @@ describe('events', function() {
     }) as EmptyFunction);
 
     describe('EventEmitterEx 2', () => {
-        const ee = new EventEmitterEx();
+        const ee = new EventEmitterEx2();
         const enum TEST_EVENTS {
             roomNew = 1 << 20,
             roomJoin = 2 << 20,
@@ -2477,14 +2477,14 @@ describe('events', function() {
             expect(counterEvents).toBe(1);
             expect(counterEvents_raw).toBe(0);
 
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin)).toBe(1);
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
             //
             ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents);
             ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
             //
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin)).toBe(0);
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
         });
 
         it("method on() - emit raw event", () => {
@@ -2501,14 +2501,14 @@ describe('events', function() {
             expect(counterEvents).toBe(0);
             expect(counterEvents_raw).toBe(1);
 
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin)).toBe(1);
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(1);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(1);
             //
             ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents);
             ee.removeListener2(TEST_EVENTS.roomJoin, listenerEvents_raw, { isRaw: true });
             //
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin)).toBe(0);
-            expect(ee.listenerCount2(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin)).toBe(0);
+            expect(ee.listenerCount(TEST_EVENTS.roomJoin, { isRaw: true })).toBe(0);
         });
     });
 
