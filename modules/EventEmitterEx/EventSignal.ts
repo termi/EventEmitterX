@@ -36,9 +36,6 @@ let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
 
-const _EventSignal__UpdateFlags__wasDepsUpdate = 1 << 1;
-const _EventSignal__UpdateFlags__wasSourceSetting = 1 << 2;
-
 export class EventSignal<T, S=T, D=undefined> {
     public readonly id = ++idIncrement;
     /**
@@ -57,8 +54,8 @@ export class EventSignal<T, S=T, D=undefined> {
     // // this symbol can be used for any public-related data, such as logging, counters etc
     // private readonly _uniqueSymbol: symbol;
     private readonly _signalSymbol: symbol;
+    private _stateFlags: EventSignal.StateFlags = 0;
     private _version = 0;
-    private _updateFlags = 0;
     private _computationsCount = 0;
     private _componentVersion = 0;
     private _computationPromise: Promise<T> | null = null;
@@ -68,30 +65,28 @@ export class EventSignal<T, S=T, D=undefined> {
     private _resolve: ((newValue: T) => void) | undefined;
     private readonly _abortSignal?: AbortSignal;
     private readonly _oneOfDepUpdated = () => {
-        this._updateFlags |= _EventSignal__UpdateFlags__wasDepsUpdate;
-
-        if (!this._isNeedToCompute) {
-            this._isNeedToCompute = true;
+        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCompute) === 0) {
+            // this._isNeedToCompute = true;
+            this._stateFlags |= (EventSignal.StateFlags.isNeedToCompute
+                | EventSignal.StateFlags.wasDepsUpdate
+            );
 
             // todo: В конструкторе EventSignal может приходить кастомный EventsEmitter.
             // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
             signalEventsEmitter.emit(this._signalSymbol);
         }
+        else {
+            this._stateFlags |= EventSignal.StateFlags.wasDepsUpdate;
+        }
 
         this._recalculateIfNeeded();
     };
     private readonly _computation?: EventSignal.ComputationWithSource<T, S, D>;
-    private readonly hasComputation: boolean;
-    protected _isNeedToCompute = true;
     protected _isInReactRenders: Set<EventSignal.ReactFC<any, any, any, any>> | undefined;
-    protected _nowInSettings = false;
-    protected _nowInComputing = false;
-    protected _hasSourceEmitter = false;
     private _sourceValue: S | undefined;
     // todo: add `statusData?: any;`?
     public readonly status?: string;
     public readonly lastError?: Error | string;
-    public isDestroyed = false;
     /** WeakRef or replacement object */
     private readonly _sourceEmitterRef?: { deref(): EventEmitter | EventEmitterX | EventTarget | undefined };
     private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceMap"];
@@ -198,7 +193,10 @@ export class EventSignal<T, S=T, D=undefined> {
             _oneOfDepUpdated,
         } = this;
 
-        this.hasComputation = typeof _computation === 'function';
+        if (typeof _computation === 'function') {
+            this._stateFlags |= (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCompute);
+        }
+
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
         this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D>)?.initialSourceValue ?? void 0;
 
@@ -219,6 +217,8 @@ export class EventSignal<T, S=T, D=undefined> {
             } = options as EventSignal.NewOptionsWithSource<T, S, D>;
 
             if (Array.isArray(deps) && deps.length > 0) {
+                this._stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
+
                 for (const { eventName } of deps) {
                     _subscriptionsToDeps.add(eventName);
 
@@ -236,7 +236,8 @@ export class EventSignal<T, S=T, D=undefined> {
                 this._sourceFilterFn = sourceFilter;
                 this._initialComputations = [];
 
-                this._hasSourceEmitter = true;
+                // this._hasSourceEmitter = true;
+                this._stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
 
                 const events = Array.isArray(sourceEvent) ? sourceEvent : [ sourceEvent ];
 
@@ -317,7 +318,8 @@ export class EventSignal<T, S=T, D=undefined> {
         const has_finaleValue = _finaleValue !== void 0;
         const has_finaleSourceValue = _finaleSourceValue !== void 0;
 
-        this.isDestroyed = true;
+        // this.isDestroyed = true;
+        this._stateFlags |= EventSignal.StateFlags.isDestroyed;
 
         //todo: Сейчас не работает
         // EventSignal._setComponentOnDestroy(this);
@@ -369,7 +371,13 @@ export class EventSignal<T, S=T, D=undefined> {
             this._sourceValue = void 0;
         }
 
-        this._hasSourceEmitter = false;
+        this._stateFlags &= ~(EventSignal.StateFlags.hasSourceEmitter
+            | EventSignal.StateFlags.nowInComputing
+            | EventSignal.StateFlags.nowInSettings
+            | EventSignal.StateFlags.isNeedToCompute
+            | EventSignal.StateFlags.wasDepsUpdate
+            | EventSignal.StateFlags.wasSourceSetting
+        );
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore readonly attribute
         this._sourceEmitterRef = void 0;
@@ -422,6 +430,10 @@ export class EventSignal<T, S=T, D=undefined> {
         this.destructor();
     }
 
+    get isDestroyed() {
+        return (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0;
+    }
+
     private _abortHandler = () => {
         this.destructor();
     };
@@ -464,7 +476,7 @@ export class EventSignal<T, S=T, D=undefined> {
             _sourceValue,
         } = this;
 
-        if (this.hasComputation && !ignoreComputation) {
+        if ((this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0 && !ignoreComputation) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
             this.lastError = void 0;
@@ -491,7 +503,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 throw new Error(`Depends on own value`);
             }
 
-            if (this._nowInComputing) {
+            if ((this._stateFlags & EventSignal.StateFlags.nowInComputing) !== 0) {
                 throw new Error(`Now in computing state (cycle deps?)`);
             }
 
@@ -506,7 +518,8 @@ export class EventSignal<T, S=T, D=undefined> {
             // eslint-disable-next-line unicorn/no-this-assignment
             currentSignal = this;
 
-            this._nowInComputing = true;
+            // this._nowInComputing = true;
+            this._stateFlags |= EventSignal.StateFlags.nowInComputing;
 
             try {
                 this._computationsCount++;
@@ -514,8 +527,11 @@ export class EventSignal<T, S=T, D=undefined> {
                 // Если в _computation нужны _updateFlags они должны быть прочитаны сразу, в синхронном коде.
                 const newValue = _computation(prevValue, _sourceValue, this);
 
-                this._updateFlags = 0;
-                this._isNeedToCompute = false;
+                // this._updateFlags = 0;this._isNeedToCompute = false;
+                this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCompute
+                    | EventSignal.StateFlags.wasDepsUpdate
+                    | EventSignal.StateFlags.wasSourceSetting
+                );
 
                 // fixme: Async computation is experimental!
                 //  И сейчас есть проблема со значением currentSignal, потому что если внутри _computation
@@ -614,11 +630,13 @@ export class EventSignal<T, S=T, D=undefined> {
             }
             finally {
                 currentSignal = prev_currentSignal;
-                this._nowInComputing = false;
+                // this._nowInComputing = false;
+                this._stateFlags &= ~EventSignal.StateFlags.nowInComputing;
             }
         }
         else {
-            this._isNeedToCompute = false;
+            // this._isNeedToCompute = false;
+            this._stateFlags &= ~EventSignal.StateFlags.isNeedToCompute;
 
             // note: If prevValue is Promise here, we really dont care
             const prevValue = this._value;
@@ -628,7 +646,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 newValue = _sourceValue as unknown as T;
             }
 
-            const not_nowInSettings = !this._nowInSettings;
+            const not_nowInSettings = (this._stateFlags & EventSignal.StateFlags.nowInSettings) === 0;
 
             if (not_nowInSettings) {
                 let isNeedToUpdate = newValue !== void 0;
@@ -647,7 +665,8 @@ export class EventSignal<T, S=T, D=undefined> {
                 if (isNeedToUpdate) {
                     this._version++;
                     this._value = newValue;
-                    this._nowInSettings = true;
+                    // this._nowInSettings = true;
+                    this._stateFlags |= EventSignal.StateFlags.nowInSettings;
 
                     try {
                         this._resolveIfNeeded(newValue);
@@ -655,8 +674,11 @@ export class EventSignal<T, S=T, D=undefined> {
                         subscribersEventsEmitter.emit(this._signalSymbol, newValue);
                     }
                     finally {
-                        this._nowInSettings = false;
-                        this._updateFlags = 0;
+                        // this._nowInSettings = false; this._updateFlags = 0;
+                        this._stateFlags &= ~(EventSignal.StateFlags.nowInSettings
+                            | EventSignal.StateFlags.wasDepsUpdate
+                            | EventSignal.StateFlags.wasSourceSetting
+                        );
                     }
                 }
             }
@@ -673,7 +695,7 @@ export class EventSignal<T, S=T, D=undefined> {
     };
 
     private _innerGet() {
-        if (this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return this._value;
         }
 
@@ -681,7 +703,7 @@ export class EventSignal<T, S=T, D=undefined> {
     }
 
     get = () => {
-        if (this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             if (currentSignal && currentSignal !== this) {
                 // todo: currentSignal._unsubscribeFrom(this._signalSymbol);
                 void 0;
@@ -694,7 +716,7 @@ export class EventSignal<T, S=T, D=undefined> {
             currentSignal._subscribeTo(this._signalSymbol);
         }
 
-        if (this._isNeedToCompute) {
+        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCompute) !== 0) {
             const maybePromise = this._calculateValue();
 
             if (maybePromise) {
@@ -726,8 +748,8 @@ export class EventSignal<T, S=T, D=undefined> {
         return this._sourceValue;
     };
 
-    getUpdateFlags() {
-        return this._updateFlags;
+    getStateFlags() {
+        return this._stateFlags;
     }
 
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
@@ -798,11 +820,12 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         if (isNeedToUpdate) {
-            this._updateFlags |= _EventSignal__UpdateFlags__wasSourceSetting;
+            this._stateFlags |= EventSignal.StateFlags.wasSourceSetting;
             this._sourceValue = newSourceValue;
 
-            if (!this._nowInComputing) {
-                this._isNeedToCompute = true;
+            if ((this._stateFlags & EventSignal.StateFlags.nowInComputing) === 0) {
+                // this._isNeedToCompute = true;
+                this._stateFlags |= EventSignal.StateFlags.isNeedToCompute;
 
                 signalEventsEmitter.emit(this._signalSymbol);
 
@@ -1008,7 +1031,7 @@ export class EventSignal<T, S=T, D=undefined> {
             shouldReturnThis = true;
         }
 
-        if (this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             if (shouldReturnThis) {
                 return this;
             }
@@ -1778,6 +1801,21 @@ export namespace EventSignal {
         closed: boolean,
         __proto__?: null,
     };
+
+    export const enum StateFlags {
+        wasDepsUpdate = 1 << 1,
+        wasSourceSetting = 1 << 2,
+
+        isNeedToCompute = 1 << 8,
+        hasSourceEmitter = 1 << 9,
+        hasComputation = 1 << 10,
+        hasDepsFromProps = 1 << 11,
+
+        nowInSettings = 1 << 15,
+        nowInComputing = 1 << 16,
+
+        isDestroyed = 1 << 30,
+    }
 }
 
 type _PreDefinedProps<PROPS=any> = Omit<Partial<PROPS>, 'componentType' | 'eventSignal' | 'version'>;
