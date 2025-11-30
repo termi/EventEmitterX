@@ -84,6 +84,45 @@ describe('EventSignal', () => {
             expect($computedSignal1.version).toBe(3);
         });
 
+        it('with objects value', async function() {
+            const signal1$ = new EventSignal({ a: 1 });
+            const signal2$ = new EventSignal({ b: 1 });
+            const computedSignal1$ = new EventSignal(`#{0}-#{0}`, (prev) => {
+                const objA = signal1$.get();
+                const objB = signal2$.get();
+                const args = [ objA.a, objB.b ];
+
+                return prev.replace(/#{(\d+)}/g, function(_, curr) {
+                    return `#{${args.shift() || curr || 0}}`;
+                });
+            });
+
+            expect(computedSignal1$.get()).toBe(`#{1}-#{1}`);
+            expect(computedSignal1$.version).toBe(1);
+
+            signal1$.set(obj => ({ ...obj, a: obj.a + 1 }));
+
+            expect(computedSignal1$.get()).toBe(`#{2}-#{1}`);
+            expect(computedSignal1$.version).toBe(2);
+
+            const objA = signal1$.get();
+            const objB = signal2$.get();
+
+            // Object mutation. No effect to signal.
+            objA.a++;
+            // Setting the same object. No effect to signal.
+            signal2$.set(objB);
+
+            expect(computedSignal1$.get()).toBe(`#{2}-#{1}`);
+            expect(computedSignal1$.version).toBe(2);
+
+            signal1$.set(obj => ({ ...obj, a: obj.a + 1 }));
+            signal2$.set(obj => ({ ...obj, b: obj.b + 1 }));
+
+            expect(computedSignal1$.get()).toBe(`#{4}-#{2}`);
+            expect(computedSignal1$.version).toBe(3);
+        });
+
         it('show how dependency works', async function() {
             const $numericValue = new EventSignal(0, {
                 description: '$numericValue',
@@ -1445,7 +1484,7 @@ describe('EventSignal', () => {
             $computed1.get();
 
             queueMicrotask(async () => {
-                for await (const index of _asyncIterator(0, 5)) {
+                for await (const index of _asyncIterator(0, 10)) {
                     $source.set(index);
                 }
 
@@ -1480,18 +1519,20 @@ describe('EventSignal', () => {
             expect(values1).toEqual([
                 'Value is: 1',
                 'Value is: 4',
+                'Value is: 7',
             ]);
 
             expect(values2).toEqual([
-                '(2) Value is: 0',
-                '(2) Value is: 3',
+                '(2) Value is: 1',
+                '(2) Value is: 4',
+                '(2) Value is: 7',
             ]);
 
             // $computed1 закрылся ДО запроса самого последнего обновления, поэтому в нём НЕ самое последнее значение из $source
-            expect($computed1.get()).toBe('Value is: 4');
-            // $computed2 закрылся ПОСЛЕ самого последнего обновления, поэтому в нём самое последнее значение из $source (почему так, хз и ещё предстоит выяснить)
-            expect($computed2.get()).toBe('(2) Value is: 3');
-            expect($source.get()).toBe(4);
+            expect($computed1.get()).toBe('Value is: 7');
+            // $computed2 закрылся ДО запроса самого последнего обновления, поэтому в нём НЕ самое последнее значение из $source
+            expect($computed2.get()).toBe('(2) Value is: 7');
+            expect($source.get()).toBe(9);
         });
 
         it('should handle destructor as iterator stop with for-await-of *3', async () => {

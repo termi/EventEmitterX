@@ -544,12 +544,20 @@ export class EventSignal<T, S=T, D=undefined> {
                         this._computationPromise = null;
                         this._setStatus('default');
 
-                        if (newValue !== void 0
-                            && (
-                                typeof newValue === 'object'
-                                || !Object.is(prevValue, newValue)
-                            )
-                        ) {
+                        let isNeedToUpdate = newValue !== void 0;
+
+                        if (isNeedToUpdate) {
+                            if (typeof newValue === 'object') {
+                                {
+                                    isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                                }
+                            }
+                            else {
+                                isNeedToUpdate = !Object.is(prevValue, newValue);
+                            }
+                        }
+
+                        if (isNeedToUpdate) {
                             this._version++;
                             this._value = newValue;
                             this._resolveIfNeeded(newValue);
@@ -583,12 +591,20 @@ export class EventSignal<T, S=T, D=undefined> {
                     return computationPromise;
                 }
 
-                if (newValue !== void 0
-                    && (
-                        typeof newValue === 'object'
-                        || !Object.is(prevValue, newValue)
-                    )
-                ) {
+                let isNeedToUpdate = newValue !== void 0;
+
+                if (isNeedToUpdate) {
+                    if (typeof newValue === 'object') {
+                        {
+                            isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                        }
+                    }
+                    else {
+                        isNeedToUpdate = !Object.is(prevValue, newValue);
+                    }
+                }
+
+                if (isNeedToUpdate) {
                     this._version++;
                     this._value = newValue;
                     this._resolveIfNeeded(newValue);
@@ -612,8 +628,23 @@ export class EventSignal<T, S=T, D=undefined> {
                 newValue = _sourceValue as unknown as T;
             }
 
-            if (!this._nowInSettings && newValue !== void 0) {
-                if (!Object.is(prevValue, newValue)) {
+            const not_nowInSettings = !this._nowInSettings;
+
+            if (not_nowInSettings) {
+                let isNeedToUpdate = newValue !== void 0;
+
+                if (isNeedToUpdate) {
+                    if (typeof newValue === 'object') {
+                        {
+                            isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                        }
+                    }
+                    else {
+                        isNeedToUpdate = !Object.is(prevValue, newValue);
+                    }
+                }
+
+                if (isNeedToUpdate) {
                     this._version++;
                     this._value = newValue;
                     this._nowInSettings = true;
@@ -749,14 +780,21 @@ export class EventSignal<T, S=T, D=undefined> {
         checkValueIsSame = false,
         ignoreUndefinedNewSourceValue = false,
     ) {
-        const { _sourceValue } = this;
+        const _sourceValue = this._sourceValue ?? this._value;
         let isNeedToUpdate = newSourceValue !== void 0 || ignoreUndefinedNewSourceValue;
 
         if (isNeedToUpdate) {
-            isNeedToUpdate = (!checkValueIsSame || this.status === 'error' || (
-                typeof _sourceValue === 'object'
-                || !Object.is(newSourceValue, _sourceValue)
-            ));
+            if (!checkValueIsSame || this.status === 'error') {
+                // nothing to do
+            }
+            else if (typeof _sourceValue === 'object') {
+                {
+                    isNeedToUpdate = !_shallowEqualObjects(_sourceValue, newSourceValue);
+                }
+            }
+            else {
+                isNeedToUpdate = !Object.is(_sourceValue, newSourceValue);
+            }
         }
 
         if (isNeedToUpdate) {
@@ -1756,7 +1794,7 @@ function _isReactComponentObject(object: { $$typeof?: unknown, type?: unknown, [
     ;
 }
 
-function _shallowEqualObjects(obj1: Object | null | undefined, obj2: Object | null | undefined) {
+function _shallowEqualObjects(obj1: unknown | null | undefined, obj2: unknown | null | undefined) {
     if (obj1 === obj2
         || (obj1 == null && obj2 == null)
     ) {
@@ -1768,16 +1806,15 @@ function _shallowEqualObjects(obj1: Object | null | undefined, obj2: Object | nu
     }
 
     const keys1 = Object.keys(obj1);
-    const keys2 = Object.keys(obj2);
 
-    if (keys1.length !== keys2.length) {
+    if (keys1.length !== Object.keys(obj2).length) {
         return false;
     }
 
     for (let i = 0, len = keys1.length ; i < len ; i++) {
         const key = keys1[i] as NonNullable<typeof keys1[0]>;
 
-        if (keys2[i] !== key || obj1[key] !== obj2[key]) {
+        if (obj1[key] !== obj2[key]) {
             return false;
         }
     }
