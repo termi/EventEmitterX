@@ -242,6 +242,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 const events = Array.isArray(sourceEvent) ? sourceEvent : [ sourceEvent ];
 
                 for (const event of events) {
+                    // todo: Подсчитывать количество вызовов по событию?
                     const _initialComputation = (...args: unknown[]) => {
                         args.unshift(event);
 
@@ -261,14 +262,20 @@ export class EventSignal<T, S=T, D=undefined> {
                             return;
                         }
 
+                        this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
+
                         const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
 
-                        this._setSourceValue(
+                        const isNeedToUpdate = this._setSourceValue(
                             newSourceValue,
                             // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
                             false,
                             newSourceValue === void 0,
                         );
+
+                        if (!isNeedToUpdate) {
+                            this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
+                        }
                     };
 
                     this._initialComputations.push([
@@ -377,6 +384,7 @@ export class EventSignal<T, S=T, D=undefined> {
             | EventSignal.StateFlags.isNeedToCompute
             | EventSignal.StateFlags.wasDepsUpdate
             | EventSignal.StateFlags.wasSourceSetting
+            | EventSignal.StateFlags.wasSourceSettingFromEvent
         );
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore readonly attribute
@@ -531,6 +539,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCompute
                     | EventSignal.StateFlags.wasDepsUpdate
                     | EventSignal.StateFlags.wasSourceSetting
+                    | EventSignal.StateFlags.wasSourceSettingFromEvent
                 );
 
                 // fixme: Async computation is experimental!
@@ -564,7 +573,13 @@ export class EventSignal<T, S=T, D=undefined> {
 
                         if (isNeedToUpdate) {
                             if (typeof newValue === 'object') {
-                                {
+                                if ((this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0) {
+                                    this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                                }
+                                else if ((this._stateFlags & EventSignal.StateFlags.valuesAsObjectShouldBeForceSettled) !== 0) {
+                                    // nothing to do
+                                }
+                                else {
                                     isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
                                 }
                             }
@@ -611,7 +626,13 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 if (isNeedToUpdate) {
                     if (typeof newValue === 'object') {
-                        {
+                        if ((this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0) {
+                            this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                        }
+                        else if ((this._stateFlags & EventSignal.StateFlags.valuesAsObjectShouldBeForceSettled) !== 0) {
+                            // nothing to do
+                        }
+                        else {
                             isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
                         }
                     }
@@ -622,8 +643,8 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 if (isNeedToUpdate) {
                     this._version++;
-                    this._value = newValue;
-                    this._resolveIfNeeded(newValue);
+                    this._value = newValue as NonNullable<typeof newValue>;
+                    this._resolveIfNeeded(newValue as NonNullable<typeof newValue>);
 
                     subscribersEventsEmitter.emit(this._signalSymbol, newValue);
                 }
@@ -653,7 +674,13 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 if (isNeedToUpdate) {
                     if (typeof newValue === 'object') {
-                        {
+                        if ((this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0) {
+                            this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                        }
+                        else if ((this._stateFlags & EventSignal.StateFlags.valuesAsObjectShouldBeForceSettled) !== 0) {
+                            // nothing to do
+                        }
+                        else {
                             isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
                         }
                     }
@@ -664,12 +691,12 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 if (isNeedToUpdate) {
                     this._version++;
-                    this._value = newValue;
+                    this._value = newValue as NonNullable<typeof newValue>;
                     // this._nowInSettings = true;
                     this._stateFlags |= EventSignal.StateFlags.nowInSettings;
 
                     try {
-                        this._resolveIfNeeded(newValue);
+                        this._resolveIfNeeded(newValue as NonNullable<typeof newValue>);
 
                         subscribersEventsEmitter.emit(this._signalSymbol, newValue);
                     }
@@ -678,6 +705,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         this._stateFlags &= ~(EventSignal.StateFlags.nowInSettings
                             | EventSignal.StateFlags.wasDepsUpdate
                             | EventSignal.StateFlags.wasSourceSetting
+                            | EventSignal.StateFlags.wasSourceSettingFromEvent
                         );
                     }
                 }
@@ -752,6 +780,10 @@ export class EventSignal<T, S=T, D=undefined> {
         return this._stateFlags;
     }
 
+    markNextValueAsForced() {
+        this._stateFlags |= EventSignal.StateFlags.nextValueShouldBeForceSettled;
+    }
+
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
     set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)) {
@@ -797,6 +829,7 @@ export class EventSignal<T, S=T, D=undefined> {
     //   }
     // }
 
+    // todo: Подсчитывать количество установок _sourceValue? Отдельно для одинаковых/undefined?
     private _setSourceValue(
         newSourceValue: S | undefined,
         checkValueIsSame = false,
@@ -810,7 +843,13 @@ export class EventSignal<T, S=T, D=undefined> {
                 // nothing to do
             }
             else if (typeof _sourceValue === 'object') {
-                {
+                if ((this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0) {
+                    this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                }
+                else if ((this._stateFlags & EventSignal.StateFlags.valuesAsObjectShouldBeForceSettled) !== 0) {
+                    // nothing to do
+                }
+                else {
                     isNeedToUpdate = !_shallowEqualObjects(_sourceValue, newSourceValue);
                 }
             }
@@ -1805,6 +1844,7 @@ export namespace EventSignal {
     export const enum StateFlags {
         wasDepsUpdate = 1 << 1,
         wasSourceSetting = 1 << 2,
+        wasSourceSettingFromEvent = 1 << 3,
 
         isNeedToCompute = 1 << 8,
         hasSourceEmitter = 1 << 9,
@@ -1813,6 +1853,9 @@ export namespace EventSignal {
 
         nowInSettings = 1 << 15,
         nowInComputing = 1 << 16,
+
+        nextValueShouldBeForceSettled = 1 << 20,
+        valuesAsObjectShouldBeForceSettled = 1 << 21,
 
         isDestroyed = 1 << 30,
     }
