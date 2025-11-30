@@ -121,6 +121,19 @@ describe('EventSignal', () => {
 
             expect(computedSignal1$.get()).toBe(`#{4}-#{2}`);
             expect(computedSignal1$.version).toBe(3);
+
+            {
+                const objA = signal1$.get();
+
+                // Object mutation. Has effect due calling of `markNextValueAsForced`.
+                objA.a++;
+                signal1$.markNextValueAsForced();
+                signal1$.set(objA);
+
+                expect(computedSignal1$.get()).toBe(`#{5}-#{2}`);
+                expect(computedSignal1$.version).toBe(4);
+                expect(objA).toBe(signal1$.get());
+            }
         });
 
         it('show how dependency works', async function() {
@@ -356,6 +369,57 @@ describe('EventSignal', () => {
             expect($user9Name.get()).toBe('Josef Bloggs');
             expect($user9Name.version).toBe(3);
             expect($user9Name.computationsCount).toBe(4);
+        });
+
+        it('common case with events-updated Store: working with mutated objects', async function() {
+            const ee = new EventEmitterX();
+            const usersStore = new UsersStore(ee);
+            const user1: User = { id: 1, firstName: 'Joe', secondName: 'Bloggs', age: 55 };
+            const user2: User = { id: 2, firstName: 'Jon', secondName: 'Dow', age: 21 };
+            const user$ = usersStore.getUserSignal(user1.id);
+
+            expect(user$.version).toBe(0);
+            expect(user$.get()).toBeNull();
+            expect(user$.version).toBe(0);
+            expect(user$.data.userId).toBe(user1.id);
+            expect(user$.get()).toBeNull();
+            expect(user$.version).toBe(0);
+
+            usersStore.addUser(user1);
+
+            expect(user$.get()).toEqual(user1);
+            expect(user$.version).toBe(1);
+
+            usersStore.updateUser(user1.id, {
+                secondName: 'Hoss',
+            });
+
+            expect(user$.get()).toEqual(user1);
+            expect(user$.get()?.secondName).toBe('Hoss');
+            expect(user$.version).toBe(2);
+
+            user$.set(user2.id);
+
+            expect(user$.get()).toBeNull();
+            expect(user$.version).toBe(3);
+            expect(user$.data.userId).toBe(user2.id);
+
+            usersStore.addUser(user2);
+
+            expect(user$.get()).toEqual(user2);
+            expect(user$.version).toBe(4);
+
+            user$.destructor();
+
+            usersStore.updateUser(user2.id, {
+                secondName: 'TuTu',
+            });
+
+            expect(user$.get()).toBe(user2);
+            // Has updated value due mutation
+            expect(user$.get()?.secondName).toBe('TuTu');
+            // Has no changes in version due no computation triggered after destructuring
+            expect(user$.version).toBe(4);
         });
     });
 
@@ -685,9 +749,11 @@ describe('EventSignal', () => {
         });
 
         it('computation value - return object', function() {
-            const $object = new EventSignal<{ numericValue: number }, number>({ numericValue: 0 }, (object, sourceValue) => {
+            const $object = new EventSignal<{ numericValue: number }, number>({ numericValue: 0 }, (object, sourceValue, eventSignal) => {
                 if (sourceValue != null) {
                     object.numericValue = sourceValue;
+
+                    eventSignal.markNextValueAsForced();
 
                     return object;
                 }
@@ -754,14 +820,14 @@ describe('EventSignal', () => {
             expect(await $currentUser.get()).toBe(user1);
             expect(usersStore.lastAsyncGetUser).toBeUndefined();
             expect($currentUser.computationsCount).toBe(2);
-            expect($currentUser.version).toBe(2);
+            expect($currentUser.version).toBe(1);
 
             // set to same value
             $currentUser.set(1);
 
             expect(await $currentUser.get()).toBe(user1);
             expect($currentUser.computationsCount).toBe(2);
-            expect($currentUser.version).toBe(2);
+            expect($currentUser.version).toBe(1);
 
             queueMicrotask(() => {
                 queueMicrotask(() => {
@@ -771,7 +837,19 @@ describe('EventSignal', () => {
 
             expect(await $currentUser.toPromise()).toBe(user2);
             expect($currentUser.computationsCount).toBe(3);
+            expect($currentUser.version).toBe(2);
+
+            $currentUser.set(1);
+
+            expect(await $currentUser.get()).toBe(user1);
+            expect($currentUser.computationsCount).toBe(4);
             expect($currentUser.version).toBe(3);
+
+            $currentUser.set(2);
+
+            expect(await $currentUser.get()).toBe(user2);
+            expect($currentUser.computationsCount).toBe(5);
+            expect($currentUser.version).toBe(4);
         });
 
         it('async computation2', async function() {
@@ -1902,6 +1980,7 @@ const defaultUsers: User[] = [
 class UsersStore {
     users: User[] = [];
     userNameSignalSignals: Record<number, EventSignal<string, number, { userId: number, computationCounter: number }>> = Object.create(null);
+    usersSignals: Record<number, EventSignal<User | null, number, { userId: number }>> = Object.create(null);
 
     constructor(public emitter: EventEmitterX, users?: User[]) {
         emitter.addListener('user-add', (user: User) => {
@@ -1958,11 +2037,34 @@ class UsersStore {
     async getUser(userId: number | undefined) {
         this.lastAsyncGetUser = userId;
 
-        return userId ? this.users.find(user => user.id === userId) : null;
+        return userId ? this.users.find(user => user.id === userId) ?? null : null;
     }
 
     getUserSync(userId: number | undefined) {
-        return userId ? this.users.find(user => user.id === userId) : null;
+        return userId ? this.users.find(user => user.id === userId) ?? null : null;
+    }
+
+    addUser(newUser: User) {
+        const user = this.getUserSync(newUser.id);
+
+        if (user) {
+            throw new Error(`User with this id (${newUser.id}) is already existed`);
+        }
+
+        this.emitter.emit('user-add', newUser satisfies User);
+    }
+
+    updateUser(userId: number, userProps: Partial<Omit<User, 'id'>>) {
+        const user = this.getUserSync(userId);
+
+        if (user) {
+            this.emitter.emit('user-update', [
+                userId,
+                userProps.firstName,
+                userProps.secondName,
+                userProps.age,
+            ] satisfies UserDTO);
+        }
     }
 
     getUserNameSignal(userId: number, finaleSourceValue?: number) {
@@ -1986,6 +2088,54 @@ class UsersStore {
             sourceEvent: `${userId}---username-changes`,
             finaleSourceValue,
             data: { userId, computationCounter: 0 },
+        });
+    }
+
+    getUserSignal(userId: number) {
+        // @ts-expect-error todo: Разобраться с типизацией
+        return this.usersSignals[userId] ??= new EventSignal<User | null, number, { userId: number }>(this.getUserSync(userId), (currentUser: User | null, sourceUserId: number | undefined, eventSignal): User | null | undefined => {
+            const stateFlags = eventSignal.getStateFlags();
+            const isNewSourceValue = (stateFlags & EventSignal.StateFlags.wasSourceSetting) !== 0
+                && sourceUserId != null
+            ;
+            const user = isNewSourceValue
+                ? this.getUserSync(sourceUserId)
+                : currentUser
+            ;
+
+            if (isNewSourceValue && sourceUserId != null && userId !== sourceUserId) {
+                userId = sourceUserId;
+                eventSignal.data.userId = sourceUserId;
+            }
+
+            if (!user) {
+                return null;
+            }
+
+            if ((stateFlags & EventSignal.StateFlags.wasSourceSettingFromEvent) !== 0) {
+                eventSignal.markNextValueAsForced();
+            }
+
+            return user;
+        }, {
+            sourceEmitter: this.emitter,
+            sourceEvent: [ 'user-update', 'user-add' ],
+            sourceFilter(eventName: unknown, data: User | UserDTO) {
+                if (eventName === 'user-update') {
+                    return (data as UserDTO)[0] === userId;
+                }
+                else if (eventName === 'user-add') {
+                    return (data as User).id === userId;
+                }
+
+                return false;
+            },
+            sourceMap(_eventName: unknown, _data: unknown) {
+                return userId;
+            },
+            data: {
+                userId,
+            },
         });
     }
 }
