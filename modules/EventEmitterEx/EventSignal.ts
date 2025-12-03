@@ -26,6 +26,9 @@ import { arrayContentStringify, stringifyWithCircularHandle, isRunningInWebDevMo
 const signalEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
+const triggerEventsEmitter = new EventEmitterX({
+    listenerOncePerEventType: true,
+});
 
 const subscribersEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
@@ -65,23 +68,44 @@ export class EventSignal<T, S=T, D=undefined> {
     private _promise: Promise<T> | undefined;
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
+    private _throttle: _TimerGroup | EventSignal<any> | ReturnType<typeof setInterval> | undefined;
     private readonly _abortSignal?: AbortSignal;
     private readonly _oneOfDepUpdated = () => {
-        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCompute) === 0) {
+        const stateFlags = this._stateFlags;
+        const hasNoThrottleOrWasForceUpdateTrigger = ((stateFlags & EventSignal.StateFlags.hasThrottle) === 0
+            || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+        );
+
+        if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) === 0) {
             // this._isNeedToCompute = true;
-            this._stateFlags |= (EventSignal.StateFlags.isNeedToCompute
+            this._stateFlags |= (EventSignal.StateFlags.isNeedToCalculateNewValue
                 | EventSignal.StateFlags.wasDepsUpdate
             );
+            this._stateFlags &= ~(EventSignal.StateFlags.wasSourceSetting
+                | EventSignal.StateFlags.wasSourceSettingFromEvent
+            );
 
-            // todo: В конструкторе EventSignal может приходить кастомный EventsEmitter.
-            // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
-            signalEventsEmitter.emit(this._signalSymbol);
+            if (hasNoThrottleOrWasForceUpdateTrigger) {
+                // todo: В конструкторе EventSignal может приходить кастомный EventsEmitter.
+                // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
+                signalEventsEmitter.emit(this._signalSymbol);
+            }
         }
         else {
             this._stateFlags |= EventSignal.StateFlags.wasDepsUpdate;
+            this._stateFlags &= ~(EventSignal.StateFlags.wasSourceSetting
+                | EventSignal.StateFlags.wasSourceSettingFromEvent
+            );
         }
 
-        this._recalculateIfNeeded();
+        if (hasNoThrottleOrWasForceUpdateTrigger) {
+            this._recalculateIfNeeded();
+        }
+    };
+    private readonly _onForceUpdateTrigger = () => {
+        this._stateFlags |= EventSignal.StateFlags.wasForceUpdateTrigger;
+
+        this._oneOfDepUpdated();
     };
     private readonly _computation?: EventSignal.ComputationWithSource<T, S, D>;
     protected _isInReactRenders: Set<EventSignal.ReactFC<any, any, any, any>> | undefined;
@@ -198,9 +222,12 @@ export class EventSignal<T, S=T, D=undefined> {
             _computation,
             _oneOfDepUpdated,
         } = this;
+        // note: `@scoped` is not in jsdoc standard. To use this you need to include the custom eslint rule.
+        /** @scoped variable can't be used in inner scope */
+        let stateFlags = this._stateFlags;
 
         if (typeof _computation === 'function') {
-            this._stateFlags |= (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCompute);
+            stateFlags |= (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue);
         }
 
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
@@ -220,10 +247,11 @@ export class EventSignal<T, S=T, D=undefined> {
                 signal: _abortSignal,
                 componentType,
                 reactFC,
+                throttle,
             } = options as EventSignal.NewOptionsWithSource<T, S, D>;
 
             if (Array.isArray(deps) && deps.length > 0) {
-                this._stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
+                stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
 
                 for (const { eventName } of deps) {
                     _subscriptionsToDeps.add(eventName);
@@ -243,7 +271,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 this._initialComputations = [];
 
                 // this._hasSourceEmitter = true;
-                this._stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
+                stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
 
                 const events = Array.isArray(sourceEvent) ? sourceEvent : [ sourceEvent ];
 
@@ -272,6 +300,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         }
 
                         this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
+                        this._stateFlags &= ~EventSignal.StateFlags.wasDepsUpdate;
 
                         const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
 
@@ -308,7 +337,53 @@ export class EventSignal<T, S=T, D=undefined> {
             else if (componentType) {
                 this.componentType = componentType;
             }
+
+            if (throttle && typeof throttle === 'object') {
+                const signalSymbol = this._signalSymbol;
+                let hasThrottle = false;
+                let isTimeout: boolean;
+
+                if ((isTimeout = throttle.type === 'timeout') || throttle.type === 'clock') {
+                    const { ms, timerGroupId = '' } = throttle;
+                    const throttleGroup = _getAndSubTimerGroup(timerGroupId, {
+                        signalSymbol,
+                        ms,
+                        isTimeout,
+                        onEnd: isTimeout ? () => {
+                            this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
+                            this._throttle = void 0;
+                        } : void 0,
+                        __proto__: null,
+                    });
+
+                    if (throttleGroup) {
+                        triggerEventsEmitter.on(signalSymbol, this._onForceUpdateTrigger);
+
+                        this._throttle = throttleGroup;
+
+                        hasThrottle = true;
+                    }
+                }
+                else if (isEventSignal(throttle.eventSignal)) {
+                    signalEventsEmitter.on(throttle.eventSignal._signalSymbol, this._onForceUpdateTrigger);
+
+                    this._throttle = throttle.eventSignal;
+
+                    hasThrottle = true;
+                }
+
+                if (hasThrottle) {
+                    stateFlags |= EventSignal.StateFlags.hasThrottle;
+
+                    if ((stateFlags & (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue)) !== 0) {
+                        // First computation is needed
+                        stateFlags |= EventSignal.StateFlags.wasForceUpdateTrigger;
+                    }
+                }
+            }
         }
+
+        this._stateFlags = stateFlags;
 
         const { id } = this;
         const key = id.toString(36);
@@ -385,12 +460,14 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         this._stateFlags &= ~(EventSignal.StateFlags.hasSourceEmitter
-            | EventSignal.StateFlags.nowInComputing
+            | EventSignal.StateFlags.nowInCalculatingNewValue
             | EventSignal.StateFlags.nowInSettings
-            | EventSignal.StateFlags.isNeedToCompute
+            | EventSignal.StateFlags.isNeedToCalculateNewValue
             | EventSignal.StateFlags.wasDepsUpdate
             | EventSignal.StateFlags.wasSourceSetting
             | EventSignal.StateFlags.wasSourceSettingFromEvent
+            | EventSignal.StateFlags.hasThrottle
+            | EventSignal.StateFlags.wasForceUpdateTrigger
         );
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore readonly attribute
@@ -433,6 +510,22 @@ export class EventSignal<T, S=T, D=undefined> {
         this._resolve = void 0;
         this._reject = void 0;
         this._promise = void 0;
+
+        const throttle = this._throttle;
+
+        if (throttle) {
+            if (isEventSignal(throttle)) {
+                signalEventsEmitter.removeListener(throttle._signalSymbol, this._onForceUpdateTrigger);
+            }
+            else if (typeof throttle === 'object' && throttle[kIsTimerGroup]) {
+                const timerGroup = throttle as _TimerGroup;
+
+                timerGroup.removeSub(this._signalSymbol);
+            }
+
+            this._throttle = void 0;
+        }
+
         /**
          * Удаляем подписки ДРУГИХ сигналов на этот EventSignal.
          */
@@ -509,6 +602,8 @@ export class EventSignal<T, S=T, D=undefined> {
             _sourceValue,
         } = this;
 
+        this._stateFlags &= ~EventSignal.StateFlags.wasForceUpdateTrigger;
+
         if ((this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0 && !ignoreComputation) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
@@ -536,7 +631,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 throw new Error(`Depends on own value`);
             }
 
-            if ((this._stateFlags & EventSignal.StateFlags.nowInComputing) !== 0) {
+            if ((this._stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) !== 0) {
                 throw new Error(`Now in computing state (cycle deps?)`);
             }
 
@@ -552,7 +647,7 @@ export class EventSignal<T, S=T, D=undefined> {
             currentSignal = this;
 
             // this._nowInComputing = true;
-            this._stateFlags |= EventSignal.StateFlags.nowInComputing;
+            this._stateFlags |= EventSignal.StateFlags.nowInCalculatingNewValue;
 
             try {
                 this._computationsCount++;
@@ -561,7 +656,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 const newValue = _computation(prevValue, _sourceValue, this);
 
                 // this._updateFlags = 0;this._isNeedToCompute = false;
-                this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCompute
+                this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCalculateNewValue
                     | EventSignal.StateFlags.wasDepsUpdate
                     | EventSignal.StateFlags.wasSourceSetting
                     | EventSignal.StateFlags.wasSourceSettingFromEvent
@@ -677,12 +772,12 @@ export class EventSignal<T, S=T, D=undefined> {
             finally {
                 currentSignal = prev_currentSignal;
                 // this._nowInComputing = false;
-                this._stateFlags &= ~EventSignal.StateFlags.nowInComputing;
+                this._stateFlags &= ~EventSignal.StateFlags.nowInCalculatingNewValue;
             }
         }
         else {
             // this._isNeedToCompute = false;
-            this._stateFlags &= ~EventSignal.StateFlags.isNeedToCompute;
+            this._stateFlags &= ~EventSignal.StateFlags.isNeedToCalculateNewValue;
 
             // note: If prevValue is Promise here, we really dont care
             const prevValue = this._value;
@@ -756,7 +851,9 @@ export class EventSignal<T, S=T, D=undefined> {
     }
 
     get = () => {
-        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+        const stateFlags = this._stateFlags;
+
+        if ((stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             if (currentSignal && currentSignal !== this) {
                 // todo: currentSignal._unsubscribeFrom(this._signalSymbol);
                 void 0;
@@ -769,7 +866,12 @@ export class EventSignal<T, S=T, D=undefined> {
             currentSignal._subscribeTo(this._signalSymbol);
         }
 
-        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCompute) !== 0) {
+        if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0
+            && (
+                (stateFlags & EventSignal.StateFlags.hasThrottle) === 0
+                || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+            )
+        ) {
             const maybePromise = this._calculateValue();
 
             if (maybePromise) {
@@ -887,9 +989,17 @@ export class EventSignal<T, S=T, D=undefined> {
             this._stateFlags |= EventSignal.StateFlags.wasSourceSetting;
             this._sourceValue = newSourceValue;
 
-            if ((this._stateFlags & EventSignal.StateFlags.nowInComputing) === 0) {
+            const stateFlags = this._stateFlags;
+
+            if ((stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) === 0) {
                 // this._isNeedToCompute = true;
-                this._stateFlags |= EventSignal.StateFlags.isNeedToCompute;
+                this._stateFlags |= EventSignal.StateFlags.isNeedToCalculateNewValue;
+
+                if ((stateFlags & EventSignal.StateFlags.hasThrottle) !== 0
+                    && (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0
+                ) {
+                    return false;
+                }
 
                 signalEventsEmitter.emit(this._signalSymbol);
 
@@ -940,10 +1050,39 @@ export class EventSignal<T, S=T, D=undefined> {
                 ;
             }
         }
+        else {
+            const stateFlags = this._stateFlags;
+
+            if ((stateFlags & EventSignal.StateFlags.hasThrottle) !== 0
+                && (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0
+            ) {
+                this._stateFlags &= ~EventSignal.StateFlags.wasForceUpdateTrigger;
+
+                const maybePromise = this._calculateValue();
+
+                // eslint-disable-next-line promise/prefer-await-to-then
+                if (maybePromise && typeof (maybePromise as Promise<unknown>).then === 'function') {
+                    // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
+                    (maybePromise as Promise<unknown>).then(_noop, error => {
+                        // todo: Не выводить ошибку в консоль, а кидать в signalEventsEmitter событие 'signalError' в
+                        //  котором должен бы обработчик для этого события.
+                        console.error('EventSignal: debounce _calculateValue: error:', error);
+                    });
+                }
+            }
+        }
     }
 
     private _checkPendingState() {
-        return !(!this._resolve && !subscribersEventsEmitter.hasListener(this._signalSymbol));
+        const stateFlags = this._stateFlags;
+
+        return !(!this._resolve && !subscribersEventsEmitter.hasListener(this._signalSymbol))
+            // todo: Точно на этом этапе нужно тормозить при throttle? Или в этот момент уже поздно тормозить? И не сломает ли это логику в каком-то из кейсов?
+            && (
+                (stateFlags & EventSignal.StateFlags.hasThrottle) === 0
+                || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+            )
+        ;
     }
 
     private _resolveIfNeeded(newValue: T) {
@@ -1891,6 +2030,48 @@ export namespace EventSignal {
         : (prevValue: T, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | undefined)
     ;
 
+    export type TriggerDescriptionTimerGroupId = number | string | symbol;
+
+    // todo:
+    //  see https://lodash.com/docs/4.17.15#debounce
+    //  see [See David Corbacho's article for details over the differences between _.debounce and _.throttle.](https://css-tricks.com/debouncing-throttling-explained-examples/)
+    /*export type TriggerDescriptionDebounce = {
+        type: 'debounce',
+        // The number of milliseconds to delay.
+        ms: number,
+        // Specify invoking on the leading edge of the timeout.
+        leading?: boolean,
+        // Specify invoking on the trailing edge of the timeout.
+        trailing?: boolean,
+        // The maximum time func is allowed to be delayed before it's invoked.
+        maxWait?: number,
+        timerGroupId?: TriggerDescriptionTimerGroupId,
+        __proto__?: null,
+    };
+    */
+    export type TriggerDescriptionTimeout = {
+        type: 'timeout',
+        // The number of milliseconds to delay.
+        ms: number,
+        // todo: leading?: boolean, trailing?: boolean,
+        timerGroupId?: TriggerDescriptionTimerGroupId,
+        __proto__?: null,
+    };
+    export type TriggerDescriptionClock = {
+        type: 'clock',
+        // Can be changed every
+        ms: number,
+        timerGroupId?: TriggerDescriptionTimerGroupId,
+        __proto__?: null,
+    };
+    export type TriggerDescriptionEventSignal = {
+        type?: 'eventSignal',
+        eventSignal: EventSignal<any>,
+        __proto__?: null,
+    };
+
+    export type TriggerDescription = TriggerDescriptionClock | TriggerDescriptionEventSignal | TriggerDescriptionTimeout;
+
     export type ReactFC<T, S, D, PROPS={}> = (props: {
         eventSignal: EventSignal<T, S, D>,
         version?: number,
@@ -1916,6 +2097,7 @@ export namespace EventSignal {
         signal?: AbortSignal,
         componentType?: Object | number | string | symbol | undefined,
         reactFC?: ReactFC<T, S, D>,
+        throttle?: TriggerDescription,
         //todo:
         // methods: {
         //   increment<number | void>(prevValue, arg = 1) { return prevValue + arg; },
@@ -1958,14 +2140,16 @@ export namespace EventSignal {
         wasDepsUpdate = 1 << 1,
         wasSourceSetting = 1 << 2,
         wasSourceSettingFromEvent = 1 << 3,
+        wasForceUpdateTrigger = 1 << 4,
 
-        isNeedToCompute = 1 << 8,
+        isNeedToCalculateNewValue = 1 << 8,
         hasSourceEmitter = 1 << 9,
         hasComputation = 1 << 10,
         hasDepsFromProps = 1 << 11,
+        hasThrottle = 1 << 12,
 
         nowInSettings = 1 << 15,
-        nowInComputing = 1 << 16,
+        nowInCalculatingNewValue = 1 << 16,
 
         nextValueShouldBeForceSettled = 1 << 20,
         valuesAsObjectShouldBeForceSettled = 1 << 21,
@@ -1983,6 +2167,138 @@ export function isEventSignal(maybeEventSignal: EventSignal<any> | unknown): may
         && ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
     ;
 }
+
+type _TimerGroup = ReturnType<typeof _makeTimerGroup>;
+
+const kIsTimerGroup = Symbol('kIsTimerGroup');
+const _timeoutTimerGroupsContainer = new Map<EventSignal.TriggerDescriptionTimerGroupId, Map<number, _TimerGroup>>();
+const _intervalTimerGroupsContainer = new Map<EventSignal.TriggerDescriptionTimerGroupId, Map<number, _TimerGroup>>();
+const _timerGroupsContainer_onNew = function() {
+    return new Map<number, _TimerGroup>();
+};
+const _makeTimerGroup = (ms: number, map: Map<number, any> | undefined, isTimeout = false) => {
+    const subs = [] as { 0: symbol, 1: (() => void) | undefined, __proto__: null }[];
+    let destroyed = false;
+    let timer: ReturnType<typeof setInterval | typeof setTimeout> | undefined;
+    let makeTimer: (() => typeof timer) | undefined = () => {
+        return isTimeout
+            ? setTimeout(function() {
+                for (const { 0: signalSymbol } of subs) {
+                    triggerEventsEmitter.emit(signalSymbol);
+                }
+
+                destroy();
+            })
+            : setInterval(function() {
+                for (const { 0: signalSymbol } of subs) {
+                    triggerEventsEmitter.emit(signalSymbol);
+                }
+            }, ms)
+        ;
+    };
+    const destroy = function() {
+        if (destroyed) {
+            return;
+        }
+
+        destroyed = true;
+        clearInterval(timer);
+        map?.delete(ms);
+        timer = makeTimer = map = void 0;
+
+        for (const { 1: effect } of subs) {
+            effect?.();
+        }
+
+        subs.length = 0;
+    };
+
+    return {
+        [kIsTimerGroup]: true,
+        // addSub
+        [0](signalSymbol: symbol, effect?: (() => void)) {
+            if (!destroyed) {
+                const wasLength = subs.length;
+
+                subs.push({ 0: signalSymbol, 1: effect, __proto__: null });
+
+                if (wasLength === 0 && !timer && makeTimer) {
+                    timer = makeTimer();
+                }
+            }
+        },
+        removeSub(signalSymbol: symbol) {
+            const wasLength = subs.length;
+            const index = subs.findIndex(sub => {
+                return sub[0] === signalSymbol;
+            });
+
+            if (index !== -1) {
+                const sub = subs[index];
+
+                subs.splice(index, 1);
+
+                sub?.[1]?.();
+            }
+
+            if (wasLength !== 0 && subs.length === 0) {
+                destroy();
+            }
+        },
+        __proto__: null,
+    };
+};
+
+function _getAndSubTimerGroup(timerGroupId: EventSignal.TriggerDescriptionTimerGroupId, {
+    signalSymbol,
+    ms,
+    isTimeout,
+    signal,
+    onEnd,
+}: {
+    signalSymbol: symbol,
+    ms: number,
+    isTimeout?: boolean,
+    signal?: AbortSignal,
+    onEnd?: () => void,
+    __proto__: null,
+}) {
+    const mapsByMsMap = (isTimeout ? _timeoutTimerGroupsContainer : _intervalTimerGroupsContainer)
+        .getOrInsertComputed(timerGroupId, _timerGroupsContainer_onNew)
+    ;
+    const timerGroup = mapsByMsMap
+        .getOrInsertComputed(ms, function() {
+            return _makeTimerGroup(ms, mapsByMsMap, isTimeout);
+        })
+    ;
+
+    let abortCleanup: (() => void) | undefined;
+
+    if (signal) {
+        if (signal.aborted) {
+            return;
+        }
+
+        const abortListener = timerGroup.removeSub.bind(timerGroup, signalSymbol);
+
+        signal.addEventListener('abort', abortListener, { once: true });
+
+        abortCleanup = signal.removeEventListener.bind(signal, 'abort', abortListener);
+    }
+
+    const effect = abortCleanup && onEnd
+        ? () => {
+            abortCleanup?.();
+            onEnd?.();
+        }
+        : abortCleanup || onEnd
+    ;
+
+    timerGroup[0](signalSymbol, effect);
+
+    return timerGroup;
+}
+
 type _PreDefinedProps<PROPS=any> = Omit<Partial<PROPS>, 'componentType' | 'eventSignal' | 'version'>;
 // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/d5a5c3b0ef50b7277750ed631c3d640b27272143/types/react/index.d.ts#L2161
 type UseSyncExternalStore = (

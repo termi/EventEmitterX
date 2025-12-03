@@ -28,7 +28,10 @@ import {
 } from '../../../spec_utils/EventTarget_helpers';
 import {
     useFakeTimers,
+    useRealTimers,
     setSystemTime,
+    realSleep,
+    advanceTimersByTimeAsync,
 } from "../../../spec_utils/fakeTimers";
 
 const { createSignal } = EventSignal;
@@ -1971,6 +1974,132 @@ describe('EventSignal', () => {
 
             expect(computedStore2$.get()).toEqual([ 'value', '3' ]);
             expect(computedStore2$.version).toBe(2);
+        });
+    });
+
+    describe('throttle', function() {
+        beforeAll(() => {
+            useFakeTimers(void 0, {
+                useJump: true,
+            });
+        });
+
+        afterAll(() => {
+            useRealTimers();
+        });
+
+        describe('without computation in throttled signal', function() {
+            it('don’t allow to EventSignal to get a new value more than once every X milliseconds', async () => {
+                const timerGroupId = Symbol();
+                // note: replace with `use throttledValue1$`
+                const throttledValue1$ = new EventSignal(0, {
+                    throttle: {
+                        timerGroupId,
+                        type: 'clock',
+                        ms: 2000,
+                        __proto__: null,
+                    },
+                });
+                // note: replace with `use throttledValue2$`
+                const throttledValue2$ = new EventSignal(555, {
+                    throttle: {
+                        timerGroupId,
+                        //todo: переделать на `type: 'debounce'` - сколько должно пройти времени с последнего изменения
+                        type: 'clock',
+                        ms: 2000,
+                        __proto__: null,
+                    },
+                });
+                const computed$ = new EventSignal('', () => {
+                    return `is ${throttledValue1$.get()} and ${throttledValue2$.get()}`;
+                });
+
+                expect(computed$.get()).toBe('is 0 and 555');
+
+                throttledValue1$.set(1);
+
+                expect(throttledValue1$.get()).toBe(0);
+                expect(computed$.get()).toBe('is 0 and 555');
+                expect(throttledValue2$.get()).toBe(555);
+
+                await realSleep();
+                await advanceTimersByTimeAsync(10);
+
+                expect(throttledValue1$.get()).toBe(0);
+                expect(computed$.get()).toBe('is 0 and 555');
+
+                await advanceTimersByTimeAsync(2000);
+
+                expect(throttledValue1$.get()).toBe(1);
+                expect(computed$.get()).toBe('is 1 and 555');
+
+                throttledValue1$.set(2);
+
+                expect(throttledValue1$.get()).toBe(1);
+                expect(computed$.get()).toBe('is 1 and 555');
+
+                await realSleep();
+                await advanceTimersByTimeAsync(500);
+
+                expect(throttledValue1$.get()).toBe(1);
+                expect(computed$.get()).toBe('is 1 and 555');
+
+                await advanceTimersByTimeAsync(2000);
+
+                expect(computed$.get()).toBe('is 2 and 555');
+                expect(throttledValue1$.get()).toBe(2);
+
+                throttledValue1$.destructor();
+                throttledValue2$.destructor();
+            });
+        });
+
+        describe('with computation in throttled signal', function() {
+            it('don’t allow to EventSignal to get a new value more than once every X milliseconds', async () => {
+                const timerGroupId = Symbol();
+                // note: replace with `use throttledValue1$`
+                const throttledComputed$ = new EventSignal('', (_p, sourceValue) => {
+                    return `count is ${sourceValue}`;
+                }, {
+                    initialSourceValue: 0,
+                    throttle: {
+                        timerGroupId,
+                        type: 'clock',
+                        ms: 2000,
+                        __proto__: null,
+                    },
+                });
+
+                expect(throttledComputed$.get()).toBe('count is 0');
+
+                throttledComputed$.set(1);
+
+                expect(throttledComputed$.get()).toBe('count is 0');
+
+                await realSleep();
+                await advanceTimersByTimeAsync(10);
+
+                expect(throttledComputed$.get()).toBe('count is 0');
+
+                await advanceTimersByTimeAsync(2000);
+
+                expect(throttledComputed$.get()).toBe('count is 1');
+
+                throttledComputed$.set(2);
+
+                expect(throttledComputed$.get()).toBe('count is 1');
+
+                await realSleep();
+                await advanceTimersByTimeAsync(500);
+
+                expect(throttledComputed$.get()).toBe('count is 1');
+
+                await advanceTimersByTimeAsync(2000);
+
+                expect(throttledComputed$.get()).toBe('count is 2');
+
+                throttledComputed$.destructor();
+            });
         });
     });
 
