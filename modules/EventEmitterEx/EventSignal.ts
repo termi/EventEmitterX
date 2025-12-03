@@ -38,6 +38,8 @@ let currentSignal: EventSignal<any, any, any> | null = null;
 
 export class EventSignal<T, S=T, D=undefined> {
     public readonly id = ++idIncrement;
+    // noinspection JSUnusedGlobalSymbols
+    public readonly isEventSignal = true;
     /**
      * Use it as for React key.
      *
@@ -89,7 +91,9 @@ export class EventSignal<T, S=T, D=undefined> {
     public readonly lastError?: Error | string;
     /** WeakRef or replacement object */
     private readonly _sourceEmitterRef?: { deref(): EventEmitter | EventEmitterX | EventTarget | undefined };
+    // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceMap"];
+    // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceFilter"];
     private readonly _initialComputations?: [
         event: number | string | symbol,
@@ -102,7 +106,7 @@ export class EventSignal<T, S=T, D=undefined> {
     // For React
     public readonly componentType?: EventSignal.NewOptions<T, S, D>["componentType"];
     // For React
-    private _reactFC?: [ reactFC: EventSignal.NewOptions<T, S, D>["reactFC"] | false, preDefinedProps?: Object ];
+    private _reactFC?: _ComponentDescription<T, S, D>;
 
     // Reserved for React
     declare readonly $$typeof: symbol;
@@ -111,13 +115,15 @@ export class EventSignal<T, S=T, D=undefined> {
      *
      * React component function (React.FC) despite of type `string` here.
      */
-    declare readonly type: ({ eventSignal }: { eventSignal: EventSignal<T, S, D> }, context?: Object) => { type: any, props: any, key: string };
+    declare readonly type: ({ eventSignal }: { eventSignal: EventSignal<T, S, D>, __proto__?: null }, context?: Object) => { type: any, props: any, key: string };
     // Reserved for React
     // declare readonly type: (props: {
     //     eventSignal: EventSignal<T, S, D>,
     // }) => any;
     // Reserved for React
     declare readonly props: { eventSignal: EventSignal<any> };
+    // Reserved for React
+    declare readonly keyProps: { key: EventSignal<any>["key"] };
     // Reserved for React
     declare readonly defaultProps: { eventSignal: EventSignal<any> };
     // Reserved for React
@@ -246,12 +252,15 @@ export class EventSignal<T, S=T, D=undefined> {
                     const _initialComputation = (...args: unknown[]) => {
                         args.unshift(event);
 
-                        if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [event: number | string | symbol, ...args: unknown[]])) {
+                        // eslint-disable-next-line prefer-spread
+                        if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])) {
                             return;
                         }
 
-                        const _newSourceValue = this._sourceMapFn
-                            ? this._sourceMapFn.apply(null, args as [event: number | string | symbol, ...args: unknown[]])
+                        const { _sourceMapFn } = this;
+                        const _newSourceValue = _sourceMapFn
+                            // eslint-disable-next-line prefer-spread
+                            ? _sourceMapFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])
                             : args[1] as S
                         ;
                         // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
@@ -294,20 +303,26 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (reactFC) {
-                this._reactFC = [ reactFC ];
+                this._reactFC = { 0: reactFC/*, 1: preDefinedProps*/, __proto__: null };
             }
             else if (componentType) {
                 this.componentType = componentType;
             }
         }
 
-        this.key = this.id.toString(36);
+        const { id } = this;
+        const key = id.toString(36);
+
+        this.key = key;
 
         Object.defineProperty(this.component, 'name', {
-            value: `EventSignal.component#${this.key}${description ? `(${description})` : ''}`,
+            value: `EventSignal.component#${key}${description ? `(${description})` : ''}`,
             configurable: true,
             writable: false,
             enumerable: true,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore allow `__proto__`
+            __proto__: null,
         });
     }
 
@@ -317,8 +332,6 @@ export class EventSignal<T, S=T, D=undefined> {
             _finaleSourceValue,
             _signalSymbol,
             _abortSignal,
-            _subscriptionsToDeps,
-            _oneOfDepUpdated,
             _initialComputations,
             _sourceEmitterRef,
         } = this;
@@ -352,14 +365,7 @@ export class EventSignal<T, S=T, D=undefined> {
             this._finaleSourceValue = void 0;
         }
 
-        /**
-         * Удаляем подписки на другие EventSignal.
-         */
-        for (const eventName of _subscriptionsToDeps) {
-            signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
-        }
-
-        _subscriptionsToDeps.clear();
+        this.clearDeps();
 
         if (_initialComputations && _sourceEmitterRef) {
             const _sourceEmitter = _sourceEmitterRef.deref();
@@ -424,6 +430,9 @@ export class EventSignal<T, S=T, D=undefined> {
         // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.isDestroyed
         this._rejectPromiseIfDestroyed();
 
+        this._resolve = void 0;
+        this._reject = void 0;
+        this._promise = void 0;
         /**
          * Удаляем подписки ДРУГИХ сигналов на этот EventSignal.
          */
@@ -438,8 +447,24 @@ export class EventSignal<T, S=T, D=undefined> {
         this.destructor();
     }
 
-    get isDestroyed() {
+    get destroyed() {
         return (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0;
+    }
+
+    clearDeps() {
+        const {
+            _subscriptionsToDeps,
+            _oneOfDepUpdated,
+        } = this;
+
+        /**
+         * Удаляем подписки на другие EventSignal.
+         */
+        for (const eventName of _subscriptionsToDeps) {
+            signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
+        }
+
+        _subscriptionsToDeps.clear();
     }
 
     private _abortHandler = () => {
@@ -787,7 +812,7 @@ export class EventSignal<T, S=T, D=undefined> {
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
     set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)) {
-        if (this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return;
         }
 
@@ -876,7 +901,17 @@ export class EventSignal<T, S=T, D=undefined> {
     }
 
     toString() {
-        return this.get();
+        const signalValue = this.get();
+
+        if (typeof signalValue === 'object' && signalValue) {
+            if (Array.isArray(signalValue)) {
+                return `[${arrayContentStringify(signalValue).join(',')}]`;
+            }
+
+            return stringifyWithCircularHandle(signalValue);
+        }
+
+        return String(signalValue);
     }
 
     valueOf() {
@@ -922,7 +957,7 @@ export class EventSignal<T, S=T, D=undefined> {
     }
 
     private _rejectPromiseIfDestroyed() {
-        if (!this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) === 0) {
             return;
         }
 
@@ -989,7 +1024,7 @@ export class EventSignal<T, S=T, D=undefined> {
     */
 
     async *[Symbol.asyncIterator]() {
-        while (!this.isDestroyed) {
+        while (!this.destroyed) {
             // note: Я не уверен, что тут await - это правильно.
             //  - Возможно, он тут портит логику ожидания?
             //  - Однако без этого await, успеват вызваться очередной `then`, создаться `promise` до вызова `destructor`.
@@ -1018,8 +1053,9 @@ export class EventSignal<T, S=T, D=undefined> {
         const { _subscriptionsToDeps } = this;
         const hasSubscription = _subscriptionsToDeps.has(signalSymbol);
 
-        if (this.isDestroyed) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             if (hasSubscription) {
+                signalEventsEmitter.removeListener(signalSymbol, this._oneOfDepUpdated);
                 _subscriptionsToDeps.delete(signalSymbol);
             }
 
@@ -1031,7 +1067,7 @@ export class EventSignal<T, S=T, D=undefined> {
 
             // todo:
             //  1. В конструкторе EventSignal может приходить кастомный EventsEmitter.
-            //  2. Когда в EventsEmitterEx будет реализован третий параметр, передевать:
+            //  2. Когда в EventEmitterX будет реализован третий параметр, передевать:
             //    2.1. cleanupCallback(onTeardown) - коллбек, который должен вызываться, когда этот listener удаляется
             //    2.2. weakSpyOnTarget - объект, который нужно добавить в WeakMap и при удалении которого GC мы должны удалить listener (это будет проверять setInterval каждые 2-5 минут).
             signalEventsEmitter.addListener(signalSymbol, this._oneOfDepUpdated);
@@ -1047,18 +1083,17 @@ export class EventSignal<T, S=T, D=undefined> {
     protected _addListener(
         listener: ((newValue: T) => void) | undefined,
         _ignore?: undefined,
+        subscriptionFlags?: number,
     ): EventSignal.Subscription;
     protected _addListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
-        once?: boolean,
-        prepend?: boolean,
+        subscriptionFlags?: number,
     ): EventSignal.Subscription | EventSignal<T, S, D>;
     protected _addListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
-        once = false,
-        prepend = false,
+        subscriptionFlags = 0,
     ): EventSignal.Subscription | EventSignal<T, S, D> {
         let shouldReturnThis = false;
 
@@ -1082,25 +1117,34 @@ export class EventSignal<T, S=T, D=undefined> {
             };
         }
 
-        _checkListener<(newValue: T) => void>(listener);
+        /**
+         * note: If this is `true`, {@link shouldReturnThis} should be `false` and it's not checked for simplicity.
+         */
+        const makeItEasyAndFastAndUseSubscription = (subscriptionFlags & 1 << 3) !== 0;
 
-        if (ignoredEventName !== undefined
-            && ignoredEventName !== ''
-            && ignoredEventName !== 'change'
-            && ignoredEventName !== 'changed'
-        ) {
+        if (!makeItEasyAndFastAndUseSubscription) {
+            _checkListener<(newValue: T) => void>(listener);
+            _checkEventSignalEventName(ignoredEventName);
+
             if (ignoredEventName === 'error') {
-                // ignore "error" subscription for now (not implemented yet)
+                // ignore "error" subscription
+                // note: in this case `shouldReturnThis` should always be `true`.
                 return this;
             }
-
-            throw new Error(`Invalid "ignoredEventName". Should be undefined or one of ["", "change", "changed", "error"] but "${String(ignoredEventName)}" found`);
+        }
+        else if (!listener) {
+            // note: in this case `shouldReturnThis` should always be `false`.
+            return {
+                unsubscribe: _noop,
+                closed: true,
+                __proto__: null,
+            };
         }
 
         const eventName = this._signalSymbol;
 
-        if (once) {
-            if (prepend) {
+        if ((subscriptionFlags & 1 << 1) !== 0) { // isUseOnce
+            if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
                 subscribersEventsEmitter.prependOnceListener(eventName, listener);
             }
             else {
@@ -1108,7 +1152,7 @@ export class EventSignal<T, S=T, D=undefined> {
             }
         }
         else {
-            if (prepend) {
+            if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
                 subscribersEventsEmitter.prependListener(eventName, listener);
             }
             else {
@@ -1124,7 +1168,7 @@ export class EventSignal<T, S=T, D=undefined> {
         const unsubscribe = () => {
             closed = true;
 
-            this._removeListener(ignoredEventName, listener);
+            this._removeListener(ignoredEventName, listener, true);
         };
 
         return {
@@ -1141,43 +1185,42 @@ export class EventSignal<T, S=T, D=undefined> {
     protected _removeListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
+        makeItEasyAndFastAndUseSubscription?: boolean,
     ): EventSignal<T, S, D> | undefined {
         let shouldReturnThis = false;
 
-        if (typeof ignoredEventName === 'function') {
-            listener = ignoredEventName;
-            ignoredEventName = void 0;
-        }
-        else {
-            shouldReturnThis = true;
-        }
-
-        if (this.isDestroyed) {
-            if (shouldReturnThis) {
-                return this;
+        if (!makeItEasyAndFastAndUseSubscription) {
+            if (typeof ignoredEventName === 'function') {
+                listener = ignoredEventName;
+                ignoredEventName = void 0;
+            }
+            else {
+                shouldReturnThis = true;
             }
 
-            return;
-        }
+            _checkListener<(newValue: T) => void>(listener);
+            _checkEventSignalEventName(ignoredEventName);
 
-        _checkListener<(newValue: T) => void>(listener);
-
-        if (ignoredEventName !== undefined && ignoredEventName !== '' && ignoredEventName !== 'change' && ignoredEventName !== 'changed') {
             if (ignoredEventName === 'error') {
                 // ignore "error" subscription
-                return;
+                // note: in this case `shouldReturnThis` should always be `true`.
+                return this;
             }
-
-            throw new Error(`Invalid "ignoredEventName". Should be undefined or one of ["", "change", "changed", "error"] but "${String(ignoredEventName)}" found`);
         }
 
-        subscribersEventsEmitter.removeListener(this._signalSymbol, listener);
+        subscribersEventsEmitter.removeListener(this._signalSymbol, listener as NonNullable<typeof listener>);
+
+        if (shouldReturnThis) {
+            return this;
+        }
+
+        return;
     }
 
     once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
     once(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     once(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
-        return this._addListener(arg1, arg2, true);
+        return this._addListener(arg1, arg2, 1 << 1);
     }
 
     on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
@@ -1195,13 +1238,13 @@ export class EventSignal<T, S=T, D=undefined> {
     prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
     prependListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     prependListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
-        return this._addListener(arg1, arg2, false, true);
+        return this._addListener(arg1, arg2, 1 << 2);
     }
 
     prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
     prependOnceListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     prependOnceListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
-        return this._addListener(arg1, arg2, true, true);
+        return this._addListener(arg1, arg2, (1 << 1) | (1 << 2));
     }
 
     off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
@@ -1216,30 +1259,18 @@ export class EventSignal<T, S=T, D=undefined> {
         return this._removeListener(arg1, arg2);
     }
 
-    emit(ignoredEventName: EventSignal.IgnoredEventNameForListeners, ...argumentsToBeIgnored: unknown[]): EventSignal<T, S, D>;
-    emit(): void;
-    emit(ignoredEventName?: EventSignal.IgnoredEventNameForListeners): EventSignal<T, S, D> | undefined {
-        let shouldReturnThis = false;
-
-        if (typeof ignoredEventName !== 'undefined') {
-            shouldReturnThis = true;
+    emit(ignoredEventName: EventSignal.IgnoredEventNameForListeners, ...argumentsToBeIgnored: unknown[]): boolean;
+    emit(): boolean;
+    emit(ignoredEventName?: EventSignal.IgnoredEventNameForListeners) {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+            return false;
         }
 
-        if (this.isDestroyed) {
-            if (shouldReturnThis) {
-                return this;
-            }
+        _checkEventSignalEventName(ignoredEventName);
 
+        if (ignoredEventName === 'error') {
+            // ignore "error" emitting
             return;
-        }
-
-        if (ignoredEventName !== undefined && ignoredEventName !== '' && ignoredEventName !== 'change' && ignoredEventName !== 'changed') {
-            if (ignoredEventName === 'error') {
-                // ignore "error" emitting
-                return;
-            }
-
-            throw new Error(`Invalid "ignoredEventName". Should be undefined or one of ["", "change", "changed", "error"] but "${String(ignoredEventName)}" found`);
         }
 
         // call new recalculation value:
@@ -1247,10 +1278,53 @@ export class EventSignal<T, S=T, D=undefined> {
         //  2. trigger new changes event to subscribers
         this.get();
 
-        if (shouldReturnThis) {
-            return this;
-        }
+        return true;
     }
+
+    removeAllListeners(): this {// eslint-disable-line class-methods-use-this
+        throw new Error('Not implemented');
+    }
+
+    setMaxListeners(_ignoredNewValue: number) {// eslint-disable-line class-methods-use-this
+        // ignore
+        return this;
+    }
+
+    getMaxListeners() {// eslint-disable-line class-methods-use-this
+        return Number.POSITIVE_INFINITY;
+    }
+
+    listeners(): Function[] {// eslint-disable-line class-methods-use-this
+        throw new Error('Not implemented');
+    }
+
+    rawListeners(_type: string): Function[] {// eslint-disable-line class-methods-use-this
+        throw new Error('Not implemented');
+    }
+
+    listenerCount(_type: string): number {// eslint-disable-line class-methods-use-this
+        throw new Error('Not implemented');
+    }
+
+    eventNames(): string[] {// eslint-disable-line class-methods-use-this
+        throw new Error('Not implemented');
+    }
+
+    /**
+     * Use it in React as implementation of `useSignal` custom hook.
+     */
+    use = () => {
+        const { _useSyncExternalStore } = this;
+
+        if (_useSyncExternalStore) {
+            _useSyncExternalStore(this.subscribeOnNextAnimationFrame, this.get);
+        }
+        else {
+            console.warn('warning: "useSyncExternalStore" for EventSignal is not set. Please use `if (!EventSignal.reactIsInited) EventSignal.initReact(React)`.');
+        }
+
+        return this.get();
+    };
 
     /**
      * todo: add overload: subscribe = (subscriptionObserver: {
@@ -1270,9 +1344,8 @@ export class EventSignal<T, S=T, D=undefined> {
             return _noop;
         }
 
-        const { unsubscribe } = this._addListener(func);
-
-        return unsubscribe;
+        // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
+        return this._addListener(func, void 0, 1 << 3).unsubscribe;
     };
 
     // noinspection JSUnusedGlobalSymbols
@@ -1289,7 +1362,8 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         const _listenerWithAnimFrameDebounce = _awaitNextAnimationFrame.bind(null, func);
-        const { unsubscribe } = this._addListener(_listenerWithAnimFrameDebounce);
+        // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
+        const { unsubscribe } = this._addListener(_listenerWithAnimFrameDebounce, void 0, 1 << 3);
         let _listenerComponentTypeUpdate: (() => void) | undefined;
 
         if (subscribeToComponentTypeUpdate) {
@@ -1306,10 +1380,10 @@ export class EventSignal<T, S=T, D=undefined> {
         return () => {
             if (_listenerComponentTypeUpdate && this.componentType) {
                 _componentsEmitter.removeListener(this.componentType as string, _listenerComponentTypeUpdate);
+                _listenerComponentTypeUpdate = void 0;
             }
 
             _unAwaitNextAnimationFrame(func);
-
             unsubscribe();
         };
     }
@@ -1365,8 +1439,8 @@ export class EventSignal<T, S=T, D=undefined> {
     // todo: Нужно доработать map и возвращать новый EventSignal который обратно связан с текущим EventSignal.
     //  "обратно связан" - результат работы нового EventSignal будет устанавливаться в качестве значения в текущий EventSignal.
     map<CR>(computation: (currentSourceValue: T) => CR) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error ignore `TS2769: No overload matches this call.
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore ignore `TS2769: No overload matches this call.
         //   Overload 1 of 5, '(initialValue: CR | Awaited<CR>, options: NewOptions<CR, S, undefined> | NewOptionsWithSource<CR, S, undefined>): EventSignal<...>', gave the following error.
         //     Argument of type '() => CR' is not assignable to parameter of type 'NewOptions<CR, S, undefined> | NewOptionsWithSource<CR, S, undefined>'.
         //     Overload 2 of 5, '(initialValue: CR | Awaited<CR>, computation: ComputationWithSource<CR, S, undefined>): EventSignal<CR, S, undefined>', gave the following error.
@@ -1377,10 +1451,10 @@ export class EventSignal<T, S=T, D=undefined> {
         });
     }
 
-    setReactFC(reactFC?: EventSignal.NewOptions<T, S, D>["reactFC"] | false) {
+    setReactFC(reactFC?: EventSignal.NewOptions<T, S, D>["reactFC"] | false, preDefinedProps?: Object | undefined) {
         const prev = this._reactFC;
 
-        this._reactFC = [ reactFC ];
+        this._reactFC = { 0: reactFC, 1: preDefinedProps, __proto__: null };
 
         return prev;
     }
@@ -1396,6 +1470,7 @@ export class EventSignal<T, S=T, D=undefined> {
         const _type: EventSignal<T, S, D>["type"] = 'type' in type ? type.type : type;
 
         return _type({
+            __proto__: null,
             eventSignal: this,
             ...props,
         }, context);
@@ -1426,6 +1501,7 @@ export class EventSignal<T, S=T, D=undefined> {
 
     static reactIsInited = false;
     declare static initReact;
+    declare private _useSyncExternalStore: UseSyncExternalStore | undefined;
     //todo: Сейчас не работает
     // declare private static _setComponentOnDestroy;
 
@@ -1435,12 +1511,8 @@ export class EventSignal<T, S=T, D=undefined> {
     // }
 
     static {
-        // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/d5a5c3b0ef50b7277750ed631c3d640b27272143/types/react/index.d.ts#L2161
-        type UseSyncExternalStore = (
-            subscribe: (onStoreChange: () => void) => () => void,
-            getSnapshot: () => any,
-            getServerSnapshot?: () => any,
-        ) => any;
+        // make `EventSignal extends null`
+        Object.setPrototypeOf(this.prototype, null);
 
         // var REACT_PROVIDER_TYPE = Symbol.for("react.provider");
         let _ReactFragment: symbol;
@@ -1463,7 +1535,7 @@ export class EventSignal<T, S=T, D=undefined> {
             version?: string,
         }) {
             if ('useSyncExternalStore' in hooks) {
-                _useSyncExternalStore = hooks.useSyncExternalStore;
+                this.prototype._useSyncExternalStore = _useSyncExternalStore = hooks.useSyncExternalStore;
 
                 if (hooks.createElement) {
                     _React_createElement = hooks.createElement;
@@ -1475,6 +1547,9 @@ export class EventSignal<T, S=T, D=undefined> {
                         type: {
                             configurable: true,
                             value: _React_memo(EventSignalComponent),
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore allow `__proto__`
+                            __proto__: null,
                         },
                     });
                 }
@@ -1489,6 +1564,9 @@ export class EventSignal<T, S=T, D=undefined> {
                     $$typeof: {
                         configurable: true,
                         value: Symbol.for("react.transitional.element"),
+                        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                        // @ts-ignore allow `__proto__`
+                        __proto__: null,
                     },
                 });
             }
@@ -1595,11 +1673,11 @@ export class EventSignal<T, S=T, D=undefined> {
                         _isInReactRenders?.add(reactFC);
                     }
 
-                    const { key, version } = eventSignal;
                     const memorizedReactFC: EventSignal.ReactFC<any, any, any> = _React_memo && !("$$typeof" in reactFC)
                         ? memorizedComponents.getOrInsertComputed(reactFC, memorizedComponents_onNew)
                         : reactFC
                     ;
+                    const { key, version } = eventSignal;
                     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                     const element = _React_createElement!(memorizedReactFC, {
                         key,
@@ -1624,15 +1702,13 @@ export class EventSignal<T, S=T, D=undefined> {
                 }
             }
             else {
-                console.warn('warning: "useSyncExternalStore" for EventSignal is not set. Please use `EventSignal.initReact({ useSyncExternalStore: React.useSyncExternalStore, createElement: React.createElement, memo: React.memo })`.');
+                console.warn('warning: "useSyncExternalStore" for EventSignal is not set. Please use `if (!EventSignal.reactIsInited) EventSignal.initReact(React)`.');
             }
 
             if (children) {
-                const { key } = eventSignal;
-
                 // return children instead of signalValue
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                return _React_createElement!(_ReactFragment, { key }, children || null);
+                return _React_createElement!(_ReactFragment, eventSignal.keyProps, children || null);
             }
 
             if (typeof signalValue === 'object' && signalValue) {
@@ -1655,6 +1731,9 @@ export class EventSignal<T, S=T, D=undefined> {
             enumerable: false,
             configurable: true,
             writable: false,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore allow `__proto__`
+            __proto__: null,
         });
 
         // Decorate Signals so React renders them as <EventSignalComponent> components. - https://github.com/preactjs/signals/blob/10e13d3a67e796873c2d4ddc6d04cd8d8705194b/packages/react/runtime/src/index.ts#L354
@@ -1662,24 +1741,58 @@ export class EventSignal<T, S=T, D=undefined> {
         Object.defineProperties(this.prototype, {
             $$typeof: {
                 configurable: true,
+                enumerable: false,
                 // https://github.com/facebook/react/blob/346c7d4c43a0717302d446da9e7423a8e28d8996/packages/shared/ReactSymbols.js#L15
                 value: Symbol.for("react.element"),
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__`
+                __proto__: null,
             },
             type: {
                 configurable: true,
+                enumerable: false,
                 value: EventSignalComponent,
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__`
+                __proto__: null,
             },
             props: {
                 configurable: true,
-                get() {
-                    return { eventSignal: this };
+                enumerable: false,
+                get(this: EventSignal<any>) {
+                    const props: EventSignal<any, any, any>["props"] = Object.freeze(Object.setPrototypeOf({ eventSignal: this }, null));
+
+                    return _defineNonEnumValue(this, 'props', props);
                 },
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__`
+                __proto__: null,
+            },
+            keyProps: {
+                configurable: true,
+                enumerable: false,
+                get(this: EventSignal<any>) {
+                    const { key } = this;
+                    const keyProps: EventSignal<any, any, any>["keyProps"] = Object.freeze(Object.setPrototypeOf({ key }, null));
+
+                    return _defineNonEnumValue(this, 'keyProps', keyProps);
+                },
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__`
+                __proto__: null,
             },
             displayName: {
                 configurable: true,
-                get() {
-                    return String(Math.random());
+                enumerable: false,
+                get(this: EventSignal<any>) {
+                    const { description } = this._signalSymbol;
+                    const displayName = `EventSignal#${this.id}${description ? `(${description})` : ''}`;
+
+                    return _defineNonEnumValue(this, 'displayName', displayName);
                 },
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore allow `__proto__`
+                __proto__: null,
             },
             ref: { configurable: true, value: null },
         });
@@ -1770,12 +1883,12 @@ export namespace EventSignal {
     //     async (prevValue: T, sourceValue: R | undefined, data: D): T | undefined,
     // } | void;
     export type ComputationWithSource<T, S, D> = T extends Promise<infer TT>
-        ? (prevValue: TT, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | void)
-        : (prevValue: T, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | void)
+        ? (prevValue: TT, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | undefined)
+        : (prevValue: T, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | undefined)
     ;
     export type ComputationWithSource2<T, S, D> = T extends Promise<infer TT>
-        ? (prevValue: TT, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | void)
-        : (prevValue: T, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | void)
+        ? (prevValue: TT, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | undefined)
+        : (prevValue: T, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | undefined)
     ;
 
     export type ReactFC<T, S, D, PROPS={}> = (props: {
@@ -1816,10 +1929,10 @@ export namespace EventSignal {
     }
     export type NewOptionsWithSource<T, S, D> = NewOptions<T, S, D> & {
         sourceEmitter: EventEmitter | EventEmitterX | EventTarget | undefined,
-        // todo: добавить sourceMapAndFilter, который может быть использован вместо пары sourceMap/sourceFilter
         sourceEvent: (number | string | symbol)[] | number | string | symbol,
-        sourceMap?: (eventName: number | string | symbol, ...args: any[]) => S,
-        sourceFilter?: (eventName: number | string | symbol, ...args: any[]) => boolean,
+        // todo: добавить sourceMapAndFilter, который может быть использован вместо пары sourceMap/sourceFilter
+        sourceMap?: ((this: null, eventName: number | string | symbol, ...args: any[]) => S),
+        sourceFilter?: ((this: null, eventName: number | string | symbol, ...args: any[]) => boolean),
         //todo:
         // // this function can throw Error
         // validateSourceValue?: (newSourceValueBeforeApply: S) => boolean,
@@ -1828,10 +1941,10 @@ export namespace EventSignal {
     };
 
     /**
-     * * Only valid values: '' | 'change' | 'changed' | 'error'.
+     * * Only valid values: '' | 'change' | 'changed' | 'data' | 'error'.
      * * All other values will rise TypeError.
      */
-    export type IgnoredEventNameForListeners = string | symbol | '' | 'change' | 'changed' | 'error';
+    export type IgnoredEventNameForListeners = string | symbol | '' | 'change' | 'changed' | 'data' | 'error';
 
     export type Subscription = {
         // Cancels the subscription
@@ -1861,7 +1974,22 @@ export namespace EventSignal {
     }
 }
 
+const tagEventSignal = 'EventSignal';
+
+EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
+
+export function isEventSignal(maybeEventSignal: EventSignal<any> | unknown): maybeEventSignal is EventSignal<any> {
+    return !!maybeEventSignal
+        && ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
+    ;
+}
 type _PreDefinedProps<PROPS=any> = Omit<Partial<PROPS>, 'componentType' | 'eventSignal' | 'version'>;
+// https://github.com/DefinitelyTyped/DefinitelyTyped/blob/d5a5c3b0ef50b7277750ed631c3d640b27272143/types/react/index.d.ts#L2161
+type UseSyncExternalStore = (
+    subscribe: (onStoreChange: () => void) => () => void,
+    getSnapshot: () => any,
+    getServerSnapshot?: () => any,
+) => any;
 
 const _componentsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
@@ -1901,6 +2029,20 @@ function _shallowEqualObjects(obj1: unknown | null | undefined, obj2: unknown | 
     }
 
     return true;
+}
+
+function _defineNonEnumValue<T = unknown>(obj: Object, propName: string, value: T): T {
+    Object.defineProperty(obj, propName, {
+        value,
+        configurable: true,
+        enumerable: false,
+        writable: false,
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore allow `__proto__`
+        __proto__: null,
+    });
+
+    return value;
 }
 
 let _nextAnimationFrameTimer: ReturnType<typeof requestAnimationFrame> | undefined = void 0;
@@ -1949,20 +2091,27 @@ const _hasWeekMapSymbolsSupport = (function() {
     }
 })();
 
-type _ComponentDescriptionForStatus = [
-    reactFC: EventSignal.ReactFC<any, any, any>,
-    preDefinedProps?: Object,
-];
+type _ComponentDescription<T, S, D> = {
+    // reactFC
+    0: EventSignal.ReactFC<T, S, D> | false | undefined,
+    // preDefinedProps
+    1?: Object,
+    __proto__: null,
+};
 
-const _reactFunctionComponentByComponentType_WeakMap = new WeakMap();
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+// @ts-ignore `TS2344: Type symbol | object does not satisfy the constraint object`
+const _reactFunctionComponentByComponentType_WeakMap = new WeakMap<object | symbol, {
+    [status: string]: _ComponentDescription<any, any, any>,
+}>();
 const _reactFunctionComponentByComponentType_Map = new Map<number | string, {
-    [status: string]: _ComponentDescriptionForStatus,
+    [status: string]: _ComponentDescription<any, any, any>,
 }>();
 
 function _getReactFunctionComponent(
     componentType: EventSignal.NewOptions<any, any, any>["componentType"],
     status?: string,
-): _ComponentDescriptionForStatus | null {
+): _ComponentDescription<any, any, any> | null {
     const type = typeof componentType;
 
     if (componentType === null || type === 'undefined') {
@@ -2008,21 +2157,18 @@ function _setReactFunctionComponent(
         }
     }
     else {
-        const componentDescriptionForStatus = {
+        const componentDescriptionForStatus: _ComponentDescription<any, any, any> = {
             0: reactFC,
             1: preDefinedProps,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore allow `__proto__: null`
             __proto__: null,
-        } as unknown as _ComponentDescriptionForStatus;
+        };
 
         if (prev_reactFCs === null) {
-            map.set(componentType as string, {
-                [_status]: componentDescriptionForStatus,
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                // @ts-ignore allow `__proto__: null`
-                __proto__: null,
-            });
+            const reactFCs = Object.create(null);
+
+            reactFCs[_status] = componentDescriptionForStatus;
+
+            map.set(componentType as string, reactFCs);
         }
         else {
             prev_reactFCs[_status] = componentDescriptionForStatus;
@@ -2112,6 +2258,19 @@ function _checkListener<T extends Function>(listener: T | unknown/* | EventListe
     }
 }
 
+/** @private */
+function _checkEventSignalEventName(ignoredEventName: EventSignal.IgnoredEventNameForListeners | string | undefined) {
+    if (ignoredEventName !== undefined
+        && ignoredEventName !== ''
+        && ignoredEventName !== 'change'
+        && ignoredEventName !== 'changed'
+        && ignoredEventName !== 'data'
+        && ignoredEventName !== 'error'
+    ) {
+        throw new Error(`Invalid "ignoredEventName". Should be undefined or one of ["", "change", "changed", "data", "error"] but "${String(ignoredEventName)}" found`);
+    }
+}
+
 function _noop() {
     // nothing
 }
@@ -2145,7 +2304,7 @@ const _WeakRef_native_support = (function() {
     // check 4 - detect polyfill
     try {
         // This SHOULD throw error:
-        //  Chrome: TypeError: Method WeakRef.prototype.deref called on incompatible receiver #<WeakRef>
+        //  Chrome/nodejs: TypeError: Method WeakRef.prototype.deref called on incompatible receiver #<WeakRef>
         //  FireFox: `TypeError: Receiver of WeakRef.deref call is not a WeakRef`
         Object.create(WeakRef.prototype).deref();
 

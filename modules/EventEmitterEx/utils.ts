@@ -57,7 +57,7 @@ export function stringifyWithCircularHandle(item: any, mapValueOrAutoHandle: boo
 export function arrayContentStringify(
     list: (Function | Object | bigint | number | string | symbol)[],
     excludeObjectFn?: (object: { [key: string]: unknown }) => boolean,
-) {
+): (object | string)[] {
     const { length } = list;
     const result = new Array(length);
 
@@ -67,7 +67,7 @@ export function arrayContentStringify(
 
         switch (type) {
             case "function":
-                result[i] = (item as Function).name;
+                result[i] = `Function#${(item as Function).name}`;
 
                 break;
             case "object":
