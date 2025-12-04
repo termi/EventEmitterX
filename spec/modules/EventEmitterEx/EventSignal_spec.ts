@@ -1990,17 +1990,19 @@ describe('EventSignal', () => {
 
         describe('without computation in throttled signal', function() {
             it('don’t allow to EventSignal to get a new value more than once every X milliseconds', async () => {
+                const ac = new AbortController();
                 const timerGroupId = Symbol();
-                // note: replace with `use throttledValue1$`
+                // note: replace with `using throttledValue1$`
                 const throttledValue1$ = new EventSignal(0, {
                     throttle: {
                         timerGroupId,
                         type: 'clock',
                         ms: 2000,
+                        signal: ac.signal,
                         __proto__: null,
                     },
                 });
-                // note: replace with `use throttledValue2$`
+                // note: replace with `using throttledValue2$`
                 const throttledValue2$ = new EventSignal(555, {
                     throttle: {
                         timerGroupId,
@@ -2016,7 +2018,12 @@ describe('EventSignal', () => {
 
                 expect(computed$.get()).toBe('is 0 and 555');
 
-                throttledValue1$.set(1);
+                // fixme: [tag: SET_WITH_SETTER__QUEUES]
+                //  Тут "предыдущее значение" для каждого `signal.set(setter)` должно быть новым и актуальным.
+                //  throttledValue1$.set(v => ++v);
+                //  throttledValue1$.set(v => ++v);
+                //  throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => v + 3);
 
                 expect(throttledValue1$.get()).toBe(0);
                 expect(computed$.get()).toBe('is 0 and 555');
@@ -2030,34 +2037,196 @@ describe('EventSignal', () => {
 
                 await advanceTimersByTimeAsync(2000);
 
-                expect(throttledValue1$.get()).toBe(1);
-                expect(computed$.get()).toBe('is 1 and 555');
+                expect(throttledValue1$.get()).toBe(3);
+                expect(computed$.get()).toBe('is 3 and 555');
 
                 throttledValue1$.set(2);
 
-                expect(throttledValue1$.get()).toBe(1);
-                expect(computed$.get()).toBe('is 1 and 555');
+                expect(throttledValue1$.get()).toBe(3);
+                expect(computed$.get()).toBe('is 3 and 555');
 
                 await realSleep();
                 await advanceTimersByTimeAsync(500);
 
-                expect(throttledValue1$.get()).toBe(1);
-                expect(computed$.get()).toBe('is 1 and 555');
+                expect(throttledValue1$.get()).toBe(3);
+                expect(computed$.get()).toBe('is 3 and 555');
 
                 await advanceTimersByTimeAsync(2000);
 
                 expect(computed$.get()).toBe('is 2 and 555');
                 expect(throttledValue1$.get()).toBe(2);
 
+                ac.abort();
+
+                throttledValue1$.set(10);
+                throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => ++v);
+
+                // fixme: [tag: SET_WITH_SETTER__QUEUES]
+                //  Тут значение в throttledValue1$ должно быть 12 !
+                expect(computed$.get()).toBe('is 3 and 555');
+                expect(throttledValue1$.get()).toBe(3); //.toBe(12);
+
                 throttledValue1$.destructor();
                 throttledValue2$.destructor();
+            });
+
+            it('don’t allow to EventSignal to get a new value until event in EventEmitter - simple', async () => {
+                const ee = new EventEmitter();
+                const throttledValue$ = new EventSignal(0, {
+                    throttle: {
+                        type: 'emitter',
+                        emitter: ee,
+                        event: 'event',
+                        __proto__: null,
+                    },
+                });
+                const computed$ = new EventSignal('', () => {
+                    return `is ${throttledValue$.get()}`;
+                });
+
+                expect(throttledValue$.get()).toBe(0);
+                expect(computed$.get()).toBe('is 0');
+
+                throttledValue$.set(1);
+
+                expect(throttledValue$.get()).toBe(0);
+                expect(computed$.get()).toBe('is 0');
+
+                ee.emit('event');
+
+                expect(throttledValue$.get()).toBe(1);
+                expect(computed$.get()).toBe('is 1');
+
+                throttledValue$.set(2);
+
+                expect(throttledValue$.get()).toBe(1);
+                expect(computed$.get()).toBe('is 1');
+
+                ee.emit('event');
+
+                expect(computed$.get()).toBe('is 2');
+                expect(throttledValue$.get()).toBe(2);
+
+                throttledValue$.destructor();
+                computed$.destructor();
+
+                expect(getEventListeners(ee, 'event')).toHaveLength(0);
+            });
+
+            it('don’t allow to EventSignal to get a new value until event in any Emitter - complex', async () => {
+                const ee = new EventEmitter();
+                const et = new EventTarget();
+                const ignoreThisEvent = Symbol('ignoreThisEvent');
+                const event2 = Symbol('event2');
+                // note: replace with `using throttledValue1$`
+                const throttledValue1$ = new EventSignal(0, {
+                    throttle: {
+                        type: 'emitter',
+                        emitter: new WeakRef(ee),
+                        event: [ 'event1', event2 ],
+                        filter(_eventName, ...args: unknown[]) {
+                            return args[0] !== ignoreThisEvent;
+                        },
+                        __proto__: null,
+                    },
+                });
+                const value2_ac = new AbortController();
+                // note: replace with `using throttledValue2$`
+                const throttledValue2$ = new EventSignal(555, {
+                    throttle: {
+                        type: 'emitter',
+                        emitter: new WeakRef(et),
+                        event: [ 'event3', 'event4' ],
+                        signal: value2_ac.signal,
+                        __proto__: null,
+                    },
+                });
+                const value3Dep = new EventSignal(0);
+                // note: replace with `using throttledValue3$`
+                const throttledValue3$ = new EventSignal('a', {
+                    throttle: {
+                        eventSignal: value3Dep,
+                        __proto__: null,
+                    },
+                });
+                const computed$ = new EventSignal('', () => {
+                    return `#1 = ${throttledValue1$}; #2 = ${throttledValue2$}; #3 = ${throttledValue3$}`;
+                });
+
+                expect(computed$.get()).toBe('#1 = 0; #2 = 555; #3 = a');
+
+                throttledValue1$.set(v => ++v);
+                throttledValue2$.set(v => ++v);
+                throttledValue3$.set(v => v + v);
+
+                expect(throttledValue1$.get()).toBe(0);
+                expect(throttledValue2$.get()).toBe(555);
+                expect(computed$.get()).toBe('#1 = 0; #2 = 555; #3 = a');
+
+                ee.emit('event1', ignoreThisEvent);
+
+                expect(throttledValue1$.get()).toBe(0);
+                expect(throttledValue2$.get()).toBe(555);
+                expect(computed$.get()).toBe('#1 = 0; #2 = 555; #3 = a');
+
+                ee.emit('event1');
+
+                expect(throttledValue1$.get()).toBe(1);
+                expect(throttledValue2$.get()).toBe(555);
+                expect(computed$.get()).toBe('#1 = 1; #2 = 555; #3 = a');
+
+                et.dispatchEvent(new CustomEvent('event3'));
+
+                expect(computed$.get()).toBe('#1 = 1; #2 = 556; #3 = a');
+                expect(throttledValue1$.get()).toBe(1);
+                expect(throttledValue2$.get()).toBe(556);
+
+                // fixme: [tag: SET_WITH_SETTER__QUEUES]
+                //  Тут "предыдущее значение" (1) для каждого `signal.set(setter)` должно быть новым и актуальным.
+                //  throttledValue1$.set(v => ++v);
+                //  throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => v + 2);
+                throttledValue2$.set(v => ++v);
+
+                value2_ac.abort();
+                value3Dep.set(v => ++v);
+
+                expect(computed$.get()).toBe('#1 = 1; #2 = 557; #3 = aa');
+                expect(throttledValue1$.get()).toBe(1);
+                expect(throttledValue2$.get()).toBe(557);
+
+                ee.emit(event2);
+                throttledValue2$.set(v => ++v);
+
+                expect(computed$.get()).toBe('#1 = 3; #2 = 558; #3 = aa');
+                expect(throttledValue1$.get()).toBe(3);
+                expect(throttledValue2$.get()).toBe(558);
+                throttledValue2$.set(v => ++v);
+                expect(computed$.get()).toBe('#1 = 3; #2 = 559; #3 = aa');
+                expect(throttledValue2$.get()).toBe(559);
+
+                throttledValue1$.destructor();
+                throttledValue2$.destructor();
+                throttledValue3$.destructor();
+                computed$.destructor();
+
+                expect(getEventListeners(ee, 'event1')).toHaveLength(0);
+                expect(getEventListeners(ee, event2)).toHaveLength(0);
+                expect(getEventListeners(et, 'event3')).toHaveLength(0);
+                expect(getEventListeners(et, 'event4')).toHaveLength(0);
+                expect(getEventListeners(value2_ac.signal, 'abort')).toHaveLength(0);
+                expect(getEventListeners(value3Dep, '')).toHaveLength(0);
+                expect(getEventListeners(throttledValue1$, '')).toHaveLength(0);
+                expect(getEventListeners(throttledValue2$, '')).toHaveLength(0);
+                expect(getEventListeners(throttledValue3$, '')).toHaveLength(0);
             });
         });
 
         describe('with computation in throttled signal', function() {
             it('don’t allow to EventSignal to get a new value more than once every X milliseconds', async () => {
                 const timerGroupId = Symbol();
-                // note: replace with `use throttledValue1$`
+                // note: replace with `using throttledValue1$`
                 const throttledComputed$ = new EventSignal('', (_p, sourceValue) => {
                     return `count is ${sourceValue}`;
                 }, {

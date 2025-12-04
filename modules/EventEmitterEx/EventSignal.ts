@@ -68,12 +68,12 @@ export class EventSignal<T, S=T, D=undefined> {
     private _promise: Promise<T> | undefined;
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
-    private _throttle: _TimerGroup | EventSignal<any> | ReturnType<typeof setInterval> | undefined;
+    private _throttleCleanUp: (() => void) | undefined;
     private readonly _abortSignal?: AbortSignal;
-    private readonly _oneOfDepUpdated = () => {
+    private readonly _oneOfDepUpdated = (noEventSignalDepUpdate?: boolean) => {
         const stateFlags = this._stateFlags;
-        const hasNoThrottleOrWasForceUpdateTrigger = ((stateFlags & EventSignal.StateFlags.hasThrottle) === 0
-            || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+        const hasNoThrottle_or_wasThrottleTrigger = ((stateFlags & EventSignal.StateFlags.hasThrottle) === 0
+            || (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) !== 0
         );
 
         if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) === 0) {
@@ -85,27 +85,22 @@ export class EventSignal<T, S=T, D=undefined> {
                 | EventSignal.StateFlags.wasSourceSettingFromEvent
             );
 
-            if (hasNoThrottleOrWasForceUpdateTrigger) {
+            if (hasNoThrottle_or_wasThrottleTrigger) {
                 // todo: В конструкторе EventSignal может приходить кастомный EventsEmitter.
                 // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
                 signalEventsEmitter.emit(this._signalSymbol);
             }
         }
-        else {
+        else if (!noEventSignalDepUpdate) {
             this._stateFlags |= EventSignal.StateFlags.wasDepsUpdate;
             this._stateFlags &= ~(EventSignal.StateFlags.wasSourceSetting
                 | EventSignal.StateFlags.wasSourceSettingFromEvent
             );
         }
 
-        if (hasNoThrottleOrWasForceUpdateTrigger) {
+        if (hasNoThrottle_or_wasThrottleTrigger) {
             this._recalculateIfNeeded();
         }
-    };
-    private readonly _onForceUpdateTrigger = () => {
-        this._stateFlags |= EventSignal.StateFlags.wasForceUpdateTrigger;
-
-        this._oneOfDepUpdated();
     };
     private readonly _computation?: EventSignal.ComputationWithSource<T, S, D>;
     protected _isInReactRenders: Set<EventSignal.ReactFC<any, any, any, any>> | undefined;
@@ -113,16 +108,11 @@ export class EventSignal<T, S=T, D=undefined> {
     // todo: add `statusData?: any;`?
     public readonly status?: string;
     public readonly lastError?: Error | string;
-    /** WeakRef or replacement object */
-    private readonly _sourceEmitterRef?: { deref(): EventEmitter | EventEmitterX | EventTarget | undefined };
     // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceMap"];
     // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceFilter"];
-    private readonly _initialComputations?: [
-        event: number | string | symbol,
-        listener: (...args: unknown[]) => void,
-    ][];
+    private readonly _sourceCleanup: (() => void) | undefined;
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
     // @ts-ignore Ignore: `TS2322: Type 'undefined' is not assignable to type 'D'. \n'D' could be instantiated with an arbitrary type which could be unrelated to 'undefined'`
     public data: D = void 0;
@@ -265,64 +255,51 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (sourceEvent && sourceEmitter) {
-                this._sourceEmitterRef = _weakRefFabric<EventEmitter | EventEmitterX | EventTarget>(sourceEmitter);
                 this._sourceMapFn = sourceMap;
                 this._sourceFilterFn = sourceFilter;
-                this._initialComputations = [];
 
                 // this._hasSourceEmitter = true;
                 stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
 
-                const events = Array.isArray(sourceEvent) ? sourceEvent : [ sourceEvent ];
+                this._sourceCleanup = _eventTargetAddListeners(sourceEmitter, (...args: unknown[]) => {
+                    // eslint-disable-next-line prefer-spread
+                    if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])) {
+                        return;
+                    }
 
-                for (const event of events) {
-                    // todo: Подсчитывать количество вызовов по событию?
-                    const _initialComputation = (...args: unknown[]) => {
-                        args.unshift(event);
-
+                    const { _sourceMapFn } = this;
+                    const _newSourceValue = _sourceMapFn
                         // eslint-disable-next-line prefer-spread
-                        if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])) {
-                            return;
-                        }
+                        ? _sourceMapFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])
+                        : args[1] as S
+                    ;
+                    // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
+                    const isForceRecomputeWithSameSourceValue = _newSourceValue === void 0;
 
-                        const { _sourceMapFn } = this;
-                        const _newSourceValue = _sourceMapFn
-                            // eslint-disable-next-line prefer-spread
-                            ? _sourceMapFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])
-                            : args[1] as S
-                        ;
-                        // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
-                        const isForceRecomputeWithSameSourceValue = _newSourceValue === void 0;
+                    if (isForceRecomputeWithSameSourceValue && _sourceMapFn) {
+                        // _sourceMapFn ничего не вернула - ничего делать не нужно
+                        return;
+                    }
 
-                        if (isForceRecomputeWithSameSourceValue && _sourceMapFn) {
-                            // _sourceMapFn ничего не вернула - ничего делать не нужно
-                            return;
-                        }
+                    this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
+                    this._stateFlags &= ~EventSignal.StateFlags.wasDepsUpdate;
 
-                        this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
-                        this._stateFlags &= ~EventSignal.StateFlags.wasDepsUpdate;
+                    const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
 
-                        const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
+                    const isNeedToUpdate = this._setSourceValue(
+                        newSourceValue,
+                        // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
+                        false,
+                        newSourceValue === void 0,
+                    );
 
-                        const isNeedToUpdate = this._setSourceValue(
-                            newSourceValue,
-                            // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
-                            false,
-                            newSourceValue === void 0,
-                        );
-
-                        if (!isNeedToUpdate) {
-                            this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
-                        }
-                    };
-
-                    this._initialComputations.push([
-                        event,
-                        _initialComputation,
-                    ]);
-
-                    _eventTargetAgnosticAddListener(sourceEmitter, event, _initialComputation);
-                }
+                    if (!isNeedToUpdate) {
+                        this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
+                    }
+                }, {
+                    eventName: sourceEvent,
+                    addEventNameToListener: true,
+                });
             }
 
             if (_abortSignal) {
@@ -339,45 +316,35 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             if (throttle && typeof throttle === 'object') {
-                const signalSymbol = this._signalSymbol;
-                let hasThrottle = false;
-                let isTimeout: boolean;
+                // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
+                const _onThrottleTrigger = () => {
+                    this._stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
 
-                if ((isTimeout = throttle.type === 'timeout') || throttle.type === 'clock') {
-                    const { ms, timerGroupId = '' } = throttle;
-                    const throttleGroup = _getAndSubTimerGroup(timerGroupId, {
-                        signalSymbol,
-                        ms,
-                        isTimeout,
-                        onEnd: isTimeout ? () => {
-                            this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
-                            this._throttle = void 0;
-                        } : void 0,
-                        __proto__: null,
-                    });
+                    if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
+                        this._oneOfDepUpdated(true);
 
-                    if (throttleGroup) {
-                        triggerEventsEmitter.on(signalSymbol, this._onForceUpdateTrigger);
-
-                        this._throttle = throttleGroup;
-
-                        hasThrottle = true;
+                        // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
+                        signalEventsEmitter.emit(this._signalSymbol);
                     }
-                }
-                else if (isEventSignal(throttle.eventSignal)) {
-                    signalEventsEmitter.on(throttle.eventSignal._signalSymbol, this._onForceUpdateTrigger);
+                };
 
-                    this._throttle = throttle.eventSignal;
+                const throttleCleanUp = this._subscribeToTrigger(throttle, _onThrottleTrigger, () => {
+                    this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
+                    this._throttleCleanUp = void 0;
 
-                    hasThrottle = true;
-                }
+                    if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) === 0) {
+                        _onThrottleTrigger();
+                    }
+                });
 
-                if (hasThrottle) {
+                if (throttleCleanUp) {
+                    this._throttleCleanUp = throttleCleanUp;
+
                     stateFlags |= EventSignal.StateFlags.hasThrottle;
 
                     if ((stateFlags & (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue)) !== 0) {
                         // First computation is needed
-                        stateFlags |= EventSignal.StateFlags.wasForceUpdateTrigger;
+                        stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
                     }
                 }
             }
@@ -407,8 +374,6 @@ export class EventSignal<T, S=T, D=undefined> {
             _finaleSourceValue,
             _signalSymbol,
             _abortSignal,
-            _initialComputations,
-            _sourceEmitterRef,
         } = this;
         const has_finaleValue = _finaleValue !== void 0;
         const has_finaleSourceValue = _finaleSourceValue !== void 0;
@@ -442,18 +407,6 @@ export class EventSignal<T, S=T, D=undefined> {
 
         this.clearDeps();
 
-        if (_initialComputations && _sourceEmitterRef) {
-            const _sourceEmitter = _sourceEmitterRef.deref();
-
-            if (_sourceEmitter) {
-                for (const { 0: event, 1: _initialComputation } of _initialComputations) {
-                    _eventTargetAgnosticRemoveListener(_sourceEmitter, event, _initialComputation);
-                }
-            }
-
-            _initialComputations.length = 0;
-        }
-
         // If has finaleSourceValue do not cleanup this._sourceValue due .getSourceValue() method
         if (!has_finaleSourceValue) {
             this._sourceValue = void 0;
@@ -467,11 +420,8 @@ export class EventSignal<T, S=T, D=undefined> {
             | EventSignal.StateFlags.wasSourceSetting
             | EventSignal.StateFlags.wasSourceSettingFromEvent
             | EventSignal.StateFlags.hasThrottle
-            | EventSignal.StateFlags.wasForceUpdateTrigger
+            | EventSignal.StateFlags.wasThrottleTrigger
         );
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-        // @ts-ignore ignore readonly attribute
-        this._sourceEmitterRef = void 0;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore readonly attribute
         this._sourceMapFn = void 0;
@@ -511,20 +461,12 @@ export class EventSignal<T, S=T, D=undefined> {
         this._reject = void 0;
         this._promise = void 0;
 
-        const throttle = this._throttle;
-
-        if (throttle) {
-            if (isEventSignal(throttle)) {
-                signalEventsEmitter.removeListener(throttle._signalSymbol, this._onForceUpdateTrigger);
-            }
-            else if (typeof throttle === 'object' && throttle[kIsTimerGroup]) {
-                const timerGroup = throttle as _TimerGroup;
-
-                timerGroup.removeSub(this._signalSymbol);
-            }
-
-            this._throttle = void 0;
-        }
+        this._sourceCleanup?.();
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore ignore readonly attribute
+        this._sourceCleanup = void 0;
+        this._throttleCleanUp?.();
+        this._throttleCleanUp = void 0;
 
         /**
          * Удаляем подписки ДРУГИХ сигналов на этот EventSignal.
@@ -568,6 +510,87 @@ export class EventSignal<T, S=T, D=undefined> {
         return this._signalSymbol;
     }
 
+    private _subscribeToTrigger(
+        trigger: EventSignal.TriggerDescription,
+        listener: () => void,
+        onEnd?: () => void,
+    ) {
+        // AbortSignal
+        const { signal } = trigger;
+
+        if (signal?.aborted) {
+            return;
+        }
+
+        let throttleCleanUp: (() => void) | undefined;
+        let isTimeout: boolean;
+
+        if ((isTimeout = trigger.type === 'timeout') || trigger.type === 'clock') {
+            const signalSymbol = this._signalSymbol;
+            const { ms, timerGroupId = '' } = trigger;
+            const timerGroup = _getAndSubTimerGroup(timerGroupId, {
+                signalSymbol,
+                ms,
+                isTimeout,
+                signal,
+                onEnd,
+                __proto__: null,
+            });
+
+            if (timerGroup) {
+                triggerEventsEmitter.on(signalSymbol, listener);
+
+                throttleCleanUp = () => {
+                    triggerEventsEmitter.removeListener(signalSymbol, listener);
+                    timerGroup.removeSub(signalSymbol);
+                };
+            }
+        }
+        else if (trigger.type === 'emitter') {
+            const {
+                emitter: _emitter,
+            } = trigger;
+            const isWeakRef = _isWeakRef(_emitter);
+            const emitter = isWeakRef ? _emitter.deref() : _emitter;
+
+            if (emitter && _emitter) {
+                const { event, filter, once } = trigger;
+
+                throttleCleanUp = _eventTargetAddListeners(emitter, listener, {
+                    eventName: event,
+                    filter,
+                    once,
+                    // Usable only with `emitter is EventTarget`
+                    passive: true,
+                    signal,
+                    onEnd,
+                    __proto__: null,
+                });
+            }
+        }
+        else if ((trigger.type === void 0 || trigger.type === 'eventSignal') && isEventSignal(trigger.eventSignal)) {
+            const signalSymbol = trigger.eventSignal._signalSymbol;
+
+            if (signalSymbol) {
+                signalEventsEmitter.on(signalSymbol, listener);
+
+                throttleCleanUp = () => {
+                    if (throttleCleanUp) {
+                        signal?.removeEventListener('abort', throttleCleanUp);
+                    }
+
+                    signalEventsEmitter.removeListener(signalSymbol, listener);
+                    onEnd?.();
+                    throttleCleanUp = void 0;
+                };
+
+                signal?.addEventListener('abort', throttleCleanUp, { once: true });
+            }
+        }
+
+        return throttleCleanUp;
+    }
+
     private async _awaitForCurrentValue(
         currentValue = this._value,
         isPromise = !!currentValue && typeof currentValue === 'object' && typeof currentValue["then"] === 'function'
@@ -602,7 +625,7 @@ export class EventSignal<T, S=T, D=undefined> {
             _sourceValue,
         } = this;
 
-        this._stateFlags &= ~EventSignal.StateFlags.wasForceUpdateTrigger;
+        this._stateFlags &= ~EventSignal.StateFlags.wasThrottleTrigger;
 
         if ((this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0 && !ignoreComputation) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
@@ -869,7 +892,7 @@ export class EventSignal<T, S=T, D=undefined> {
         if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0
             && (
                 (stateFlags & EventSignal.StateFlags.hasThrottle) === 0
-                || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+                || (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) !== 0
             )
         ) {
             const maybePromise = this._calculateValue();
@@ -911,6 +934,18 @@ export class EventSignal<T, S=T, D=undefined> {
         this._stateFlags |= EventSignal.StateFlags.nextValueShouldBeForceSettled;
     }
 
+    // todo: [tag: SET_WITH_SETTER__QUEUES]
+    //  Пересмотреть концепцию set с setter'ом. Нужно сделать так, чтобы никакие значения не терялись.
+    //  Сейчас при throttle и/или при async computation, в prev будет последнее посчитанное значение для
+    //  каждого `signal.set(setter)` вызванного синхронно друг за другом. Это будет создавать ситуацию, когда часть
+    //  данных будет теряться. Например один и тот де EventSignal будет вести себя по-разному с throttle и без:
+    //   - Без throttle в каждом `signal.set(v => v + 1)` идущем друг за другом предыдущее значение (v) будет новым
+    //     и равным вычисленному в предыдущем `signal.set(v => v + 1)`
+    //   - С throttle или с sync computation в каждом `signal.set(v => v + 1)` идущем друг за другом предыдущее значение (v)
+    //     будет одинаковым и равным последнему вычисленному значению.
+    //  Для решения этой проблемы, выводы `signal.set(setter)` нужно сохраняться в очередь и резолвить эту очередь в момент,
+    //   когда нам нужно пересчитать значение. В случае с sync computation каждый элемент в очереди выполняется асинхронно
+    //   и мы должны дождаться результата.
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
     set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)) {
@@ -996,7 +1031,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 this._stateFlags |= EventSignal.StateFlags.isNeedToCalculateNewValue;
 
                 if ((stateFlags & EventSignal.StateFlags.hasThrottle) !== 0
-                    && (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0
+                    && (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) === 0
                 ) {
                     return false;
                 }
@@ -1050,13 +1085,17 @@ export class EventSignal<T, S=T, D=undefined> {
                 ;
             }
         }
+        // todo: Не уверен, что это нужно. Потому что пересчитывание значения должно быть только в случае:
+        //  1. Если мы запрашиваем новое значение (вызов `get()`)
+        //  2. Если есть подписка в signalEventsEmitter на этот сигнал от другого сигнала (точно?, уточнить)
+        //  3. Если есть listener повешенный с помощью addListener (подписка в subscribersEventsEmitter на этот сигнал)
         else {
             const stateFlags = this._stateFlags;
 
             if ((stateFlags & EventSignal.StateFlags.hasThrottle) !== 0
-                && (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0
+                && (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) === 0
             ) {
-                this._stateFlags &= ~EventSignal.StateFlags.wasForceUpdateTrigger;
+                this._stateFlags &= ~EventSignal.StateFlags.wasThrottleTrigger;
 
                 const maybePromise = this._calculateValue();
 
@@ -1080,7 +1119,7 @@ export class EventSignal<T, S=T, D=undefined> {
             // todo: Точно на этом этапе нужно тормозить при throttle? Или в этот момент уже поздно тормозить? И не сломает ли это логику в каком-то из кейсов?
             && (
                 (stateFlags & EventSignal.StateFlags.hasThrottle) === 0
-                || (stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) !== 0
+                || (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) !== 0
             )
         ;
     }
@@ -1433,8 +1472,15 @@ export class EventSignal<T, S=T, D=undefined> {
         return Number.POSITIVE_INFINITY;
     }
 
-    listeners(): Function[] {// eslint-disable-line class-methods-use-this
-        throw new Error('Not implemented');
+    listeners(type?: number | string | symbol): Function[] {// eslint-disable-line class-methods-use-this
+        _checkEventSignalEventName(type);
+
+        if (type === 'error') {
+            // ignore "error" subscription
+            throw new Error('Not implemented');
+        }
+
+        return signalEventsEmitter.listeners(this._signalSymbol);
     }
 
     rawListeners(_type: string): Function[] {// eslint-disable-line class-methods-use-this
@@ -2035,7 +2081,7 @@ export namespace EventSignal {
     // todo:
     //  see https://lodash.com/docs/4.17.15#debounce
     //  see [See David Corbacho's article for details over the differences between _.debounce and _.throttle.](https://css-tricks.com/debouncing-throttling-explained-examples/)
-    /*export type TriggerDescriptionDebounce = {
+    /*export type ThrottleDescriptionDebounce = {
         type: 'debounce',
         // The number of milliseconds to delay.
         ms: number,
@@ -2055,6 +2101,7 @@ export namespace EventSignal {
         ms: number,
         // todo: leading?: boolean, trailing?: boolean,
         timerGroupId?: TriggerDescriptionTimerGroupId,
+        signal?: AbortSignal,
         __proto__?: null,
     };
     export type TriggerDescriptionClock = {
@@ -2062,15 +2109,26 @@ export namespace EventSignal {
         // Can be changed every
         ms: number,
         timerGroupId?: TriggerDescriptionTimerGroupId,
+        signal?: AbortSignal,
         __proto__?: null,
     };
     export type TriggerDescriptionEventSignal = {
         type?: 'eventSignal',
         eventSignal: EventSignal<any>,
+        signal?: AbortSignal,
+        __proto__?: null,
+    };
+    export type TriggerDescriptionEventEmitter = {
+        type: 'emitter',
+        emitter: EventEmitter | EventEmitterX | EventTarget | WeakRef<EventEmitter | EventEmitterX | EventTarget> | undefined,
+        event: (number | string | symbol)[] | number | string | symbol,
+        filter?: ((this: null, eventName: number | string | symbol, ...args: any[]) => boolean),
+        once?: boolean,
+        signal?: AbortSignal,
         __proto__?: null,
     };
 
-    export type TriggerDescription = TriggerDescriptionClock | TriggerDescriptionEventSignal | TriggerDescriptionTimeout;
+    export type TriggerDescription = TriggerDescriptionClock | TriggerDescriptionEventEmitter | TriggerDescriptionEventSignal | TriggerDescriptionTimeout;
 
     export type ReactFC<T, S, D, PROPS={}> = (props: {
         eventSignal: EventSignal<T, S, D>,
@@ -2140,7 +2198,7 @@ export namespace EventSignal {
         wasDepsUpdate = 1 << 1,
         wasSourceSetting = 1 << 2,
         wasSourceSettingFromEvent = 1 << 3,
-        wasForceUpdateTrigger = 1 << 4,
+        wasThrottleTrigger = 1 << 4,
 
         isNeedToCalculateNewValue = 1 << 8,
         hasSourceEmitter = 1 << 9,
@@ -2165,6 +2223,14 @@ EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
 export function isEventSignal(maybeEventSignal: EventSignal<any> | unknown): maybeEventSignal is EventSignal<any> {
     return !!maybeEventSignal
         && ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
+    ;
+}
+
+function _isWeakRef<T extends object=object>(maybeWeakRef: WeakRef<T> | unknown): maybeWeakRef is WeakRef<T> {
+    return !!maybeWeakRef
+        && typeof (maybeWeakRef as WeakRef<any>).deref === 'function'
+        // can be 'WeakRef' or 'FakeWeakRef'
+        && String(maybeWeakRef[Symbol.toStringTag]).includes('WeakRef')
     ;
 }
 
@@ -2494,14 +2560,104 @@ function _setReactFunctionComponent(
     return prev_reactFCDescriptor || null;
 }
 
-const kTargetListener = Symbol('kTargetListener');
+/**
+ * @private
+ * @throws {TypeError} 'Invalid type of "emitter". Should be EventEmitter or EventTarget'
+ * @throws {TypeError} 'Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
+ */
+function _eventTargetAddListeners(
+    emitter: EventEmitter | EventTarget | WeakRef<EventEmitter | EventTarget>,
+    listener: (...args: unknown[]) => void,
+    options: {
+        eventName: (number | string | symbol)[] | number | string | symbol,
+        filter?: (this: null, eventName: number | string | symbol, ...args: unknown[]) => boolean,
+        addEventNameToListener?: boolean,
+        once?: boolean,
+        // Usable only with `emitter is EventTarget`
+        passive?: boolean,
+        signal?: AbortSignal,
+        onEnd?: () => void,
+        __proto__?: null,
+    },
+) {
+    const isWeakRefEmitter = _isWeakRef(emitter);
+    /** WeakRef or replacement object */
+    const emitterWeakRef = isWeakRefEmitter ? emitter : _weakRefFabric(emitter);
+    const { signal, onEnd } = options;
+    const subscriptions: { 0: number | string | symbol, 1: typeof listener, __proto__: null }[] = [];
+    const cancel = function() {
+        const emitter = emitterWeakRef.deref();
 
-/** @private */
+        if (emitter) {
+            for (const { 0: eventName, 1: listener } of subscriptions) {
+                _eventTargetAgnosticRemoveListener(emitter, eventName, listener);
+            }
+        }
+
+        subscriptions.length = 0;
+        abortCleanup?.();
+        onEnd?.();
+    };
+    let abortCleanup: (() => void) | undefined;
+
+    if (signal) {
+        signal.addEventListener('abort', cancel, { once: true });
+
+        abortCleanup = signal.removeEventListener.bind(signal, 'abort', cancel);
+    }
+
+    {
+        const _emitter = isWeakRefEmitter ? emitter.deref() : emitter;
+
+        if (_emitter) {
+            const { eventName, filter, once, passive, addEventNameToListener } = options;
+            const flags = { once, passive };
+
+            for (const _eventName of Array.isArray(eventName) ? eventName : [ eventName ]) {
+                const _listener = (filter || addEventNameToListener)
+                    ? (...args: unknown[]) => {
+                        const matched = !filter || filter.call(null, _eventName, ...args);
+
+                        if (matched) {
+                            if (addEventNameToListener) {
+                                listener(_eventName, ...args);
+                            }
+                            else {
+                                listener(...args);
+                            }
+
+                            if (once) {
+                                cancel();
+                            }
+                        }
+                    }
+                    : listener
+                ;
+
+                subscriptions.push({ 0: _eventName, 1: _listener, __proto__: null });
+                _eventTargetAgnosticAddListener(_emitter, _eventName, _listener, flags);
+            }
+        }
+        else {
+            abortCleanup?.();
+
+            return _noop;
+        }
+    }
+
+    return cancel;
+}
+
+/**
+ * @private
+ * @throws {TypeError} 'Invalid type of "emitter". Should be EventEmitter or EventTarget'
+ * @throws {TypeError} 'Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
+ */
 function _eventTargetAgnosticAddListener<T>(
     emitter: EventEmitter | EventTarget,
     name: number | string | symbol,
     listener: (newValue: T) => void,
-    flags?: { once?: boolean },
+    flags?: { once?: boolean, signal?: AbortSignal },
 ) {
     if (typeof (emitter as EventEmitter).on === 'function') {
         if (flags?.once) {
@@ -2512,31 +2668,34 @@ function _eventTargetAgnosticAddListener<T>(
         }
     }
     else if (typeof (emitter as EventTarget).addEventListener === 'function') {
-        const eventName = typeof (name as unknown) === 'symbol'
-            ? String(`symbol----${String(name)}`)
-            : name as string
-        ;
-
-        (emitter as EventTarget).addEventListener(eventName, listener as (() => void), flags);
+        // note: is eventName is symbol it will be error:
+        //  TypeError: Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string
+        // note: listener is type of `(event: { target: EventTarget }) => void`
+        (emitter as EventTarget).addEventListener(name as string, listener as (() => void), flags);
     }
     else {
         throw new TypeError(`Invalid type of "emitter". Should be EventEmitter or EventTarget`);
     }
 }
 
-/** @private */
-function _eventTargetAgnosticRemoveListener<T>(emitter: EventEmitter | EventTarget, name: number | string | symbol, listener: (newValue: T) => void) {
+/**
+ * @private
+ * @throws {TypeError} 'Invalid type of "emitter". Should be EventEmitter or EventTarget'
+ * @throws {TypeError} 'Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
+ */
+function _eventTargetAgnosticRemoveListener<T>(
+    emitter: EventEmitter | EventTarget,
+    name: number | string | symbol,
+    listener: (newValue: T) => void,
+) {
     if (typeof (emitter as EventEmitter).removeListener === 'function') {
         (emitter as EventEmitter).removeListener(name as string, listener);
     }
     else if (typeof (emitter as EventTarget).removeEventListener === 'function') {
-        const eventName = typeof (name as unknown) === 'symbol'
-            ? String(`symbol----${String(name)}`)
-            : name as string
-        ;
-        const compatibleListener = listener[kTargetListener] || listener;
-
-        (emitter as EventTarget).removeEventListener(eventName, compatibleListener);
+        // note: is eventName is symbol it will be error:
+        //  TypeError: Failed to execute 'removeEventListener' on 'EventTarget': Cannot convert a Symbol value to a string
+        // note: listener is type of `(event: { target: EventTarget }) => void`
+        (emitter as EventTarget).removeEventListener(name as string, listener as (() => void));
     }
     else {
         throw new TypeError(`Invalid type of "emitter". Should be EventEmitter or EventTarget`);
@@ -2549,9 +2708,9 @@ function _eventTargetAgnosticRemoveListener<T>(emitter: EventEmitter | EventTarg
 //         (emitter as EventEmitter).emit(name as string, eventData);
 //     }
 //     else if (typeof (emitter as EventTarget).dispatchEvent === 'function') {
-//         const eventName = typeof name === 'symbol' ? String(`symbol----${String(name)}`) : name as string;
-//
-//         (emitter as EventTarget).dispatchEvent(new CustomEvent<unknown>(eventName, {
+//         // note: is eventName is symbol it will be error:
+//         //  TypeError: Failed to construct 'CustomEvent': Cannot convert a Symbol value to a string
+//         (emitter as EventTarget).dispatchEvent(new CustomEvent<unknown>(name as string, {
 //             detail: eventData,
 //         }));
 //     }
@@ -2575,7 +2734,7 @@ function _checkListener<T extends Function>(listener: T | unknown/* | EventListe
 }
 
 /** @private */
-function _checkEventSignalEventName(ignoredEventName: EventSignal.IgnoredEventNameForListeners | string | undefined) {
+function _checkEventSignalEventName(ignoredEventName: EventSignal.IgnoredEventNameForListeners | number | string | undefined) {
     if (ignoredEventName !== undefined
         && ignoredEventName !== ''
         && ignoredEventName !== 'change'
@@ -2649,14 +2808,14 @@ const __FakeWeakRef_proto__ = Object.setPrototypeOf({
     [Symbol.toStringTag]: 'FakeWeakRef',
 }, null);
 
-function _weakRefFabric<O = Object | symbol>(target: O): { deref(): O | undefined } {
-    if (typeof target === 'symbol' ? _WeakRef_symbols_support : _WeakRef_native_support) {
-        return new WeakRef(target as Object) as unknown as { deref(): O | undefined };
+function _weakRefFabric<O extends object = object>(target: O): WeakRef<O> {
+    if (typeof (target as unknown) === 'symbol' ? _WeakRef_symbols_support : _WeakRef_native_support) {
+        return new WeakRef(target as Object as O);
     }
 
     return Object.setPrototypeOf({
         __value: target,
-    }, __FakeWeakRef_proto__) as { deref(): O | undefined };
+    }, __FakeWeakRef_proto__) as WeakRef<O>;
 }
 
 // todo: Не экспортировать signalEventsEmitter, а сделать отдельные методы, которые будут давать информацию о его состоянии.
