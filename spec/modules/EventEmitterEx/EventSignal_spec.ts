@@ -19,6 +19,7 @@ import {
     EventSignal,
     __test__get_signalEventsEmitter,
     __test__get_subscribersEventsEmitter,
+    __test__get_timersTriggerEventsEmitter,
 } from "../../../modules/EventEmitterEx/EventSignal";
 // import { isAbortError } from "../../../common/AbortController";
 import { EventEmitterX, once, on } from "../../../modules/events";
@@ -38,6 +39,12 @@ const { createSignal } = EventSignal;
 
 const __test__signalEventsEmitter = __test__get_signalEventsEmitter();
 const __test__subscribersEventsEmitter = __test__get_subscribersEventsEmitter();
+const __test__timersTriggerEventsEmitter = __test__get_timersTriggerEventsEmitter();
+
+const SECONDS = 1000;
+const MINUTES = 60 * SECONDS;
+const SECONDS_15 = SECONDS * 15;
+const SECONDS_30 = SECONDS * 30;
 
 describe('EventSignal', () => {
     const _isEvenNumber = (num: number) => {
@@ -1974,6 +1981,165 @@ describe('EventSignal', () => {
 
             expect(computedStore2$.get()).toEqual([ 'value', '3' ]);
             expect(computedStore2$.version).toBe(2);
+        });
+    });
+
+    describe('trigger', function() {
+        beforeAll(() => {
+            useFakeTimers(void 0, {
+                useJump: true,
+            });
+        });
+
+        afterAll(() => {
+            useRealTimers();
+        });
+
+        describe('only works with computation in triggered signal', function() {
+            it('force update signal value every X milliseconds', async () => {
+                const ac = new AbortController();
+                const timerGroupId = Symbol();
+                // note: replace with `using counterValue$`
+                const counterValue$ = new EventSignal(0, (v, sourceValue, eventSignal) => {
+                    return eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting
+                        ? sourceValue
+                        : ++v
+                    ;
+                }, {
+                    trigger: {
+                        timerGroupId,
+                        type: 'clock',
+                        ms: SECONDS_30,
+                        signal: ac.signal,
+                        __proto__: null,
+                    },
+                });
+                // note: replace with `using timeValue$`
+                const timeValue$ = new EventSignal('', function(_v, options) {
+                    return new Date().toLocaleString(void 0, options);
+                }, {
+                    initialSourceValue: {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZone: '+03:00',
+                        hour12: false,
+                        hourCycle: 'h23',
+                    } as Intl.DateTimeFormatOptions,
+                    trigger: {
+                        type: 'clock',
+                        timerGroupId,
+                        ms: MINUTES,
+                        __proto__: null,
+                    },
+                });
+                const fromTemplate$ = new EventSignal('', (_v, template) => {
+                    const args = [
+                        counterValue$.get(),
+                        timeValue$.get()
+                            // '04.12.2025, 09:05:00' -> '04.12.2025 09:05:00'
+                            .replace(', ', ' ')
+                            // '09:05:00,751' -> '09:05:00.751'
+                            .replace(',', '.')
+                        ,
+                    ];
+
+                    return template.replace(/(#{(\d+)})/g, function(_full, _group, indexString) {
+                        const index = Number(indexString);
+                        const value = args[index];
+
+                        return String(value ?? '');
+                    });
+                }, {
+                    initialSourceValue: 'counter is #{0} and time is "#{1}"',
+                });
+
+                setSystemTime('2025-12-04T09:05:00+03:00');
+
+                expect(fromTemplate$.get()).toBe('counter is 1 and time is "09:05:00"');
+
+                // fixme: [tag: SET_WITH_SETTER__QUEUES]
+                //  Тут "предыдущее значение" для каждого `signal.set(setter)` должно быть новым и актуальным.
+                //  throttledValue1$.set(v => ++v);
+                //  throttledValue1$.set(v => ++v);
+                //  throttledValue1$.set(v => ++v);
+                counterValue$.set(v => v + 3);
+
+                expect(counterValue$.get()).toBe(4);
+                expect(fromTemplate$.get()).toBe('counter is 4 and time is "09:05:00"');
+
+                await advanceTimersByTimeAsync(SECONDS_15);
+
+                expect(counterValue$.get()).toBe(4);
+                expect(fromTemplate$.get()).toBe('counter is 4 and time is "09:05:00"');
+
+                await advanceTimersByTimeAsync(SECONDS_15);
+
+                expect(counterValue$.get()).toBe(5);
+                expect(fromTemplate$.get()).toBe('counter is 5 and time is "09:05:00"');
+
+                await advanceTimersByTimeAsync(SECONDS_30 + 735);
+
+                expect(counterValue$.get()).toBe(6);
+                expect(fromTemplate$.get()).toBe('counter is 6 and time is "09:06:00"');
+
+                ac.abort();
+                timeValue$.set((_v, options) => {
+                    return {
+                        ...options,
+                        hour: 'numeric',
+                        fractionalSecondDigits: 3,
+                    };
+                });
+                counterValue$.set(v => ++v);
+
+                expect(counterValue$.get()).toBe(7);
+                expect(fromTemplate$.get()).toBe('counter is 7 and time is "9:06:00.735"');
+
+                await advanceTimersByTimeAsync(SECONDS_30);
+
+                expect(fromTemplate$.get()).toBe('counter is 7 and time is "9:06:00.735"');
+
+                await advanceTimersByTimeAsync(SECONDS_30);
+
+                expect(fromTemplate$.get()).toBe('counter is 7 and time is "9:07:00.735"');
+
+                timeValue$.set((_v, options) => {
+                    const { hour, minute, second, fractionalSecondDigits, ...rest } = options;
+
+                    return {
+                        ...rest,
+                        timeStyle: 'medium',
+                        dateStyle: 'short',
+                    };
+                });
+
+                expect(fromTemplate$.get()).toBe('counter is 7 and time is "04.12.2025 09:07:00"');
+
+                await advanceTimersByTimeAsync(MINUTES * 5);
+
+                setSystemTime('2025-12-04T17:49:31.541+03:00');
+
+                expect(fromTemplate$.get()).toBe('counter is 7 and time is "04.12.2025 17:49:31"');
+
+                fromTemplate$.set('[ "#{1}", #{0} ]');
+
+                expect(fromTemplate$.get()).toBe('[ "04.12.2025 17:49:31", 7 ]');
+
+                await advanceTimersByTimeAsync(MINUTES);
+
+                expect(fromTemplate$.get()).toBe('[ "04.12.2025 17:50:31", 7 ]');
+
+                counterValue$.destructor();
+                timeValue$.destructor();
+                fromTemplate$.destructor();
+
+                expect(getEventListeners(ac.signal, 'abort')).toHaveLength(0);
+                expect(getEventListeners(__test__signalEventsEmitter, counterValue$.eventName)).toHaveLength(0);
+                expect(getEventListeners(__test__signalEventsEmitter, timeValue$.eventName)).toHaveLength(0);
+                expect(getEventListeners(__test__timersTriggerEventsEmitter, counterValue$.eventName)).toHaveLength(0);
+                expect(getEventListeners(__test__timersTriggerEventsEmitter, timeValue$.eventName)).toHaveLength(0);
+            });
         });
     });
 
