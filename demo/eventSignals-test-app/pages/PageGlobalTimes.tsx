@@ -1,21 +1,22 @@
 'use strict';
 
+import type { MouseEvent } from "react";
+
 import * as React from "react";
-import { memo, createContext, useContext, useLayoutEffect, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
 import {
     mostPopularCities$,
 } from "../state/GlobalTimesState";
+import { pipPopupWindow$ } from "../state/pipWindowState";
 
 import NavBar from "../components/NavBar";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error
 import styles from './PageGlobalTimes.module.css';
-import { pipPopupWindow$ } from "../state/pipWindowState";
 
 const ViewType$Context = createContext(null as ReturnType<typeof makeViewType$> | null);
 const makeViewType$ = () => {
@@ -58,12 +59,18 @@ export default function PageGlobalTimes({ viewType, filterById }: {
 }) {
     const viewType$ = useMemo(makeViewType$, []);
 
+    useEffect(() => {
+        return () => viewType$.destructor();
+    }, [ viewType$ ]);
+
     if (viewType) {
         viewType$.set(viewType);
     }
-    else {
-        viewType = viewType$.get();
-    }
+
+    // Получаем актуальное значение и подписываемся на изменения сигнала.
+    // Подписка нужна, чтобы обновлять controllable интупы формы, если сигнал viewType$ измениться "снаружи".
+    // note: Если гарантировано не будет измениться "снаружи", то можно тут использовать get и сделать инпуты uncontrollable.
+    viewType = viewType$.use();
 
     console.log(PageGlobalTimes.name, 'render');
 
@@ -84,9 +91,12 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                                 const checked = elementDescription.value === viewType;
 
                                 return (<label key={elementDescription.value} className={styles.viewLabel}>
-                                    <input type="radio" name={viewType$.data.radioName} value={elementDescription.value}
-                                        defaultChecked={checked}/>
-                                    <span className="btn-text">{elementDescription.label}</span>
+                                    <input type="radio"
+                                        name={viewType$.data.radioName}
+                                        value={elementDescription.value}
+                                        checked={checked}
+                                    />
+                                    <span className={styles.btnText}>{elementDescription.label}</span>
                                 </label>);
                             })}
                         </form>
@@ -126,6 +136,19 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.componentT
     </div>);
 });
 
+function _setPopup(event: MouseEvent<HTMLDivElement>) {
+    const { currentTarget } = event;
+    const id = (currentTarget as HTMLElement)?.getAttribute?.('data-id') as (string | null);
+
+    if (id) {
+        pipPopupWindow$.setPopup({
+            dataId: id,
+            component: PageGlobalTimes,
+            componentProps: { filterById: id, viewType: 'grid' },
+        });
+    }
+}
+
 EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.elementsComponentType, function GlobalTimesCity({
     eventSignal,
 }: {
@@ -147,11 +170,6 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
     const { data } = eventSignal;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const pipWindowInfo = pipPopupWindow$.use();
-    const pipWindowUniqueId = useMemo(() => Symbol(), []);
-    const $portalContent = (pipWindowInfo.uniqueId === pipWindowUniqueId && pipWindowInfo?.window?.document?.body)
-        ? <PipPopupWindow component={PageGlobalTimes} targetContainer={pipWindowInfo.window.document.body} filterById={id} viewType={'grid'} />
-        : null
-    ;
     const viewType = useContext(ViewType$Context)?.use();
 
     useLayoutEffect(() => {
@@ -164,13 +182,12 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         };
     }, [ data ]);
 
-    return (<div className={styles.cityCard} data-id={id} data-viewType={viewType} onClick={pipWindowInfo.dataId === id ? null : () => {
-        pipPopupWindow$.markNextValueAsForced();
-        pipPopupWindow$.set({
-            uniqueId: pipWindowUniqueId,
-            dataId: id,
-        });
-    }}>
+    return (<div
+        className={styles.cityCard}
+        data-id={id}
+        data-viewType={viewType}
+        onClick={pipWindowInfo.dataId === id ? null : _setPopup}
+    >
         <div className={styles.canvasContainer}>
             <canvas ref={canvasRef}></canvas>
         </div>
@@ -191,25 +208,5 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
                 <span>{dayLightSign}️</span>
             </div>
         </div>
-        {$portalContent}
     </div>);
 });
-
-let PipPopupWindow = function PipPopupWindow<P extends Record<string, any>>({
-    component: Component,
-    targetContainer,
-    ...props
-}: {
-    component: React.FC<P> | null,
-    targetContainer: HTMLElement | null,
-} & P) {
-    if (Component == null || targetContainer == null) {
-        return null;
-    }
-
-    return createPortal(<Component {...props as unknown as P} />, targetContainer);
-};
-
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-PipPopupWindow = memo(PipPopupWindow);

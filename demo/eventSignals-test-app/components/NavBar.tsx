@@ -1,7 +1,9 @@
 'use strict';
 
+import type { MouseEvent } from 'react';
+
 import * as React from 'react';
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 
 document.head.insertAdjacentHTML("beforeend", `<style>
 .NavBar__menu {
@@ -12,9 +14,9 @@ document.head.insertAdjacentHTML("beforeend", `<style>
 }
 </style>`);
 
-export default function NavBar() {
-    const handleClick = useCallback((event) => {
-        const href = event.target?.getAttribute('href') as string | undefined;
+const NavBar = memo(function NavBar() {
+    const handleClick = useCallback((event: MouseEvent<HTMLElement>) => {
+        const href = event.currentTarget?.getAttribute('href') as string | undefined;
 
         if (href) {
             event.preventDefault();
@@ -32,4 +34,6 @@ export default function NavBar() {
         <li><a href="/four" onClick={handleClick}>Four</a></li>
         <li><a href="/times" onClick={handleClick}>Global Times</a></li>
     </ul>);
-}
+});
+
+export default NavBar;
