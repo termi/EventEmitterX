@@ -5,35 +5,46 @@ import type * as React from "react";
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-type NewPipWindowOptions = {
-    uniqueId: symbol,
+type NewPipWindowOptions<P extends Record<string, any>=Record<string, any>> = {
     width?: number,
     height?: number,
     onClose?: (error?: Error | string) => void,
     dataId?: number | string | undefined,
+    component?: React.FC<P> | null,
+    componentProps?: P | null,
 };
 
-const pipUniqueIdNon = Symbol('pipUniqueIdNon');
 const emptyPipPopupWindowDescription: PipPopupWindowDescription = {
-    uniqueId: pipUniqueIdNon,
     window: null as Window | null,
     dataId: void 0,
+    component: null,
+    componentProps: null,
 };
 
 Object.freeze(Object.setPrototypeOf(emptyPipPopupWindowDescription, null));
 
 type PipPopupWindowDescription = {
-    uniqueId: symbol,
     window: Window | null,
     dataId?: number | string | undefined,
+    component?: React.FC<Record<string, any>> | null,
+    componentProps?: Record<string, any> | null,
 };
 
-export const pipPopupWindow$ = new EventSignal({
-    uniqueId: pipUniqueIdNon,
+// import PageGlobalTimes from "../pages/PageGlobalTimes";
+//
+// // Сделал setPopup, потому что не понял, как заставить Generic работать на методе pipPopupWindow$.set
+// pipPopupWindow$.setPopup({
+//     component: PageGlobalTimes,
+//     componentProps: { filterBydId: '1' }
+// });
+
+export const pipPopupWindow$ = Object.assign(new EventSignal({
     window: null as Window | null,
     dataId: undefined as number | string | undefined,
+    component: null,
+    componentProps: null,
 } satisfies PipPopupWindowDescription, async function(prev, newPipWindowOptions) {
-    if (newPipWindowOptions == null) {
+    if (newPipWindowOptions == null || !newPipWindowOptions.component) {
         prev.window?.close();
 
         return emptyPipPopupWindowDescription;
@@ -44,11 +55,12 @@ export const pipPopupWindow$ = new EventSignal({
     }
 
     const {
-        uniqueId,
         width = 400,
         height = 300,
         onClose,
         dataId,
+        component,
+        componentProps,
     } = newPipWindowOptions;
 
     try {
@@ -72,30 +84,35 @@ export const pipPopupWindow$ = new EventSignal({
             window.document.head.append(style.cloneNode(true));
         });
 
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                // 'pagehide' callback will be dispatched
+                window.close();
+            }
+        };
+
         // Обработчик закрытия окна
         window.addEventListener('pagehide', () => {
+            window?.document?.removeEventListener('keydown', onKeyDown);
             onClose?.();
             window = null;
 
-            pipPopupWindow$.set(emptyPipPopupWindowDescription);
-        });
-
-        // Обработчик закрытия через Escape
-        window.document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                window.close();
-                window = null;
-
+            if (pipPopupWindow$.status !== 'pending') {
+                // Только если окно закрывается НЕ ПО ПРИЧИНЕ смены содержимого
                 pipPopupWindow$.set(emptyPipPopupWindowDescription);
             }
         });
 
+        // Обработчик закрытия через Escape
+        window.document.addEventListener('keydown', onKeyDown);
+
         return {
-            uniqueId,
             get window() {
                 return window;
             },
             dataId,
+            component,
+            componentProps,
         } as PipPopupWindowDescription;
     }
     catch (error) {
@@ -104,6 +121,11 @@ export const pipPopupWindow$ = new EventSignal({
     }
 }, {
     initialSourceValue: null as NewPipWindowOptions | null,
+}), {
+    setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P>) {
+        this.markNextValueAsForced();
+        this.set(newValue);
+    },
 });
 
 (globalThis as unknown as Record<string, any>).__test__pipPopupWindow$ = pipPopupWindow$;

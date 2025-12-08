@@ -4,6 +4,7 @@
 // https://jsonplaceholder.typicode.com/todos/3
 
 import * as React from 'react';
+import { createPortal } from "react-dom";
 import { createRoot } from 'react-dom/client';
 
 import { polyfillCountryFlagEmojis } from "country-flag-emoji-polyfill";
@@ -15,6 +16,7 @@ import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
+import { pipPopupWindow$ } from "./state/pipWindowState";
 
 import PageOne from "./pages/PageOne";
 import PageTwo from "./pages/PageTwo";
@@ -99,6 +101,22 @@ mainState.$counter2.addListener(newValue => {
         EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, SignalAsString1, { textColor: 'green' });
     }
 });
+
+const pipPopupContainer = createRoot(document.querySelector('#pipPopupContainer'), {
+    onRecoverableError(error) {
+        console.error('onRecoverableError: #pipPopupContainer', error);
+    },
+});
+
+pipPopupContainer.render(<pipPopupWindow$.component sFC={function({ eventSignal }: { eventSignal: typeof pipPopupWindow$ }) {
+    const { component: Component, componentProps, window } = eventSignal.getLast();
+
+    if (!Component || !window?.document?.body) {
+        return null;
+    }
+
+    return createPortal(<Component {...componentProps} />, window.document.body);
+}} />);
 
 initNavigation({
     root: createRoot(document.querySelector('#main'), {

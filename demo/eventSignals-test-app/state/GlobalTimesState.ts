@@ -377,13 +377,13 @@ class TimeCanvas {
 
         switch (timeOfDay) {
             case 'morning':
-                gradient.addColorStop(0, 'rgba(255, 200, 100, 0.05)');
-                gradient.addColorStop(1, 'rgba(255, 150, 50, 0.05)');
+                gradient.addColorStop(0, 'rgba(100, 200, 255, 0.03)');
+                gradient.addColorStop(1, 'rgba(50, 150, 255, 0.03)');
 
                 break;
             case 'day':
-                gradient.addColorStop(0, 'rgba(100, 200, 255, 0.03)');
-                gradient.addColorStop(1, 'rgba(50, 150, 255, 0.03)');
+                gradient.addColorStop(0, 'rgba(255, 200, 100, 0.05)');
+                gradient.addColorStop(1, 'rgba(255, 150, 50, 0.05)');
 
                 break;
             case 'evening':
@@ -420,11 +420,11 @@ class TimeCanvas {
 
             switch (timeOfDay) {
                 case 'morning':
-                    color = `rgba(255, 200, 100, ${particle.opacity})`;
+                    color = `rgba(100, 200, 255, ${particle.opacity})`;
 
                     break;
                 case 'day':
-                    color = `rgba(100, 200, 255, ${particle.opacity})`;
+                    color = `rgba(255, 200, 100, ${particle.opacity})`;
 
                     break;
                 case 'evening':
