@@ -1,0 +1,341 @@
+
+.page-header-forPageGlobalTimes {
+  /*noinspection CssInvalidMediaFeature*/
+  @media (display-mode: picture-in-picture) {
+    & {
+      display: none;
+    }
+  }
+}
+
+.PageGlobalTimes {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+  padding: 20px;
+  color: #333;
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background-color: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+
+    /*noinspection CssInvalidMediaFeature*/
+    @media (display-mode: picture-in-picture) {
+      & > header, & > footer {
+        display: none;
+      }
+    }
+  }
+
+  header {
+    background: linear-gradient(to right, #4a6fa5, #6a93cb);
+    color: white;
+    padding: 30px;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    margin: 0;
+    font-weight: 700;
+    letter-spacing: 1px;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    font-weight: 300;
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+
+    .view-toggle {
+      display: flex;
+      gap: 5px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 8px;
+      border-radius: 10px;
+    }
+
+    /* Правильное скрытие радиокнопок */
+    .view-toggle input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      border: 0;
+      clip: rect(0 0 0 0);
+      overflow: hidden;
+    }
+
+    /* Контейнер для радиокнопки и текста */
+    .view-label {
+      display: inline-block;
+      position: relative;
+      cursor: pointer;
+    }
+
+    /* Стилизация видимой части кнопки */
+    .view-label .btn-text {
+      display: block;
+      padding: 8px 16px;
+      border: none;
+      background: rgba(255, 255, 255, 0.3);
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.3s;
+      text-align: center;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .view-label:hover .btn-text {
+      background: rgba(255, 255, 255, 0.4);
+    }
+
+    /* Стили для активного состояния */
+    .view-label input[type="radio"]:checked + .btn-text {
+      background: white;
+      color: #4a6fa5;
+    }
+
+    /* Фокус для доступности */
+    .view-label input[type="radio"]:focus + .btn-text {
+      outline: 2px solid rgba(255, 255, 255, 0.6);
+      outline-offset: 2px;
+    }
+  }
+
+  .cities-container {
+    padding: 30px;
+  }
+
+  .city-card {
+    position: relative;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    margin-bottom: 15px;
+    background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    transition: all 0.3s ease;
+    border-left: 5px solid #4a6fa5;
+  }
+
+  .city-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(90deg, #ffffff 0%, #f8f9fa 100%);
+  }
+
+  .city-info {
+    flex: 1;
+  }
+
+  .city-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+    display: flex;
+    align-items: start;
+    gap: 10px;
+    white-space: normal;
+
+    > div {
+      text-align: left;
+    }
+
+    .optional-line-break {
+      display: none;
+    }
+  }
+
+  .country {
+    font-size: 1rem;
+    color: #7f8c8d;
+    margin-top: 5px;
+    font-weight: 400;
+  }
+
+  .time-info {
+    text-align: right;
+    min-width: 200px;
+  }
+
+  .local-time {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: #2c3e50;
+  }
+
+  .time-format {
+    font-size: 1rem;
+    color: #7f8c8d;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .flag {
+    font-size: 1.8rem;
+    margin-right: 5px;
+    /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
+    /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
+    font-family: "Twemoji Country Flags", auto;
+  }
+
+  .timezone {
+    background-color: #4a6fa5;
+    color: white;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: inline-block;
+    margin-top: 8px;
+    white-space: nowrap;
+  }
+
+  .update-time {
+    text-align: center;
+    padding: 20px;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    border-top: 1px solid #eee;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+    color: #4a6fa5;
+  }
+
+  @media (max-width: 600px) {
+    .city-card {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .time-info {
+      text-align: left;
+      margin-top: 15px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2rem;
+    }
+  }
+
+  .canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Стиль плитки */
+  .cities-container.cities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+
+    .city-card {
+      flex-direction: column;
+      align-items: flex-start;
+      height: 180px;
+      padding: 20px;
+    }
+
+    .city-info {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 15px;
+      width: 100%;
+    }
+
+    .city-name {
+      justify-content: space-between;
+      text-align: end;
+
+      .optional-line-break {
+        display: inline;
+      }
+    }
+
+    .time-info {
+      text-align: left;
+      min-width: unset;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .local-time {
+      font-size: 1.5rem;
+      text-align: start;
+    }
+    .time-format {
+      text-align: end;
+    }
+  }
+
+  /* todo: Стиль таблицы */
+  .cities-container.cities-table {
+    canvas {
+      display: none;
+    }
+  }
+
+  /*noinspection CssInvalidMediaFeature*/
+  @media (display-mode: picture-in-picture) {
+    & {
+      background: transparent;
+      min-height: unset;
+      padding: 0;
+      color: #333;
+
+      .container {
+        max-width: unset;
+        margin: 0;
+        background-color: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        overflow: visible;
+        backdrop-filter: none;
+      }
+
+      .cities-container {
+        padding: 0;
+        margin: 0;
+      }
+    }
+  }
+}
+

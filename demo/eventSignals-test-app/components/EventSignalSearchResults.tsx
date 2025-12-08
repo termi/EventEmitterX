@@ -32,7 +32,7 @@ export const $requestDataSignal = new EventSignal([] as unknown as ReturnType<ty
             EventSignalSearchResults.rendersCounter = 0;
         },
     },
-    componentType: 'albumsSearchResults',
+    componentType: Symbol('albumsSearchResults'),
 });
 
 globalThis.__$requestDataSignal = $requestDataSignal;

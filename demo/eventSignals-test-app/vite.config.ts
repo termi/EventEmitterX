@@ -15,6 +15,13 @@ import typescript2 from 'rollup-plugin-typescript2';
 */
 export default defineConfig({
     // ...your vite configuration
+    css: {
+        modules: {
+            localsConvention: 'camelCase', // или 'dashes'
+            generateScopedName: '[local]',
+            // generateScopedName: '[name]__[local]___[hash:base64:5]',
+        },
+    },
     plugins: [
         {
             ...typescript2({

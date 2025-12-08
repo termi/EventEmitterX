@@ -34,7 +34,12 @@ export default function PageFour() {
             >clearCache</button>
         </fieldset>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            {$widgetsList}
+            <$widgetsList.component context={{
+                //todo: Как оно могло бы быть
+                // onWidgetDelete(id) {
+                //     $widgetsList.data.removeWidget(id);
+                // },
+            }} />
             {/*<$widgetsList.component sComponents={new Map([ [ jsonPlaceholderUserComponentType, UserSimpleCart ] ])} />*/}
         </div>
     </>);
@@ -45,6 +50,8 @@ function WidgetButtonDisableSignal({ eventSignal, onClick, children }: {
     onClick?: () => void,
     children: React.ReactNode,
 }) {
+    // const theme = React.useContext(ThemeContext);
+
     return (<button onClick={onClick ?? eventSignal.data.onClick} disabled={eventSignal.get()}>
         {eventSignal.data.title}
         {children}
@@ -62,6 +69,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 function UserSimpleCart({ eventSignal }: { eventSignal: Signal$jsonPlaceholderUser1 }) {
     const userId = eventSignal.get();
     const { userDTO } = eventSignal.data;
+    const onWidgetDelete = useContext($widgetsList)?.onWidgetDelete;
 
     if (!userDTO) {
         throw new Error('userDTO is not defined');
