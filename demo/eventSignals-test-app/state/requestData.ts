@@ -4,27 +4,29 @@
 import type {} from 'cftools/ts_types/index';
 
 function _fetchData(_cache: Map<string, Promise<{id: number, title: string, year: number}[]>>, url: string): ReturnType<typeof getData> {
-    return _cache.emplace(url, {
-        insert(key) {
-            const promise = getData(key);
+    let isNewValue = true;
+    const resultPromise = _cache.getOrInsertComputed(url, function(key) {
+        isNewValue = false;
 
-            _cache.set(key, promise);
+        const promise = getData(key);
 
-            // eslint-disable-next-line promise/prefer-await-to-then
-            promise.then(() => {
-                wasErrorResult = false;
-            }, () => {
-                _cache.delete(key);
-            });
+        _cache.set(key, promise);
 
-            return promise;
-        },
-        update(value) {
+        // eslint-disable-next-line promise/prefer-await-to-then
+        promise.then(() => {
             wasErrorResult = false;
+        }, () => {
+            _cache.delete(key);
+        });
 
-            return value;
-        },
+        return promise;
     });
+
+    if (!isNewValue) {
+        wasErrorResult = false;
+    }
+
+    return resultPromise;
 }
 
 const _cache1 = new Map();
@@ -48,7 +50,11 @@ async function getData(url: string) {
     }
 }
 
-const allAlbums = [ {
+const allAlbums: {
+    id: number,
+    title: string,
+    year: number,
+}[] = [ {
     id: 13,
     title: 'Let It Be',
     year: 1970,

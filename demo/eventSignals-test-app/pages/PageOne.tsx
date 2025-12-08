@@ -2,8 +2,7 @@
 
 import * as React from "react";
 
-import Counter1 from "../components/Counter1";
-import Counter2 from "../components/Counter2";
+import Counter from "../components/Counter";
 import NavBar from "../components/NavBar";
 
 import { mainState } from "../state/AppStates";
@@ -15,13 +14,17 @@ export default function PageOne() {
         <h1>Page One</h1>
         <NavBar/>
         <div style={{ display: 'flex' }}>
-            <Counter1/>
-            <Counter2/>
+            <mainState.$computed1.component sFC={Counter} title="Counter1"/>
+            <Counter eventSignal={mainState.$computed2} title="Counter2"/>
+            {mainState.$computed2}
         </div>
         <br />
         {mainState.$jsonPlaceholderUser1}
         <br />
-        {/* На данный момент внопка снизу не работает как надо из-за фундаментальной стратегии применённой к EventSignal: computation не знает, кто инициализоровал изменения: set() или одна из зависимостей. */}
-        {/*<button onClick={() => mainState.$jsonPlaceholderUser1.set(currentUserId => ++currentUserId)}>get next user</button>*/}
+        <button onClick={() => {
+            return mainState.$jsonPlaceholderUser1.set((_, currentUserId) => {
+                return ++currentUserId;
+            });
+        }}>get next user</button>
     </>);
 }

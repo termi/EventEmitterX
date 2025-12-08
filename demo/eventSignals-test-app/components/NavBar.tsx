@@ -23,10 +23,13 @@ export default function NavBar() {
         }
     }, []);
 
+    console.log(NavBar.name, 'render');
+
     return (<ul className="NavBar__menu">
         <li><a href="/one" onClick={handleClick}>One</a></li>
         <li><a href="/two" onClick={handleClick}>Two</a></li>
         <li><a href="/three" onClick={handleClick}>Three</a></li>
         <li><a href="/four" onClick={handleClick}>Four</a></li>
+        <li><a href="/times" onClick={handleClick}>Global Times</a></li>
     </ul>);
 }

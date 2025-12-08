@@ -40,7 +40,10 @@ export default function PageTwo() {
                 {$userSecondName}
             </fieldset>
         </form>
-        <div data-counter={counter} onClick={() => setCounter(a => a + 1)}>This is mapped EventSignal &quot;$userFullNameObject&quot;: {$mappedSignal}</div>
+        <div data-counter={counter} onClick={() => setCounter(a => a + 1)}>
+            This is mapped EventSignal &quot;$userFullNameObject&quot;:&nbsp;
+            {$mappedSignal}
+        </div>
     </>);
 }
 

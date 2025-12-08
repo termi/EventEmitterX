@@ -6,11 +6,14 @@
 import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 
+import { polyfillCountryFlagEmojis } from "country-flag-emoji-polyfill";
+
 import 'termi@polyfills';
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
 import { initNavigation } from "./lib/history_navigation";
+import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 
 import PageOne from "./pages/PageOne";
@@ -25,11 +28,17 @@ import JsonPlaceholderUser from "./components/JsonPlaceholderUser";
 import AsyncSpinner from "./components/AsyncSpinner";
 import AsyncSpinner2 from "./components/AsyncSpinner2";
 import ErrorView from "./components/ErrorView";
+import PageGlobalTimes from "./pages/PageGlobalTimes";
+
+import './app.module.css';
+
+// @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/)
+polyfillCountryFlagEmojis();
 
 globalThis.__React = React;
 
 // Инициализируем EventSignal для работы с React.
-EventSignal.initReact({ useSyncExternalStore: React.useSyncExternalStore, createElement: React.createElement, memo: React.memo });
+EventSignal.initReact(React);
 
 // Регистрируем компонент UserCard для отображения EventSignal с componentType == mainState.userFullNameComponentType.
 // Внимание: тут React.memo только для тестирования и демонстрации. ОН НЕ НУЖЕН в вашем коде.
@@ -92,15 +101,18 @@ mainState.$counter2.addListener(newValue => {
 });
 
 initNavigation({
-    root: createRoot(document.querySelector('#main')),
+    root: createRoot(document.querySelector('#main'), {
+        onRecoverableError(error) {
+            console.error('onRecoverableError: #main:', error);
+        },
+    }),
     routes: [
         { path: '/one',   action() { return <><PageOne /></>; } },
         { path: '/two',   action() { return <><PageTwo /></>; } },
         { path: '/three', action() { return <><PageThree /></>; } },
         { path: '/four',  action() { return <><PageFour /></>; } },
+        { path: '/times',  action() { return <><PageGlobalTimes /></>; } },
         { path: '(.*)',   action() { return <><Page404 /></>; } },
     ],
     page404: Page404,
 });
-
-const randomColor = () => `#${Math.floor(Math.random() * 16_777_215).toString(16)}`;

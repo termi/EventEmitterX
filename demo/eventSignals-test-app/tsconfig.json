@@ -1,6 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "types": ["vite/client"],
     "outDir": "./build/ts-output",
     // https://www.typescriptlang.org/tsconfig/#allowSyntheticDefaultImports
     // Решение ошибки `TS1259: Module '"@types/react/index"' can only be default-imported using the 'esModuleInterop' flag`.
@@ -20,7 +21,8 @@
     "module": "ESNext"
   },
   "include": [
-    "./src/**/*.ts",
-    "./src/**/*.tsx",
+    "./types/global.d.ts",
+    "./types/pip.d.ts",
+    "./types/document-picture-in-picture.d.ts"
   ]
 }

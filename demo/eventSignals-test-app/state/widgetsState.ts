@@ -92,6 +92,14 @@ export const $widgetsList = new EventSignal<(ReturnType<typeof makePlaceholderUs
     initialSourceValue: [],
     finaleSourceValue: [],
     // componentType: 'test',
+    /*
+    context: {
+        onWidgetDelete(id: number) {
+            _$widgetsList_data.removeWidget(id);
+        },
+        allowItemsDelete: void 0 as boolean | undefined,
+    },
+    */
 });
 
 function randomNumber(from = 0, to = 2_147_483_647) {

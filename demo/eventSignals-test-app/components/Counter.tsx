@@ -1,15 +1,21 @@
 'use strict';
 
+import type { CSSProperties } from "react";
+
 import * as React from "react";
 
 import { mainState } from "../state/AppStates";
 
-export default function Counter2() {
-    console.log('render Counter2');
+export default function Counter({ eventSignal, style, title = 'Counter' }: {
+    eventSignal: typeof mainState.$computed1 | typeof mainState.$computed2,
+    style?: CSSProperties,
+    title?: string,
+}) {
+    console.log('render', title);
 
-    return (<div>
-        <h2>Counter2</h2>
-        <h3>Value is: {mainState.$computed2}</h3>
+    return (<div style={style}>
+        <h2>{title}</h2>
+        <h3>Value is: {eventSignal}</h3>
         <div>
             <span>Change Counter1:</span>
             <button onClick={() => mainState.incrementCounter1()}>+</button>

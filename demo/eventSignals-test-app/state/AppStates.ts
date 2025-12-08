@@ -2,8 +2,9 @@
 
 import type * as React from "react";
 
-import { randomNumber } from "../lib/utils";
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+
+import { randomNumber } from "../lib/utils";
 
 const stringCounterComponentType = '--counter--';
 const $counter1 = new EventSignal(0);
@@ -89,6 +90,7 @@ const $userFullNameObject = new EventSignal({
     };
 }, {
     componentType: userFullNameComponentType,
+    data: { test: 1 },
 });
 
 export type JsonPlaceholderUserDTO = {
@@ -125,22 +127,26 @@ export function clearPlaceholderUserEventSignalCache() {
     }
 }
 
-export function makePlaceholderUserEventSignal(id: number, getNewValue?: () => number) {
-    return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(id, getNewValue);
+export function makePlaceholderUserEventSignal(id: number, eventSignal?: EventSignal<number>) {
+    return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(id, eventSignal);
 }
 
-function _makePlaceholderUserEventSignal(id: number, getNewValue?: () => number) {
+function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: EventSignal<number>) {
+    // todo: Перенести этот пример EventSignal в тесты EventSignal_spec.ts
     return new EventSignal<Promise<number>, number, {
         currentUserId?: number,
         userDTO?: JsonPlaceholderUserDTO,
         abortController?: AbortController,
     }>(id, async (prevUserId, sourceUserId, eventSignal) => {
-        const _newUserid = getNewValue?.();
-        // todo: Чтобы отдавать приоритет sourceUserId, а не $counter1.get(), нужно добавить EventSignal.flags в котором будет подниматься флаг .lastChangesFromNewSourceValue
-        const newUserid = (sourceUserId !== void 0 && _newUserid === prevUserId && _newUserid !== void 0
-            ? sourceUserId
-            : _newUserid
-        ) ?? prevUserId;
+        // Нужно безусловно вызывать `eventSignalSourceId?.get()`, чтобы сработали подписки на зависимость
+        const _newUserId = eventSignalSourceId?.get();
+        const newUserid = ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0 ? sourceUserId : null)
+            ?? _newUserId
+            ?? prevUserId
+        ;
+
+        // Синхронизируем sourceValue с актуальным значением
+        eventSignal.set(newUserid);
 
         //todo: Это приводит к ошибке, можно тестировать вместе с ErrorBoundary, когда он будет реализован
         // if (newUserid === prevUserId) {
@@ -148,7 +154,7 @@ function _makePlaceholderUserEventSignal(id: number, getNewValue?: () => number)
         // }
 
         eventSignal.data.currentUserId = newUserid;
-        eventSignal.data.abortController?.abort(`request new userId=${newUserid}`);
+        eventSignal.data.abortController?.abort(new Error(`request new userId=${newUserid}`));
 
         const abortController = new AbortController();
 
@@ -190,7 +196,7 @@ function _makePlaceholderUserEventSignal(id: number, getNewValue?: () => number)
     });
 }
 
-const $jsonPlaceholderUser1 = makePlaceholderUserEventSignal($counter1.get(), $counter1.get);
+const $jsonPlaceholderUser1 = makePlaceholderUserEventSignal($counter1.get(), $counter1);
 
 export type Signal$jsonPlaceholderUser1 = typeof $jsonPlaceholderUser1;
 
