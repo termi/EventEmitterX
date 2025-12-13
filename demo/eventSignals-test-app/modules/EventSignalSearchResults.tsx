@@ -5,8 +5,8 @@ import type { ChangeEvent } from "react";
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-import ErrorView from "./ErrorView";
-import AsyncSpinner from "./AsyncSpinner";
+import ErrorView from "../$components/ErrorView";
+import AsyncSpinner from "../$components/AsyncSpinner";
 import { fetchData2 } from "../state/requestData";
 
 export const $requestDataSignal = new EventSignal([] as unknown as ReturnType<typeof fetchData2>, async function(_prev, searchQuery) {

@@ -6,11 +6,11 @@ import { useState } from 'react';
 import DeferredSearchResults, {
     __DeferredSearchResults__setDisabled,
     __DeferredSearchResults__setQuery,
-} from '../components/DeferredSearchResults';
-import NavBar from "../components/NavBar";
+} from '../modules/DeferredSearchResults';
+import NavBar from "../modules/NavBar";
 
 import { clearCache, setUseRandomError } from "../state/requestData";
-import { $requestDataSignal } from "../components/EventSignalSearchResults";
+import { $requestDataSignal } from "../modules/EventSignalSearchResults";
 
 document.head.insertAdjacentHTML('beforeend', `<style>
 details {

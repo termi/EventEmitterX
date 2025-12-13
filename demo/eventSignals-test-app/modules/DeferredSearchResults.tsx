@@ -44,7 +44,7 @@ export default function DeferredSearchResults() {
 
 DeferredSearchResults.renderCounter = 0;
 
-export function SearchResults({ query }: { query: string }) {
+function SearchResults({ query }: { query: string }) {
     if (query === '') {
         return null;
     }
