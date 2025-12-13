@@ -6,6 +6,8 @@ import { defineConfig } from 'vite';
 import { vitePluginTypescriptTransform } from 'vite-plugin-typescript-transform';
 import typescript2 from 'rollup-plugin-typescript2';
 
+import { createPrebuildPlugin } from './dev/vite/plugins/prebuild.vite';
+
 // Подменяем esbuild компилятор TypeScript на настоящий typescript.
 /*
 На данный момент [02.10.2024] это не особо полезно и может быть закомментировано (весь этот файл), но в будущем
@@ -43,5 +45,7 @@ export default defineConfig({
                 },
             },
         }),
+        createPrebuildPlugin(),
     ],
 });
+

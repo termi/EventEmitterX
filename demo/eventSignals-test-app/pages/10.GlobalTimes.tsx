@@ -13,6 +13,7 @@ import {
 import { pipPopupWindow$ } from "../state/pipWindowState";
 
 import NavBar from "../modules/NavBar";
+import { menuItemTitle$ } from './10.GlobalTimes.metadata';
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error

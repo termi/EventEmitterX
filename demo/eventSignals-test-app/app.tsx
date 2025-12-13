@@ -4,6 +4,7 @@
 // https://jsonplaceholder.typicode.com/todos/3
 
 import * as React from 'react';
+import { Suspense } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from 'react-dom/client';
 
@@ -17,6 +18,8 @@ import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
+import { routersList } from './state/routers.prebuild';
+
 import UserCard from "./$components/UserCard";
 import SignalAsString1 from "./$components/SignalAsString1";
 import SignalAsString2 from "./$components/SignalAsString2";
@@ -119,12 +122,17 @@ initNavigation({
         },
     }),
     routes: [
-        { path: '/one',   action() { return <><PageOne /></>; } },
-        { path: '/two',   action() { return <><PageTwo /></>; } },
-        { path: '/three', action() { return <><PageThree /></>; } },
-        { path: '/four',  action() { return <><PageFour /></>; } },
-        { path: '/times',  action() { return <><PageGlobalTimes /></>; } },
-        { path: '(.*)',   action() { return <><Page404 /></>; } },
+        ...routersList.map(router => {
+            const { Component } = router;
+
+            return {
+                path: router.routerPath,
+                action() {
+                    return <Suspense fallback={'...Loading'}>
+                        <Component />
+                    </Suspense>;
+                },
+            };
+        }),
     ],
-    page404: Page404,
 });
