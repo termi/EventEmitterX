@@ -18,6 +18,7 @@ import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
+import { i18n_componentType } from "./state/i18n";
 import { routersList } from './state/routers.prebuild';
 
 import UserCard from "./$components/UserCard";
@@ -54,6 +55,8 @@ polyfillCountryFlagEmojis();
 
 // Инициализируем EventSignal для работы с React.
 EventSignal.initReact(React);
+
+EventSignal.registerReactComponentForComponentType(i18n_componentType, AnimatedText, 'pending');
 
 // Регистрируем компонент UserCard для отображения EventSignal с componentType == mainState.userFullNameComponentType.
 // Внимание: тут React.memo только для тестирования и демонстрации. ОН НЕ НУЖЕН в вашем коде.

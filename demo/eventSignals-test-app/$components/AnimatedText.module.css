@@ -1,0 +1,19 @@
+
+.AnimatedText span {
+  opacity: 0;
+  display: inline-block;
+  animation: css-animation-typing 1s infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes css-animation-typing {
+  0% {
+    opacity: 0.1;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.1;
+  }
+}

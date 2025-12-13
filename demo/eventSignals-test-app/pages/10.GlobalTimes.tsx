@@ -11,6 +11,7 @@ import {
     mostPopularCities$,
 } from "../state/GlobalTimesState";
 import { pipPopupWindow$ } from "../state/pipWindowState";
+import { i18n$$, i18nString$$ } from "../state/i18n";
 
 import NavBar from "../modules/NavBar";
 import { menuItemTitle$ } from './10.GlobalTimes.metadata';
@@ -35,15 +36,15 @@ const makeViewType$ = () => {
             elements: [
                 {
                     value: 'list',
-                    label: 'Список',
+                    label: i18nString$$('Список'),
                 },
                 {
                     value: 'grid',
-                    label: 'Плитка',
+                    label: i18nString$$('Плитка'),
                 },
                 {
                     value: 'table',
-                    label: 'Таблица',
+                    label: i18nString$$('Таблица'),
                 },
             ],
         },
@@ -83,8 +84,8 @@ export default function PageGlobalTimes({ viewType, filterById }: {
         <div className={styles.PageGlobalTimes}>
             <section className={styles.container}>
                 <header>
-                    <h1>🌍 Мировое время</h1>
-                    <div className={styles.subtitle}>Локальное время в популярных городах мира</div>
+                    <h1>🌍 {menuItemTitle$}</h1>
+                    <div className={styles.subtitle}>{i18n$`Локальное время в популярных городах мира`}</div>
 
                     <div className={styles.controls}>
                         <form className={styles.viewToggle} action="#" onChange={viewType$.data.onFormChange}>
@@ -109,7 +110,7 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                 </ViewType$Context.Provider>
 
                 <footer className={styles.updateTime}>
-                    Время обновляется каждую секунду
+                    {i18n$$`Время обновляется каждую секунду`}
                 </footer>
             </section>
         </div>
