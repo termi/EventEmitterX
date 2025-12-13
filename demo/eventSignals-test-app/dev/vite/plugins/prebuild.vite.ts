@@ -2,7 +2,7 @@
 
 import * as module from "node:module";
 
-export function createPrebuildPlugin() {
+export function createPrebuildPlugin({ projectRoot }: { projectRoot: string }) {
     return {
         name: "rebuild",
         buildStart() {
@@ -36,7 +36,7 @@ export function createPrebuildPlugin() {
         //
         //     // return modules;
         // },
-        async transform(code, file) {
+        async transform(code: string, file: string) {
             if (!file.includes('.prebuild.')) {
                 return;
             }
@@ -71,6 +71,10 @@ export function createPrebuildPlugin() {
                 ...globalThis,
             };
 
+            if (!context.globalThis) {
+                context.globalThis = context.global || globalThis;
+            }
+
             vm.runInNewContext(codeCommonjs, vm.createContext(context));
 
             const moduleFromCode = context.exports;
@@ -84,7 +88,7 @@ export function createPrebuildPlugin() {
                 beforeCode: string,
                 afterCode: string,
             } = await onBuild({
-                projectRoot: __dirname,
+                projectRoot,
                 thisFilepath: file,
             });
 

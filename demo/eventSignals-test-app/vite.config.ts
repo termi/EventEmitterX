@@ -84,7 +84,7 @@ export default defineConfig({
         }),
         */
         createCSSHotReloadConfirmPlugin(),
-        createPrebuildPlugin(),
+        createPrebuildPlugin({ projectRoot: __dirname }),
     ],
 });
 
