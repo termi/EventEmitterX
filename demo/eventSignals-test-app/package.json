@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "type": "module",
   "packageManager": "pnpm@6.32.1",
   "scripts": {
     "dev": "vite",
@@ -12,10 +13,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "cities": "^2.0.0",
     "country-flag-emoji-polyfill": "^0.1.8",
-    "i18n-iso-countries": "^7.14.0",
     "react": "19.1.0",
     "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2"
   }
 }

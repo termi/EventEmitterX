@@ -31,10 +31,26 @@ import AnimatedText from "./$components/AnimatedText";
 
 import './app.module.css';
 
+if (import.meta.env.DEV) {
+    // eslint-disable-next-line promise/prefer-await-to-then
+    import('./lib/dev/css-hot-reload-client').then(module => {
+        module.setupCSSHotReload();
+        // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
+    }).catch(error => {
+        console.warn('Failed to load CSS hot reload:', error);
+    });
+}
+
+if (import.meta.hot) {
+    import.meta.hot.on('vite:beforeUpdate', () => {
+        console.log('Компоненты обновляются...');
+    });
+}
+
 // @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/)
 polyfillCountryFlagEmojis();
 
-globalThis.__React = React;
+(globalThis as unknown as { __React: typeof React }).__React = React;
 
 // Инициализируем EventSignal для работы с React.
 EventSignal.initReact(React);
