@@ -133,6 +133,7 @@
     margin-bottom: 15px;
     background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
     border-radius: 15px;
+    overflow: hidden;
     transition: all 0.3s ease;
     border-left: 5px solid #4a6fa5;
   }
@@ -151,9 +152,6 @@
     font-size: 1.5rem;
     font-weight: 600;
     color: #2c3e50;
-    display: flex;
-    align-items: start;
-    gap: 10px;
     white-space: normal;
 
     > div {
@@ -195,6 +193,8 @@
   .flag {
     font-size: 1.8rem;
     margin-right: 5px;
+    vertical-align: middle;
+    margin-inline-end: 10px;
     /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
     /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
     font-family: "Twemoji Country Flags", auto;
