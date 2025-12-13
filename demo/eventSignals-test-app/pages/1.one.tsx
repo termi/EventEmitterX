@@ -7,11 +7,13 @@ import NavBar from "../modules/NavBar";
 
 import { mainState } from "../state/AppStates";
 
+import { menuItemTitle$ } from './1.one.metadata';
+
 export default function PageOne() {
     console.log('render PageOne');
 
     return (<>
-        <h1>Page One</h1>
+        <h1>{menuItemTitle$}</h1>
         <NavBar/>
         <div style={{ display: 'flex' }}>
             <mainState.$computed1.component sFC={Counter} title="Counter1"/>

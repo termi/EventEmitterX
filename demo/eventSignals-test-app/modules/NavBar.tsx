@@ -5,6 +5,8 @@ import type { MouseEvent } from 'react';
 import * as React from 'react';
 import { memo, useCallback } from 'react';
 
+import { routersList } from '../state/routers.prebuild';
+
 document.head.insertAdjacentHTML("beforeend", `<style>
 .NavBar__menu {
     li {
@@ -28,11 +30,23 @@ const NavBar = memo(function NavBar() {
     console.log(NavBar.name, 'render');
 
     return (<ul className="NavBar__menu">
-        <li><a href="/one" onClick={handleClick}>One</a></li>
-        <li><a href="/two" onClick={handleClick}>Two</a></li>
-        <li><a href="/three" onClick={handleClick}>Three</a></li>
-        <li><a href="/four" onClick={handleClick}>Four</a></li>
-        <li><a href="/times" onClick={handleClick}>Global Times</a></li>
+        {routersList.map(router => {
+            const {
+                routerPath,
+                pageTitle,
+                menuHidden,
+            } = router;
+            const menuItemTitle$ = router.metadata?.menuItemTitle$
+                || router.metadata?.menuItemTitle
+                || pageTitle
+            ;
+
+            if (menuHidden) {
+                return null;
+            }
+
+            return <li key={routerPath}><a href={routerPath} onClick={handleClick}>{menuItemTitle$}</a></li>;
+        })}
     </ul>);
 });
 

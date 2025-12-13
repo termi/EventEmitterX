@@ -14,7 +14,7 @@ export function initNavigation({
 }: {
     root: Root,
     routes: Route[],
-    page404: () => JSX.Element,
+    page404?: () => JSX.Element,
 }) {
     if (isInited) {
         throw new Error('Already inited');
@@ -22,10 +22,17 @@ export function initNavigation({
 
     isInited = true;
 
+    const page404route = routes.find(routItem => {
+        return routItem.path === '(.*)';
+    }) ?? { path: '(.*)', action: page404 ?? (() => '404') };
+
     const onNewPage = (pageUrl = location.pathname) => {
+        const pagePair = pageUrl.split('?');
+        const pagePath = pagePair[0];
+
         const routItem = routes.find(routItem => {
-            return pageUrl.startsWith(routItem.path);
-        }) ?? { path: '(.*)', action: page404 };
+            return routItem.path === pagePath;
+        }) ?? page404route;
 
         root.render(routItem.action());
     };
