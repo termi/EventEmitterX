@@ -7,10 +7,13 @@ import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import { randomNumber } from "../lib/utils";
 
 const stringCounterComponentType = '--counter--';
-const $counter1 = new EventSignal(0);
-const $computed1 = new EventSignal('', () => {
-    return `Counter is ${$counter1.get()}`;
+const counter1$ = new EventSignal(0, {
+    description: 'counter1$',
+});
+const computed1$ = new EventSignal('', () => {
+    return `Counter is ${counter1$.get()}`;
 }, {
+    description: 'computed1$',
     //todo:
     // methods: {
     //   increment<number | void>(prevValue, arg = 1) { return prevValue + arg; },
@@ -22,23 +25,26 @@ const $computed1 = new EventSignal('', () => {
     componentType: stringCounterComponentType,
 });
 
-const $counter2 = new EventSignal(0);
-const $computed2 = new EventSignal('', () => {
-    return `Counter is ${$counter2.get()}`;
+const counter2$ = new EventSignal(0, {
+    description: 'counter2$',
+});
+const computed2$ = new EventSignal('', () => {
+    return `Counter is ${counter2$.get()}`;
 }, {
+    description: 'computed2$',
     componentType: stringCounterComponentType,
 });
 
-const incrementCounter1 = $counter1.createMethod<number | void>((prevValue, arg = 1) => {
+const incrementCounter1 = counter1$.createMethod<number | void>((prevValue, arg = 1) => {
     return prevValue + arg;
 });
-const decrementCounter1 = $counter1.createMethod<number | void>((prevValue, arg = 1) => {
+const decrementCounter1 = counter1$.createMethod<number | void>((prevValue, arg = 1) => {
     return prevValue - arg;
 });
-const incrementCounter2 = $counter2.createMethod<number | void>((prevValue, arg = 1) => {
+const incrementCounter2 = counter2$.createMethod<number | void>((prevValue, arg = 1) => {
     return prevValue + arg;
 });
-const decrementCounter2 = $counter2.createMethod<number | void>((prevValue, arg = 1) => {
+const decrementCounter2 = counter2$.createMethod<number | void>((prevValue, arg = 1) => {
     return prevValue - arg;
 });
 
@@ -48,37 +54,37 @@ const style: React.CSSProperties = {
     flexWrap: 'wrap',
 };
 
-const $userFirstName = new EventSignal('Вася', {
+const userFirstName$ = new EventSignal('Вася', {
     data: {
         title: 'First name',
         cssClasses: 'form-input first-name',
         style,
         onChanges: (event: React.ChangeEvent<HTMLInputElement>) => {
-            $userFirstName.set(String(event.target.value || ''));
+            userFirstName$.set(String(event.target.value || ''));
         },
     },
 });
-const $userSecondName = new EventSignal('Пупкин', {
+const userSecondName$ = new EventSignal('Пупкин', {
     data: {
         title: 'Second name',
         cssClasses: 'form-input seconds-name',
         style,
         onChanges: (event: React.ChangeEvent<HTMLInputElement>) => {
-            $userSecondName.set(String(event.target.value || ''));
+            userSecondName$.set(String(event.target.value || ''));
         },
     },
 });
 const happySymbols_array = Array.from("🔥😂😊😁🙏😎💪😋😇🎉🙌🤘👍🤑🤩🤪🤠🥳😌🤤😍😀");
 const happySymbols_max = happySymbols_array.length - 1;
 const userFullNameComponentType = '--UserCard--';
-const $userFullNameObject = new EventSignal({
+const userFullNameObject$ = new EventSignal({
     firstName: '',
     secondName: '',
     fullName: '',
     icon: '',
 }, (prevValue) => {
-    const raw_firstName = $userFirstName.get();
-    const raw_secondName = $userSecondName.get();
+    const raw_firstName = userFirstName$.get();
+    const raw_secondName = userSecondName$.get();
     const firstName = `"${raw_firstName.toUpperCase()}"`;
     const isNewIcon = prevValue.firstName !== firstName || !prevValue.icon;
 
@@ -196,29 +202,29 @@ function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: Event
     });
 }
 
-const $jsonPlaceholderUser1 = makePlaceholderUserEventSignal($counter1.get(), $counter1);
+const jsonPlaceholderUser1$ = makePlaceholderUserEventSignal(counter1$.get(), counter1$);
 
-export type Signal$jsonPlaceholderUser1 = typeof $jsonPlaceholderUser1;
+export type JsonPlaceholderUser1$ = typeof jsonPlaceholderUser1$;
 
 export const mainState = {
-    $counter1,
-    $computed1,
-    $counter2,
-    $computed2,
+    counter1$,
+    computed1$,
+    counter2$,
+    computed2$,
 
     incrementCounter1,
     decrementCounter1,
     incrementCounter2,
     decrementCounter2,
 
-    $userFirstName,
-    $userSecondName,
-    $userFullNameObject,
+    userFirstName$,
+    userSecondName$,
+    userFullNameObject$,
 
     userFullNameComponentType,
     stringCounterComponentType,
 
-    $jsonPlaceholderUser1,
+    jsonPlaceholderUser1$,
     jsonPlaceholderUserComponentType,
 };
 

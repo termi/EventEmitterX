@@ -7,7 +7,7 @@ import * as React from "react";
 import { mainState } from "../state/AppStates";
 
 export default function Counter({ eventSignal, style, title = 'Counter' }: {
-    eventSignal: typeof mainState.$computed1 | typeof mainState.$computed2,
+    eventSignal: typeof mainState.computed1$ | typeof mainState.computed2$,
     style?: CSSProperties,
     title?: string,
 }) {

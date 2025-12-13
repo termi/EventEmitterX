@@ -9,15 +9,15 @@ import { mainState } from "../state/AppStates";
 import { randomNumber } from "../lib/utils";
 
 const {
-    $userFirstName,
-    $userSecondName,
-    $userFullNameObject,
+    userFirstName$,
+    userSecondName$,
+    userFullNameObject$,
 } = mainState;
 
-$userFirstName.setReactFC(SignalInputComponent);
-$userSecondName.setReactFC(SignalInputComponent);
+userFirstName$.setReactFC(SignalInputComponent);
+userSecondName$.setReactFC(SignalInputComponent);
 
-const $mappedSignal = $userFullNameObject.map(value => value.fullName.replace(/(\W)/g, function(_, char) {
+const $mappedSignal = userFullNameObject$.map(value => value.fullName.replace(/(\W)/g, function(_, char) {
     return `${char}${String.fromCharCode(776 + randomNumber(1, 30))}`;
 }));
 
@@ -29,25 +29,25 @@ export default function PageTwo() {
     return (<>
         <h1>Page Two</h1>
         <NavBar/>
-        <div className="-w-user-card">{$userFullNameObject}</div>
+        <div className="-w-user-card">{userFullNameObject$}</div>
         <form style={{ marginTop: '10px' }}>
             <fieldset style={{
                 display: 'grid',
                 gridTemplateColumns: 'max-content',
                 gridGap: '5px',
             }}>
-                {$userFirstName}
-                {$userSecondName}
+                {userFirstName$}
+                {userSecondName$}
             </fieldset>
         </form>
         <div data-counter={counter} onClick={() => setCounter(a => a + 1)}>
-            This is mapped EventSignal &quot;$userFullNameObject&quot;:&nbsp;
+            This is mapped EventSignal &quot;userFullNameObject$&quot;:&nbsp;
             {$mappedSignal}
         </div>
     </>);
 }
 
-function SignalInputComponent({ eventSignal }: { eventSignal: typeof $userFirstName | typeof $userSecondName }) {
+function SignalInputComponent({ eventSignal }: { eventSignal: typeof userFirstName$ | typeof userSecondName$ }) {
     return (<label key={eventSignal.key} className={eventSignal.data.cssClasses} style={eventSignal.data.style}>
         <span>{eventSignal.data.title}</span>
         <input value={eventSignal.get()} onChange={eventSignal.data.onChanges} style={{ width: '100%' }}/>

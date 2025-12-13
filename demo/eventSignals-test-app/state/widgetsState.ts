@@ -8,9 +8,9 @@ import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import { makePlaceholderUserEventSignal, clearPlaceholderUserEventSignalCache } from "./AppStates";
 
 const _$widgetsList_data = {
-    $addWidgetsDisable: new EventSignal(false, {
+    addWidgetsDisable$: new EventSignal(false, {
         componentType: Symbol(),
-        description: '$addWidgetsDisable',
+        description: 'addWidgetsDisable$',
         data: {
             title: 'addWidget',
             onClick: () => {
@@ -18,9 +18,9 @@ const _$widgetsList_data = {
             },
         },
     }),
-    $clearWidgetsDisable: new EventSignal(true, {
+    clearWidgetsDisable$: new EventSignal(true, {
         componentType: Symbol(),
-        description: '$clearWidgetsDisable',
+        description: 'clearWidgetsDisable$',
         data: {
             title: 'clearWidgets',
             onClick: () => {
@@ -29,14 +29,14 @@ const _$widgetsList_data = {
         },
     }),
     get addWidgetBtnDisabled() {
-        return this.$addWidgetsDisable.get();
+        return this.addWidgetsDisable$.get();
     },
     set addWidgetBtnDisabled(newValue: boolean) {
-        this.$addWidgetsDisable.set(newValue);
+        this.addWidgetsDisable$.set(newValue);
     },
     addWidgetBtnRef: createRef<HTMLButtonElement>(),
     addWidgets(...ids: (number | true)[]) {
-        const list = $widgetsList.getSourceValue();
+        const list = widgetsList$.getSourceValue();
         const newIds = ids.map(id => {
             return id === true ? randomNumber(0, 15) : id;
         }).filter(id => !list.includes(id));
@@ -53,10 +53,10 @@ const _$widgetsList_data = {
             this.addWidgetBtnDisabled = true;
         }
 
-        $widgetsList.set([ ...list, ...newIds ]);
+        widgetsList$.set([ ...list, ...newIds ]);
     },
     removeWidget: (id: number) => {
-        const list = $widgetsList.getSourceValue();
+        const list = widgetsList$.getSourceValue();
         const index = list.indexOf(id);
 
         if (index === -1) {
@@ -67,7 +67,7 @@ const _$widgetsList_data = {
 
         newList.splice(index, 1);
 
-        $widgetsList.set(newList);
+        widgetsList$.set(newList);
     },
     clearWidgets() {
         if (this.addWidgetBtnRef.current) {
@@ -76,15 +76,15 @@ const _$widgetsList_data = {
 
         this.addWidgetBtnDisabled = false;
 
-        $widgetsList.set([]);
+        widgetsList$.set([]);
     },
     clearCache() {
         clearPlaceholderUserEventSignalCache();
     },
 };
 
-export const $widgetsList = new EventSignal<(ReturnType<typeof makePlaceholderUserEventSignal>)[], number[], typeof _$widgetsList_data>([], (_prev, idsList) => {
-    _$widgetsList_data.$clearWidgetsDisable.set(idsList.length === 0);
+export const widgetsList$ = new EventSignal<(ReturnType<typeof makePlaceholderUserEventSignal>)[], number[], typeof _$widgetsList_data>([], (_prev, idsList) => {
+    _$widgetsList_data.clearWidgetsDisable$.set(idsList.length === 0);
 
     return idsList.map(id => makePlaceholderUserEventSignal(id));
 }, {
@@ -107,7 +107,7 @@ function randomNumber(from = 0, to = 2_147_483_647) {
 }
 
 globalThis.__widgetsState = {
-    $widgetsList,
-    $addWidgetsDisable: _$widgetsList_data.$addWidgetsDisable,
-    $clearWidgetsDisable: _$widgetsList_data.$clearWidgetsDisable,
+    widgetsList$,
+    addWidgetsDisable$: _$widgetsList_data.addWidgetsDisable$,
+    clearWidgetsDisable$: _$widgetsList_data.clearWidgetsDisable$,
 };
