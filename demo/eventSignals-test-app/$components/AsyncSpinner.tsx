@@ -4,51 +4,11 @@ import * as React from "react";
 
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-document.head.insertAdjacentHTML('beforeend', `<style>
-.AsyncSpinnerLoader {
-    position: relative;
-    display: inline-block;
-}
-
-.AsyncSpinnerLoader__spinner {
-    width: 48px;
-    height: 48px;
-    border: 5px solid #FFF;
-    border-bottom-color: #FF3D00;
-    border-radius: 50%;
-    display: inline-block;
-    box-sizing: border-box;
-    animation: AsyncSpinnerLoader_rotation 1s linear infinite;
-}
-
-.AsyncSpinnerLoader__text {
-    max-width: 100%;
-    max-height: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-@keyframes AsyncSpinnerLoader_rotation {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
-}
-
-.AsyncSpinnerLoader__text {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    margin: 0;
-}
-</style>`);
+import css from './AsyncSpinner.module.css';
 
 export default function AsyncSpinner({ eventSignal, hint }: { eventSignal?: EventSignal<unknown, unknown, unknown | { currentUserId?: number }>, hint?: string }) {
-    return (<span className="AsyncSpinnerLoader">
-        <span className="AsyncSpinnerLoader__spinner"></span>
-        <span className="AsyncSpinnerLoader__text">{hint ?? eventSignal?.data?.["currentUserId"]}</span>
+    return (<span className={css.AsyncSpinnerLoader}>
+        <span className={css.AsyncSpinnerLoader__spinner}></span>
+        <span className={css.AsyncSpinnerLoader__text}>{hint ?? eventSignal?.data?.["currentUserId"]}</span>
     </span>);
 }

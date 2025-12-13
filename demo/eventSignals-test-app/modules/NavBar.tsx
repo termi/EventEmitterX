@@ -7,14 +7,7 @@ import { memo, useCallback } from 'react';
 
 import { routersList } from '../state/routers.prebuild';
 
-document.head.insertAdjacentHTML("beforeend", `<style>
-.NavBar__menu {
-    li {
-        display: inline-block;
-        padding-right: 20px;
-    }
-}
-</style>`);
+import css from './NavBar.module.css';
 
 const NavBar = memo(function NavBar() {
     const handleClick = useCallback((event: MouseEvent<HTMLElement>) => {
@@ -29,7 +22,7 @@ const NavBar = memo(function NavBar() {
 
     console.log(NavBar.name, 'render');
 
-    return (<ul className="NavBar__menu">
+    return (<ul className={css.NavBar__menu}>
         {routersList.map(router => {
             const {
                 routerPath,

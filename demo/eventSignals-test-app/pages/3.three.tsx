@@ -10,37 +10,15 @@ import DeferredSearchResults, {
 import NavBar from "../modules/NavBar";
 
 import { clearCache, setUseRandomError } from "../state/requestData";
-import { $requestDataSignal } from "../modules/EventSignalSearchResults";
+import { requestDataSignal$ } from "../modules/EventSignalSearchResults";
 
-document.head.insertAdjacentHTML('beforeend', `<style>
-details {
-    font-size: 70%;
-    border: 1px solid #aaa;
-    border-radius: 4px;
-    padding: 0.5em 0.5em 0;
-}
-
-summary {
-    font-weight: bold;
-    margin: -0.5em -0.5em 0;
-    padding: 0.5em;
-}
-
-details[open] {
-    padding: 0.5em;
-}
-
-details[open] summary {
-    border-bottom: 1px solid #aaa;
-    margin-bottom: 0.5em;
-}
-</style>`);
+import css from './3.three.module.css';
 
 export default function PageThree() {
     const { 0: clickCounter, 1: setClickCounter } = useState(0);
 
     return (
-        <>
+        <div className={css.PageThree}>
             <h1>Page Three</h1>
             <NavBar/>
             <details>
@@ -55,8 +33,8 @@ export default function PageThree() {
             <hr />
             <DeferredSearchResults />
             <hr />
-            {$requestDataSignal}
-        </>
+            {requestDataSignal$}
+        </div>
     );
 }
 
@@ -69,12 +47,12 @@ async function _testRender() {
 
     testRunning = true;
 
-    $requestDataSignal.data.disabled = true;
-    $requestDataSignal.set('');
+    requestDataSignal$.data.disabled = true;
+    requestDataSignal$.set('');
     setUseRandomError(false);
 
     DeferredSearchResults.renderCounter = 0;
-    $requestDataSignal.data.resetRenders();
+    requestDataSignal$.data.resetRenders();
 
     __DeferredSearchResults__setDisabled(true);
     __DeferredSearchResults__setQuery('');
@@ -85,7 +63,7 @@ async function _testRender() {
     });
 
     DeferredSearchResults.renderCounter = 0;
-    $requestDataSignal.data.resetRenders();
+    requestDataSignal$.data.resetRenders();
 
     for (const value of [
         'a',
@@ -94,7 +72,7 @@ async function _testRender() {
         'let',
         'error',
     ]) {
-        $requestDataSignal.set(value);
+        requestDataSignal$.set(value);
         __DeferredSearchResults__setQuery(value);
 
         await new Promise<void>(resolve => {
@@ -106,8 +84,8 @@ async function _testRender() {
     testRunning = false;
 
     // eslint-disable-next-line require-atomic-updates
-    $requestDataSignal.data.disabled = false;
-    $requestDataSignal.set('');
+    requestDataSignal$.data.disabled = false;
+    requestDataSignal$.set('');
     __DeferredSearchResults__setDisabled(false);
     __DeferredSearchResults__setQuery('');
 
@@ -119,12 +97,12 @@ function _reset() {
     clearCache();
 
     DeferredSearchResults.renderCounter = 0;
-    $requestDataSignal.data.resetRenders();
+    requestDataSignal$.data.resetRenders();
 
-    $requestDataSignal.set('');
+    requestDataSignal$.set('');
     __DeferredSearchResults__setQuery(a => {
         if (a === '') {
-            $requestDataSignal.set('-');
+            requestDataSignal$.set('-');
 
             setTimeout(() => {
                 _reset();

@@ -4,13 +4,13 @@
 import * as React from "react";
 
 import NavBar from "../modules/NavBar";
-import { $widgetsList } from "../state/widgetsState";
+import { widgetsList$ } from "../state/widgetsState";
 /*
-import type { Signal$jsonPlaceholderUser1 } from "../state/AppStates";
+import type { JsonPlaceholderUser1$ } from "../state/AppStates";
 import { mainState } from "../state/AppStates";
 */
 
-const { $addWidgetsDisable, $clearWidgetsDisable } = $widgetsList.data;
+const { addWidgetsDisable$, clearWidgetsDisable$ } = widgetsList$.data;
 // const { jsonPlaceholderUserComponentType } = mainState;
 
 export default function PageFour() {
@@ -20,21 +20,21 @@ export default function PageFour() {
         <h1>Page PageFour</h1>
         <NavBar/>
         <fieldset>
-            <$addWidgetsDisable.component sFC={WidgetButtonDisableSignal}>
+            <addWidgetsDisable$.component sFC={WidgetButtonDisableSignal}>
                 <span style={{ color: 'red' }}> random</span>
-            </$addWidgetsDisable.component>
+            </addWidgetsDisable$.component>
             <button
-                ref={$widgetsList.data.addWidgetBtnRef}
-                onClick={() => $widgetsList.data.addWidgets(9, 15, 7, 1, 20, 3, 6, 5)}
-                disabled={$widgetsList.data.addWidgetBtnDisabled}
+                ref={widgetsList$.data.addWidgetBtnRef}
+                onClick={() => widgetsList$.data.addWidgets(9, 15, 7, 1, 20, 3, 6, 5)}
+                disabled={widgetsList$.data.addWidgetBtnDisabled}
             >addWidgets</button>
-            <$clearWidgetsDisable.component sFC={WidgetButtonDisableSignal} />
+            <clearWidgetsDisable$.component sFC={WidgetButtonDisableSignal} />
             <button
-                onClick={$widgetsList.data.clearCache}
+                onClick={widgetsList$.data.clearCache}
             >clearCache</button>
         </fieldset>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <$widgetsList.component context={{
+            <widgetsList$.component context={{
                 //todo: Как оно могло бы быть
                 // onWidgetDelete(id) {
                 //     $widgetsList.data.removeWidget(id);
@@ -46,7 +46,7 @@ export default function PageFour() {
 }
 
 function WidgetButtonDisableSignal({ eventSignal, onClick, children }: {
-    eventSignal: typeof $addWidgetsDisable | typeof $clearWidgetsDisable,
+    eventSignal: typeof addWidgetsDisable$ | typeof clearWidgetsDisable$,
     onClick?: () => void,
     children: React.ReactNode,
 }) {
@@ -66,7 +66,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 }
 </style>`);
 
-function UserSimpleCart({ eventSignal }: { eventSignal: Signal$jsonPlaceholderUser1 }) {
+function UserSimpleCart({ eventSignal }: { eventSignal: JsonPlaceholderUser1$ }) {
     const userId = eventSignal.get();
     const { userDTO } = eventSignal.data;
     const onWidgetDelete = useContext($widgetsList)?.onWidgetDelete;

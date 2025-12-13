@@ -21,14 +21,14 @@ import { pipPopupWindow$ } from "./state/pipWindowState";
 import { i18n_componentType } from "./state/i18n";
 import { routersList } from './state/routers.prebuild';
 
-import UserCard from "./$components/UserCard";
 import SignalAsString1 from "./$components/SignalAsString1";
 import SignalAsString2 from "./$components/SignalAsString2";
-import JsonPlaceholderUser from "./$components/JsonPlaceholderUser";
 import AsyncSpinner from "./$components/AsyncSpinner";
 import AsyncSpinner2 from "./$components/AsyncSpinner2";
 import ErrorView from "./$components/ErrorView";
 import AnimatedText from "./$components/AnimatedText";
+import UserCard from "./modules/UserCard";
+import JsonPlaceholderUser from "./modules/JsonPlaceholderUser";
 
 import './app.module.css';
 
@@ -86,14 +86,14 @@ EventSignal.registerReactComponentForComponentType(mainState.stringCounterCompon
     EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, ErrorView, 'error');
 }
 
-mainState.$counter1.addListener(newValue => {
+mainState.counter1$.addListener(newValue => {
     (newValue > 9)
         ? EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, AsyncSpinner2, 'pending')
         : EventSignal.registerReactComponentForComponentType(mainState.jsonPlaceholderUserComponentType, AsyncSpinner, 'pending')
     ;
 });
 
-mainState.$counter2.addListener(newValue => {
+mainState.counter2$.addListener(newValue => {
     if (newValue < 0) {
         EventSignal.registerReactComponentForComponentType(mainState.stringCounterComponentType, void 0);
     }

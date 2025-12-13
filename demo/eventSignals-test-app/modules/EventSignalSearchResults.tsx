@@ -9,7 +9,7 @@ import ErrorView from "../$components/ErrorView";
 import AsyncSpinner from "../$components/AsyncSpinner";
 import { fetchData2 } from "../state/requestData";
 
-export const $requestDataSignal = new EventSignal([] as unknown as ReturnType<typeof fetchData2>, async function(_prev, searchQuery) {
+export const requestDataSignal$ = new EventSignal([] as unknown as ReturnType<typeof fetchData2>, async function(_prev, searchQuery) {
     const query = searchQuery || '';
 
     if (!query) {
@@ -23,10 +23,10 @@ export const $requestDataSignal = new EventSignal([] as unknown as ReturnType<ty
         title: 'Search albums:',
         disabled: false,
         onChanges: (event: ChangeEvent<HTMLInputElement>) => {
-            $requestDataSignal.set(String(event.target.value || ''));
+            requestDataSignal$.set(String(event.target.value || ''));
         },
         retry: () => {
-            $requestDataSignal.set($requestDataSignal.getSourceValue());
+            requestDataSignal$.set(requestDataSignal$.getSourceValue());
         },
         resetRenders: () => {
             EventSignalSearchResults.rendersCounter = 0;
@@ -35,11 +35,11 @@ export const $requestDataSignal = new EventSignal([] as unknown as ReturnType<ty
     componentType: Symbol('albumsSearchResults'),
 });
 
-globalThis.__$requestDataSignal = $requestDataSignal;
+globalThis.__requestDataSignal$ = requestDataSignal$;
 
-EventSignal.registerReactComponentForComponentType($requestDataSignal.componentType, EventSignalSearchResults);
+EventSignal.registerReactComponentForComponentType(requestDataSignal$.componentType, EventSignalSearchResults);
 
-function EventSignalSearchResults({ eventSignal }: { eventSignal: typeof $requestDataSignal }) {
+function EventSignalSearchResults({ eventSignal }: { eventSignal: typeof requestDataSignal$ }) {
     const { status } = eventSignal;
     const query = eventSignal.getSourceValue() || '';
     const albums = eventSignal.getLast();

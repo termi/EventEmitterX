@@ -5,17 +5,7 @@ import * as React from "react";
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import type { JsonPlaceholderUserDTO } from "../state/AppStates";
 
-document.head.insertAdjacentHTML('beforeend', `<style>
-.JsonPlaceholderUser {
-    table {
-        border-spacing: 0;
-
-        th, td {
-            border: 1px solid gray;
-        }
-    }
-}
-</style>`);
+import css from './JsonPlaceholderUser.module.css';
 
 export default function JsonPlaceholderUser({ eventSignal, componentType, version, textColor, backgroundColor }: {
     eventSignal: EventSignal<number, any, {
@@ -30,7 +20,7 @@ export default function JsonPlaceholderUser({ eventSignal, componentType, versio
     const { userDTO } = eventSignal.data;
 
     return (<div
-        className="JsonPlaceholderUser"
+        className={css.JsonPlaceholderUser}
         data-user-id={eventSignal.get()}
         data-componenttype={componentType}
         data-version={version}
