@@ -220,11 +220,32 @@
     border-top: 1px solid #eee;
   }
 
-  .loading {
-    text-align: center;
-    padding: 40px;
-    font-size: 1.2rem;
-    color: #4a6fa5;
+  .pip-icon {
+    position: absolute;
+    right: 8px;
+    top: 10px;
+    cursor: pointer;
+    /** Visible only with .city-card:hover */
+    display: none;
+  }
+
+  .pip-icon.pip-icon--close {
+    /** need empty body for CSS Modules resolver */
+    background-color: #ceffce;
+    border-radius: 2px;
+  }
+
+  /*noinspection CssInvalidMediaFeature*/
+  @media not (display-mode: picture-in-picture) {
+    .pip-icon.pip-icon--close {
+      display: inline;
+    }
+
+    .city-card:hover {
+      .pip-icon {
+        display: inline;
+      }
+    }
   }
 
   @media (max-width: 600px) {
@@ -283,9 +304,15 @@
     .city-name {
       justify-content: space-between;
       text-align: end;
+      display: flex;
+      flex-direction: row-reverse;
 
       .optional-line-break {
         display: inline;
+      }
+
+      > div {
+        text-align: right;
       }
     }
 

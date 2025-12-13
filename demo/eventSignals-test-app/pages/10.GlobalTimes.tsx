@@ -140,13 +140,20 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.componentT
 function _setPopup(event: MouseEvent<HTMLDivElement>) {
     const { currentTarget } = event;
     const id = (currentTarget as HTMLElement)?.getAttribute?.('data-id') as (string | null);
+    const mode = (currentTarget as HTMLElement)?.getAttribute?.('data-click-mode') as (string | null);
+    const shouldOpen = mode === 'open';
+    const isThisPipOpen = pipPopupWindow$.getLast().dataId === id;
+    const shouldIgnore = shouldOpen
+        ? isThisPipOpen
+        : !isThisPipOpen
+    ;
 
-    if (id) {
-        pipPopupWindow$.setPopup({
+    if (id && !shouldIgnore) {
+        pipPopupWindow$.setPopup(shouldOpen ? {
             dataId: id,
             component: PageGlobalTimes,
             componentProps: { filterById: id, viewType: 'grid' },
-        });
+        } : void 0);
     }
 }
 
@@ -170,24 +177,17 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
     } = eventSignal.get();
     const { data } = eventSignal;
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const pipWindowInfo = pipPopupWindow$.use();
+    const isThisPipOpen = pipPopupWindow$.use().dataId === id;
     const viewType = useContext(ViewType$Context)?.use();
 
     useLayoutEffect(() => {
-        const canvasElement = canvasRef.current;
-
-        data.initCanvasAnimation(canvasElement);
-
-        return () => {
-            data.cancelCanvasAnimation(canvasElement);
-        };
+        return data.initCanvasAnimation(canvasRef.current);
     }, [ data ]);
 
     return (<div
         className={styles.cityCard}
         data-id={id}
-        data-viewType={viewType}
-        onClick={pipWindowInfo.dataId === id ? null : _setPopup}
+        data-viewtype={viewType}
     >
         <div className={styles.canvasContainer}>
             <canvas ref={canvasRef}></canvas>
@@ -209,5 +209,10 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
                 <span>{dayLightSign}️</span>
             </div>
         </div>
+        <img className={`${styles.pipIcon} ${isThisPipOpen ? styles.pipIconClose : ''}`}
+            data-id={id} data-click-mode={isThisPipOpen ? 'close' : 'open'}
+            onClick={_setPopup}
+            src="/static/pip.svg" alt="pip" height="24px"
+        />
     </div>);
 });
