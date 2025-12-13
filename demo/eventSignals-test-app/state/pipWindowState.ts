@@ -70,6 +70,10 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
             height,
         });
 
+        if (!window) {
+            return emptyPipPopupWindowDescription;
+        }
+
         // Создаем контейнер для React в PIP окне
         const container = document.createElement('div');
 
@@ -87,7 +91,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
                 // 'pagehide' callback will be dispatched
-                window.close();
+                window?.close();
             }
         };
 
@@ -117,14 +121,18 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
     }
     catch (error) {
         console.error('Failed to open Picture-in-Picture:', error);
-        onClose?.(error);
+        onClose?.(error as Error | string);
     }
 }, {
     initialSourceValue: null as NewPipWindowOptions | null,
 }), {
-    setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P>) {
+    setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P> | undefined) {
         this.markNextValueAsForced();
-        this.set(newValue);
+        this.set(newValue ?? {
+            dataId: null,
+            component: null,
+            componentProps: null,
+        });
     },
 });
 
