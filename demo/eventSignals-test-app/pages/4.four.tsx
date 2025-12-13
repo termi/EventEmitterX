@@ -3,7 +3,7 @@
 
 import * as React from "react";
 
-import NavBar from "../components/NavBar";
+import NavBar from "../modules/NavBar";
 import { $widgetsList } from "../state/widgetsState";
 /*
 import type { Signal$jsonPlaceholderUser1 } from "../state/AppStates";

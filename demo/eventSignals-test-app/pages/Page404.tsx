@@ -1,7 +1,7 @@
 'use strict';
 
 import * as React from "react";
-import NavBar from "../components/NavBar";
+import NavBar from "../modules/NavBar";
 
 export default function Page404() {
     return (<>

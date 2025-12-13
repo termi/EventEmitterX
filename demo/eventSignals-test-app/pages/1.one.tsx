@@ -2,8 +2,8 @@
 
 import * as React from "react";
 
-import Counter from "../components/Counter";
-import NavBar from "../components/NavBar";
+import Counter from "../$components/Counter";
+import NavBar from "../modules/NavBar";
 
 import { mainState } from "../state/AppStates";
 

@@ -12,7 +12,7 @@ import {
 } from "../state/GlobalTimesState";
 import { pipPopupWindow$ } from "../state/pipWindowState";
 
-import NavBar from "../components/NavBar";
+import NavBar from "../modules/NavBar";
 
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error
