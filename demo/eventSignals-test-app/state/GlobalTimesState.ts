@@ -4,6 +4,7 @@
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import hashSum from 'cftools/common/hashSum';
 import { throttle } from 'cftools/common/FunctionTools';
+import { currentLocale$ } from "./i18n";
 
 const componentTypeGlobalTimesList = Symbol('GlobalTimes/List');
 const componentTypeGlobalTimesCity = Symbol('GlobalTimes/City');
@@ -12,7 +13,7 @@ export const mostPopularCities$ = new EventSignal(
     [] as mostPopularCities$.CityDescriptionEventSignal[],
     function(_prev, mostPopularCitiesList) {
         return mostPopularCitiesList.map(cityDescription => {
-            return _makeCityTimeSignal(cityDescription);
+            return _makeCityTime$$(cityDescription);
         });
     }, {
         initialSourceValue: getMostPopularCities(),
@@ -24,10 +25,54 @@ export const mostPopularCities$ = new EventSignal(
 );
 
 export namespace mostPopularCities$ {
-    export type CityDescriptionEventSignal = ReturnType<typeof _makeCityTimeSignal>;
+    export type CityDescriptionEventSignal = ReturnType<typeof _makeCityTime$$>;
 }
 
-function _makeCityTimeSignal(cityDescription: RawCityDescription) {
+/**
+ * @example Use custom date
+ * nowTime$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+ * @example Use system date
+ * nowTime$.set(null);
+ */
+const nowTime$ = new EventSignal<number, number | null>(Date.now(), (prevNow, customNow, eventSignal) => {
+    return customNow
+        ? (eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0
+            ? customNow
+            : (prevNow + 1000)
+        : Date.now()
+    ;
+}, {
+    trigger: {
+        type: 'clock',
+        ms: 1000,
+        timerGroupId: componentTypeGlobalTimesCity,
+    },
+});
+
+const _dnCacheOnNew = function(locale: string) {
+    return Object.assign(new Intl.DisplayNames(locale, _DisplayNames_options), {
+        getByLocaleSafe(locale: string) {
+            const countryCode = locale.split('-')[1];
+
+            try {
+                return this.of(countryCode.toUpperCase()) as string;
+            }
+            catch {
+                // ignore
+            }
+
+            return void 0;
+        },
+    });
+};
+const _dnCache = Object.assign(new Map<string, ReturnType<typeof _dnCacheOnNew>>(), {
+    getOrNew(key: string) {
+        return this.getOrInsertComputed(key, _dnCacheOnNew) as ReturnType<typeof _dnCacheOnNew>;
+    },
+});
+const _DisplayNames_options = Object.freeze(Object.setPrototypeOf({ type: 'region' }, null)) as Intl.DisplayNamesOptions;
+
+function _makeCityTime$$(cityDescription: RawCityDescription) {
     const id = hashSum([
         cityDescription.name,
         cityDescription.locale,
@@ -35,14 +80,18 @@ function _makeCityTimeSignal(cityDescription: RawCityDescription) {
     ]);
     let timeOfDay: TimeOfDay = 'day';
 
-    return new EventSignal({} as CityDescription, function(prev, rawCityDescription) {
-        const timeInfo = formatLocalTime(rawCityDescription);
+    const cityTime$ = new EventSignal({} as CityDescription, function(prev, rawCityDescription) {
+        const currentLocale = currentLocale$.get();
+        const regionNames = _dnCache.getOrNew(currentLocale);
+        const timeInfo = formatLocalTime(rawCityDescription, nowTime$.get());
 
         timeOfDay = timeInfo.timeOfDay;
 
+        const country = regionNames.getByLocaleSafe(rawCityDescription.locale) || rawCityDescription.country;
         const cityDescription: CityDescription = {
             id,
             ...rawCityDescription,
+            country,
             enable: prev.enable ?? true,
             timeOfDay,
             dayLightSign: timeInfo.dayLightSign,
@@ -56,11 +105,6 @@ function _makeCityTimeSignal(cityDescription: RawCityDescription) {
     }, {
         initialSourceValue: cityDescription,
         componentType: componentTypeGlobalTimesCity,
-        trigger: {
-            type: 'clock',
-            ms: 1000,
-            timerGroupId: componentTypeGlobalTimesCity,
-        },
         data: {
             initCanvasAnimation: ($canvas: HTMLCanvasElement | null) => {
                 if (typeof document === 'undefined' || !$canvas) {
@@ -76,15 +120,19 @@ function _makeCityTimeSignal(cityDescription: RawCityDescription) {
                 const animation = new TimeCanvas($canvas, timeOfDay);
 
                 canvasAnimations.set($canvas, animation);
-            },
-            cancelCanvasAnimation: ($canvas: HTMLCanvasElement | null) => {
-                if ($canvas) {
+
+                cityTime$.addListener(animation.updateTimeOfDayFromObject);
+
+                return () => {
+                    cityTime$.removeListener(animation.updateTimeOfDayFromObject);
                     canvasAnimations.get($canvas)?.destroy();
                     canvasAnimations.delete($canvas);
-                }
+                };
             },
         },
     });
+
+    return cityTime$;
 }
 
 type TimeOfDay = 'day' | 'evening' | 'morning' | 'night';
@@ -108,7 +156,7 @@ type RawCityDescription = {
     flag: string,
 };
 
-function formatLocalTime(city: RawCityDescription, nowDate = new Date()) {
+function formatLocalTime(city: RawCityDescription, now: number | undefined) {
     // const timeFormatter = new Intl.DateTimeFormat(city.locale, {
     //     timeZone: city.timeZone,
     //     // hour: '2-digit',
@@ -126,6 +174,7 @@ function formatLocalTime(city: RawCityDescription, nowDate = new Date()) {
     // });
     // dateFormatter.format(nowDate);
 
+    const nowDate = new Date(now ?? Date.now());
     // Форматируем время и дату
     const h23localTime = nowDate.toLocaleTimeString(city.locale, { timeZone: city.timeZone, timeStyle: 'short', hour12: false });
     const time = nowDate.toLocaleTimeString(city.locale, { timeZone: city.timeZone, timeStyle: 'medium' });
@@ -169,7 +218,6 @@ function formatLocalTime(city: RawCityDescription, nowDate = new Date()) {
 // Список популярных городов с их временными зонами и локалями
 function getMostPopularCities(): RawCityDescription[] {
     const date = new Date();
-    const regionNames = new Intl.DisplayNames(void 0, { type: 'region' });
 
     return [
         {
@@ -283,20 +331,6 @@ function getMostPopularCities(): RawCityDescription[] {
         const timeB = date.toLocaleString('en-US', { timeZone: b.timeZone });
 
         return new Date(timeA).getTime() - new Date(timeB).getTime();
-    }).map(city => {
-        const {
-            timeZone,
-        } = city;
-        const countryCode = timeZone.split('-')[1];
-
-        try {
-            city.country = regionNames.of(countryCode.toUpperCase());
-        }
-        catch {
-            // ignore
-        }
-
-        return city;
     });
 }
 
@@ -453,10 +487,13 @@ class TimeCanvas {
         animate();
     }
 
+    updateTimeOfDayFromObject = (obj: { timeOfDay: TimeOfDay }) => {
+        this.updateTimeOfDay(obj.timeOfDay);
+    };
+
     updateTimeOfDay(timeOfDay: TimeOfDay) {
         if (this.timeOfDay !== timeOfDay) {
             this.timeOfDay = timeOfDay;
-            this.createParticles();
         }
     }
 
@@ -475,4 +512,7 @@ class TimeCanvas {
 // Хранилище canvas анимаций
 const canvasAnimations = new Map<HTMLCanvasElement, TimeCanvas>();
 
-(globalThis as unknown as Record<string, any>).__test__canvasAnimations = canvasAnimations;
+Object.assign(globalThis, {
+    __test__canvasAnimations: canvasAnimations,
+    __test__nowTime$: nowTime$,
+});
