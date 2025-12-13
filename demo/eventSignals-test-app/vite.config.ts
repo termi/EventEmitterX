@@ -1,12 +1,18 @@
 'use strict';
 
+/*
 import * as ts from 'typescript';
 import { ModuleKind } from 'typescript';
-import { defineConfig } from 'vite';
 import { vitePluginTypescriptTransform } from 'vite-plugin-typescript-transform';
 import typescript2 from 'rollup-plugin-typescript2';
+*/
+import { defineConfig } from 'vite';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error
+import reactPlugin from '@vitejs/plugin-react';
 
 import { createPrebuildPlugin } from './dev/vite/plugins/prebuild.vite';
+import { createCSSHotReloadConfirmPlugin } from "./dev/vite/plugins/cssHotReloadConfirm.vite";
 
 // Подменяем esbuild компилятор TypeScript на настоящий typescript.
 /*
@@ -17,6 +23,32 @@ import { createPrebuildPlugin } from './dev/vite/plugins/prebuild.vite';
 */
 export default defineConfig({
     // ...your vite configuration
+    build: {
+        rollupOptions: {
+            treeshake: 'recommended',
+            output: {
+                manualChunks(id: string) {
+                    if (id.includes('react')) {
+                        return 'react';
+                    }
+
+                    if (id.includes('/modules/events/')) {
+                        return 'events';
+                    }
+
+                    if (id.includes('/cftools/')) {
+                        return 'cftools';
+                    }
+
+                    if (id.includes('/node_modules/')) {
+                        return 'vendor';
+                    }
+
+                    return null;
+                },
+            },
+        },
+    },
     css: {
         modules: {
             localsConvention: 'camelCase', // или 'dashes'
@@ -25,6 +57,11 @@ export default defineConfig({
         },
     },
     plugins: [
+        reactPlugin({
+            // Включить fast refresh
+            fastRefresh: true,
+        }),
+        /*
         {
             ...typescript2({
                 typescript: ts,
@@ -45,6 +82,8 @@ export default defineConfig({
                 },
             },
         }),
+        */
+        createCSSHotReloadConfirmPlugin(),
         createPrebuildPlugin(),
     ],
 });

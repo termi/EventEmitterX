@@ -1,6 +1,7 @@
 {
-  "extends": "../../tsconfig.json",
+//  "extends": "../../tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "types": ["vite/client"],
     "outDir": "./build/ts-output",
     // https://www.typescriptlang.org/tsconfig/#allowSyntheticDefaultImports
@@ -15,14 +16,26 @@
     "esModuleInterop": true,
     "composite": true,
     "skipLibCheck": true,
-    "preserveConstEnums": false,
+    "alwaysStrict": true,
+    "noResolve": false,
+    "preserveConstEnums": true,
     "isolatedModules": false,
+    "moduleDetection": "force",
     "target": "ES2022",
-    "module": "ESNext"
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "jsx": "react",
+    "newLine": "lf"
   },
-  "include": [
+  "__include": [
     "./types/global.d.ts",
     "./types/pip.d.ts",
     "./types/document-picture-in-picture.d.ts"
+  ],
+  "include": [
+    "**/*.jsx",
+    "**/*.js",
+    "**/*.tsx",
+    "**/*.ts"
   ]
 }
