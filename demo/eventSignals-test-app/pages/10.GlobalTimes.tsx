@@ -16,15 +16,19 @@ import { i18n$$, i18nString$$ } from "../state/i18n";
 import NavBar from "../modules/NavBar";
 import { menuItemTitle$ } from './10.GlobalTimes.metadata';
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
-import styles from './PageGlobalTimes.module.css';
+import styles from './10.GlobalTimes.module.css';
 
-const ViewType$Context = createContext(null as ReturnType<typeof makeViewType$> | null);
+type ViewType$ = ReturnType<typeof makeViewType$>;
+
+const ViewType$Context = createContext(null as ViewType$ | null);
 const makeViewType$ = () => {
-    const viewType$ = new EventSignal('list' as 'grid' | 'list' | 'table', {
+    let destructor: (() => void) | undefined;
+    const viewType$ = Object.assign(new EventSignal('list' as 'grid' | 'list' | 'table', {
         description: 'viewType$',
         data: {
+            onFormSubmit: ((event) => {
+                event.preventDefault();
+            }) as React.FormEventHandler<HTMLFormElement>,
             onFormChange: ((event) => {
                 const target = event.target as HTMLInputElement;
 
@@ -48,26 +52,37 @@ const makeViewType$ = () => {
                 },
             ],
         },
+    }), {
+        effectWithDestructor: () => {
+            return destructor ??= viewType$.destructor.bind(viewType$);
+        },
     });
 
     (globalThis as unknown as Record<string, any>).__test__viewType$ = viewType$;
 
     return viewType$;
 };
-
-export default function PageGlobalTimes({ viewType, filterById }: {
-    viewType?: ReturnType<ReturnType<typeof makeViewType$>["get"]>,
-    filterById?: string,
-}) {
+const useViewType$ = (viewType?: ReturnType<ViewType$["get"]>) => {
     const viewType$ = useMemo(makeViewType$, []);
 
-    useEffect(() => {
-        return () => viewType$.destructor();
-    }, [ viewType$ ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(viewType$.effectWithDestructor, [ viewType$ ]);
 
-    if (viewType) {
+    // Только если мы только что создали viewType$ и нужно указать ему первоначальное значение
+    if (viewType && viewType$.version === 0) {
         viewType$.set(viewType);
+        // Форсируем получение нового значения. Это нужно потому что (на данный момент) viewType$.use() вызывает viewType$.getLastValue().
+        viewType$.get();
     }
+
+    return viewType$;
+};
+
+export default function PageGlobalTimes({ viewType, filterById }: {
+    viewType?: ReturnType<ViewType$["get"]>,
+    filterById?: string,
+}) {
+    const viewType$ = useViewType$(viewType);
 
     // Получаем актуальное значение и подписываемся на изменения сигнала.
     // Подписка нужна, чтобы обновлять controllable интупы формы, если сигнал viewType$ измениться "снаружи".
@@ -85,10 +100,13 @@ export default function PageGlobalTimes({ viewType, filterById }: {
             <section className={styles.container}>
                 <header>
                     <h1>🌍 {menuItemTitle$}</h1>
-                    <div className={styles.subtitle}>{i18n$`Локальное время в популярных городах мира`}</div>
+                    <div className={styles.subtitle}>{i18n$$`Локальное время в популярных городах мира`}</div>
 
                     <div className={styles.controls}>
-                        <form className={styles.viewToggle} action="#" onChange={viewType$.data.onFormChange}>
+                        <form className={styles.viewToggle} action="#"
+                            onChange={viewType$.data.onFormChange}
+                            onSubmit={viewType$.data.onFormSubmit}
+                        >
                             {viewType$.data.elements.map(elementDescription => {
                                 const checked = elementDescription.value === viewType;
 
@@ -97,6 +115,9 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                                         name={viewType$.data.radioName}
                                         value={elementDescription.value}
                                         checked={checked}
+                                        // note: 'readonly' attribute applies to all except type = [hidden, range, color, checkbox, radio, buttons].
+                                        // This attribute exists only due React warn: You provided a `checked` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultChecked`. Otherwise, set either `onChange` or `readOnly`.
+                                        readOnly={true}
                                     />
                                     <span className={styles.btnText}>{elementDescription.label}</span>
                                 </label>);
@@ -195,12 +216,18 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         </div>
         <div className={styles.cityInfo}>
             <div className={styles.cityName}>
-                <div>
+                <div title={timeZone}>
                     <span className={styles.flag}>{flag}</span>
+                    <span>
+                        {i18nString$$(name)}
+                        <br className={styles.optionalLineBreak}/>{' '}
+                        ({timeZoneName})
+                    </span>
+                </div>
+                <div>
                     <div className={styles.country}>{country}</div>
                     <div className={styles.timezone}>{locale}</div>
                 </div>
-                <span title={timeZone}>{name} <br className={styles.optionalLineBreak}/>({timeZoneName})</span>
             </div>
         </div>
         <div className={styles.timeInfo}>
