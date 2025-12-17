@@ -13,9 +13,9 @@ import {
 import { pipPopupWindow$ } from "../state/pipWindowState";
 import { i18n$$, i18nString$$ } from "../state/i18n";
 
-import { menuItemTitle$ } from './10.GlobalTimes.metadata';
+import { menuItemTitle$, unicodeIcon } from './10.GlobalTimes.metadata';
 
-import styles from './10.GlobalTimes.module.css';
+import css from './10.GlobalTimes.module.css';
 
 type ViewType$ = ReturnType<typeof makeViewType$>;
 
@@ -91,21 +91,21 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     console.log(PageGlobalTimes.name, 'render');
 
     return (<>
-        <div className={styles.PageGlobalTimes}>
-            <section className={styles.container}>
+        <div className={css.PageGlobalTimes}>
+            <section className={css.container}>
                 <header>
-                    <h1>🌍 {menuItemTitle$}</h1>
-                    <div className={styles.subtitle}>{i18n$$`Локальное время в популярных городах мира`}</div>
+                    <h1>{unicodeIcon} {menuItemTitle$}</h1>
+                    <div className={css.subtitle}>{i18n$$`Локальное время в популярных городах мира`}</div>
 
-                    <div className={styles.controls}>
-                        <form className={styles.viewToggle} action="#"
+                    <div className={css.controls}>
+                        <form className={css.viewToggle} action="#"
                             onChange={viewType$.data.onFormChange}
                             onSubmit={viewType$.data.onFormSubmit}
                         >
                             {viewType$.data.elements.map(elementDescription => {
                                 const checked = elementDescription.value === viewType;
 
-                                return (<label key={elementDescription.value} className={styles.viewLabel}>
+                                return (<label key={elementDescription.value} className={css.viewLabel}>
                                     <input type="radio"
                                         name={viewType$.data.radioName}
                                         value={elementDescription.value}
@@ -114,24 +114,41 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                                         // This attribute exists only due React warn: You provided a `checked` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultChecked`. Otherwise, set either `onChange` or `readOnly`.
                                         readOnly={true}
                                     />
-                                    <span className={styles.btnText}>{elementDescription.label}</span>
+                                    <span className={css.btnText}>{elementDescription.label}</span>
                                 </label>);
                             })}
                         </form>
                     </div>
                 </header>
 
-                <ViewType$Context.Provider value={viewType$}>
-                    <mostPopularCities$.component filterById={filterById}/>
-                </ViewType$Context.Provider>
+                {/* todo: <mostPopularCities$.component.ModContext value={viewType}> */}
+                <mostPopularCities$.component.ViewContext value={viewType === 'table' ? {
+                    [mostPopularCities$.componentType as string]: GlobalTimesTable,
+                    [mostPopularCities$.data.elementsComponentType]: GlobalTimesTableRow,
+                } : void 0}>
+                    <ViewType$Context.Provider value={viewType$}>
+                        <mostPopularCities$.component filterById={filterById}/>
+                    </ViewType$Context.Provider>
+                </mostPopularCities$.component.ViewContext>
 
-                <footer className={styles.updateTime}>
+                <footer className={css.updateTime}>
                     {i18n$$`Время обновляется каждую секунду`}
                 </footer>
             </section>
         </div>
     </>);
 }
+
+/* todo:
+EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesList);
+EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesTable, {
+    mod: 'table',
+    applyView: [
+        // [ componentType, reactFC, preDefinedProps? ]
+        [ mostPopularCities$.data.elementsComponentType, GlobalTimesTableRow ],
+    ],
+});
+*/
 
 EventSignal.registerReactComponentForComponentType(mostPopularCities$.componentType, function GlobalTimesList({
     eventSignal,
@@ -141,12 +158,12 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.componentT
     filterById?: string,
 }) {
     const viewType = useContext(ViewType$Context)?.use();
-    const classNameMode = viewType === 'grid' ? styles.citiesGrid
-        : viewType === 'table' ? styles.citiesTable
+    const classNameMode = viewType === 'grid' ? css.citiesGrid
+        : viewType === 'table' ? css.citiesTable
         : ''
     ;
 
-    return (<div className={`${styles.citiesContainer} ${classNameMode}`}>
+    return (<div className={`${css.citiesContainer} ${classNameMode}`}>
         {filterById
             ? eventSignal.get().filter(item => item.get().id === filterById)
             : eventSignal.get()
@@ -202,40 +219,97 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
     }, [ data ]);
 
     return (<div
-        className={styles.cityCard}
+        className={css.cityCard}
         data-id={id}
         data-viewtype={viewType}
+        style={{ "--city-flag-content": `"${flag}"` } as React.CSSProperties}
     >
-        <div className={styles.canvasContainer}>
+        <div className={css.canvasContainer}>
             <canvas ref={canvasRef}></canvas>
         </div>
-        <div className={styles.cityInfo}>
-            <div className={styles.cityName}>
+        <div className={css.cityInfo}>
+            <div className={css.cityName}>
                 <div title={timeZone}>
-                    <span className={styles.flag}>{flag}</span>
                     <span>
                         {i18nString$$(name)}
-                        <br className={styles.optionalLineBreak}/>{' '}
+                        <br className={css.optionalLineBreak}/>{' '}
                         ({timeZoneName})
                     </span>
                 </div>
                 <div>
-                    <div className={styles.country}>{country}</div>
-                    <div className={styles.timezone}>{locale}</div>
+                    <div className={css.country}>{country}</div>
+                    <div className={css.timezone}>{locale}</div>
                 </div>
             </div>
         </div>
-        <div className={styles.timeInfo}>
-            <div className={styles.localTime}>{time}</div>
-            <div className={styles.timeFormat}>
+        <div className={css.timeInfo}>
+            <div className={css.localTime}>{time}</div>
+            <div className={css.timeFormat}>
                 <span>{date}</span>
                 <span>{dayLightSign}️</span>
             </div>
         </div>
-        <img className={`${styles.pipIcon} ${isThisPipOpen ? styles.pipIconClose : ''}`}
+        <img className={`${css.pipIcon} ${isThisPipOpen ? css.pipIconClose : ''}`}
             data-id={id} data-click-mode={isThisPipOpen ? 'close' : 'open'}
             onClick={_setPopup}
             src="/static/pip.svg" alt="pip" height="24px"
         />
     </div>);
 });
+
+function GlobalTimesTable({
+    eventSignal,
+    filterById,
+}: {
+    eventSignal: typeof mostPopularCities$,
+    filterById?: string,
+}) {
+    const cities = filterById
+        ? eventSignal.get().filter(item => item.get().id === filterById)
+        : eventSignal.get()
+    ;
+
+    return (<table className={`${css.citiesContainer} ${css.citiesTable}`}>
+        <thead>
+            <tr>
+                <th></th>
+                <th>{i18nString$$('Город')}</th>
+                <th>{i18nString$$('Страна')}</th>
+                <th>{i18nString$$('Локаль')}</th>
+                <th>{i18nString$$('Часовой пояс')}</th>
+                <th>{i18nString$$('Часовой пояс')}</th>
+                <th>{i18nString$$('Местное время')}</th>
+                <th>{i18nString$$('Местная дата')}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {cities}
+        </tbody>
+    </table>);
+}
+
+function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.CityDescriptionEventSignal }) {
+    const {
+        id,
+        name,
+        flag,
+        country,
+        locale,
+        date,
+        time,
+        dayLightSign,
+        timeZone,
+        timeZoneName,
+    } = eventSignal.get();
+
+    return <tr key={id} data-id={id}>
+        <td className={css.cityFlag}>{flag}</td>
+        <td className={css.cityName}>{i18nString$$(name)}</td>
+        <td className={css.country}>{country}</td>
+        <td>{locale}</td>
+        <td>{timeZone}</td>
+        <td>{timeZoneName}</td>
+        <td>{dayLightSign} {time}</td>
+        <td>{date}</td>
+    </tr>;
+}
