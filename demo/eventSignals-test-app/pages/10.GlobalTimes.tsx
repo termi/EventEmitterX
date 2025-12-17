@@ -13,7 +13,6 @@ import {
 import { pipPopupWindow$ } from "../state/pipWindowState";
 import { i18n$$, i18nString$$ } from "../state/i18n";
 
-import NavBar from "../modules/NavBar";
 import { menuItemTitle$ } from './10.GlobalTimes.metadata';
 
 import styles from './10.GlobalTimes.module.css';
@@ -92,10 +91,6 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     console.log(PageGlobalTimes.name, 'render');
 
     return (<>
-        <div className={styles.pageHeaderForPageGlobalTimes}>
-            <h1>PageGlobalTimes</h1>
-            <NavBar/>
-        </div>
         <div className={styles.PageGlobalTimes}>
             <section className={styles.container}>
                 <header>

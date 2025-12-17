@@ -3,7 +3,6 @@
 import * as React from "react";
 
 import Counter from "../modules/Counter";
-import NavBar from "../modules/NavBar";
 
 import { mainState } from "../state/AppStates";
 
@@ -13,8 +12,6 @@ export default function PageOne() {
     console.log('render PageOne');
 
     return (<>
-        <h1>{menuItemTitle$}</h1>
-        <NavBar/>
         <div style={{ display: 'flex' }}>
             <mainState.computed1$.component sFC={Counter} title="Counter1"/>
             <Counter eventSignal={mainState.computed2$} title="Counter2"/>

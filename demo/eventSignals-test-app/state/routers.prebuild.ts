@@ -15,6 +15,7 @@ const routersList: {
         menuItemTitle$: EventSignal<string>,
     },
     Component: React.FC,
+    Layout?: React.FC,
 }[] = [];
 
 export { routersList };

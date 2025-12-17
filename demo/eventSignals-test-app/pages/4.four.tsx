@@ -3,7 +3,6 @@
 
 import * as React from "react";
 
-import NavBar from "../modules/NavBar";
 import { widgetsList$ } from "../state/widgetsState";
 /*
 import type { JsonPlaceholderUser1$ } from "../state/AppStates";
@@ -17,8 +16,6 @@ export default function PageFour() {
     console.log('render PageFour');
 
     return (<>
-        <h1>Page PageFour</h1>
-        <NavBar/>
         <fieldset>
             <addWidgetsDisable$.component sFC={WidgetButtonDisableSignal}>
                 <span style={{ color: 'red' }}> random</span>
