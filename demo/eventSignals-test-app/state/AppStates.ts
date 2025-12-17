@@ -5,14 +5,23 @@ import type * as React from "react";
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
 import { randomNumber } from "../lib/utils";
+import { i18n, i18n$$ } from "./i18n";
 
 const stringCounterComponentType = '--counter--';
 const counter1$ = new EventSignal(0, {
     description: 'counter1$',
+    data: {
+        title: i18n$$`Счетчик ${'1'}`,
+    },
 });
-const computed1$ = new EventSignal('', () => {
-    return `Counter is ${counter1$.get()}`;
+const computed1$ = new EventSignal('', (_prev, sourceValue, eventSignal) => {
+    if (eventSignal.getStateFlags() === EventSignal.StateFlags.wasSourceSetting) {
+        counter1$.set(sourceValue);
+    }
+
+    return i18n`Значение = ${counter1$.get()}`;
 }, {
+    initialSourceValue: counter1$.get(),
     description: 'computed1$',
     //todo:
     // methods: {
@@ -23,17 +32,87 @@ const computed1$ = new EventSignal('', () => {
     // // comes to $computed1._.increment and $computed1._.decrement, $computed1._.setFromDOMEvent
     finaleValue: 'Counter is destroyed',
     componentType: stringCounterComponentType,
+    data: {
+        title: i18n$$`Счетчик ${'1'} со строкой-префиксом`,
+        _: {
+            increment(arg = 1) {
+                counter1$.set(v => v + arg);
+            },
+            incrementOne() {
+                counter1$.set(v => v + 1);
+            },
+            decrement(arg = 1) {
+                counter1$.set(v => v - arg);
+            },
+            decrementOne() {
+                counter1$.set(v => v - 1);
+            },
+            reset(arg = 0) {
+                counter1$.set(arg || 0);
+            },
+            resetToZero() {
+                counter1$.set(0);
+            },
+        } as NumericSignalMethods,
+    },
 });
 
 const counter2$ = new EventSignal(0, {
     description: 'counter2$',
+    data: {
+        title: i18n$$`Счетчик ${'2'}`,
+    },
 });
-const computed2$ = new EventSignal('', () => {
-    return `Counter is ${counter2$.get()}`;
+const computed2$ = Object.assign(new EventSignal('', () => {
+    return i18n`Значение = ${counter2$.get()}`;
 }, {
     description: 'computed2$',
     componentType: stringCounterComponentType,
+    data: {
+        title: i18n$$`Счетчик ${'2'} со строкой-префиксом`,
+        _: {
+            increment(arg = 1) {
+                counter2$.set(v => v + arg);
+            },
+            incrementOne() {
+                counter2$.set(v => v + 1);
+            },
+            decrement(arg = 1) {
+                counter2$.set(v => v - arg);
+            },
+            decrementOne() {
+                counter2$.set(v => v - 1);
+            },
+            reset(arg = 0) {
+                counter2$.set(arg || 0);
+            },
+            resetToZero() {
+                counter2$.set(0);
+            },
+        } as NumericSignalMethods,
+    },
+}), {
+    set(newCounter: number) {
+        counter2$.set(newCounter);
+    },
 });
+
+const countersSum$ = new EventSignal(0, () => {
+    return counter1$.get() + counter2$.get();
+}, {
+    data: {
+        title: i18n$$`Сумма значений`,
+    },
+});
+
+type NumericSignalMethods = {
+    increment(arg?: number): void,
+    incrementOne(): void,
+    decrement(arg?: number): void,
+    decrementOne(): void,
+    reset(arg?: number): void,
+    resetToZero(): void,
+};
 
 const incrementCounter1 = counter1$.createMethod<number | void>((prevValue, arg = 1) => {
     return prevValue + arg;
@@ -133,7 +212,7 @@ export function clearPlaceholderUserEventSignalCache() {
     }
 }
 
-export function makePlaceholderUserEventSignal(id: number, eventSignal?: EventSignal<number>) {
+export function makePlaceholderUserEventSignal(id: number, eventSignal?: EventSignal<number, any, any>) {
     return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(id, eventSignal);
 }
 
@@ -202,7 +281,17 @@ function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: Event
     });
 }
 
-const jsonPlaceholderUser1$ = makePlaceholderUserEventSignal(counter1$.get(), counter1$);
+const jsonPlaceholderUser1$ = Object.assign(makePlaceholderUserEventSignal(counter1$.get(), counter1$), {
+    data: {
+        getNextUser: Object.assign(() => {
+            return jsonPlaceholderUser1$.set((_, currentUserId) => {
+                return ++currentUserId;
+            });
+        }, {
+            title: i18n$$`Следующий пользователь`,
+        }),
+    },
+});
 
 export type JsonPlaceholderUser1$ = typeof jsonPlaceholderUser1$;
 
@@ -211,6 +300,7 @@ export const mainState = {
     computed1$,
     counter2$,
     computed2$,
+    countersSum$,
 
     incrementCounter1,
     decrementCounter1,

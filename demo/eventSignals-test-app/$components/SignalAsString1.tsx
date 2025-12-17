@@ -10,7 +10,7 @@ export default function SignalAsString1({ eventSignal, textColor }: { eventSigna
         console.log('SignalAsString1 useEffect');
 
         return () => {
-            console.log('SignalAsString1 unmount ');
+            console.log('SignalAsString1 unmount');
         };
     }, []);
 
