@@ -127,6 +127,9 @@
     overflow: hidden;
     transition: all 0.3s ease;
     border-left: 5px solid #4a6fa5;
+
+    /** Set country flag via 'style' attribute like this: style="--city-flag-content: 'US'" */
+    --city-flag-content: '';
   }
 
   .city-card:hover {
@@ -145,7 +148,20 @@
     color: #2c3e50;
     white-space: normal;
 
+    &::before {
+      content: var(--city-flag-content);
+      display: inline-block;
+      font-size: 1.8rem;
+      margin-right: 5px;
+      vertical-align: middle;
+      margin-inline-end: 10px;
+      /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
+      /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
+      font-family: "Twemoji Country Flags", auto;
+    }
+
     > div {
+      display: inline;
       text-align: left;
     }
 
@@ -179,16 +195,6 @@
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
-  }
-
-  .flag {
-    font-size: 1.8rem;
-    margin-right: 5px;
-    vertical-align: middle;
-    margin-inline-end: 10px;
-    /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
-    /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
-    font-family: "Twemoji Country Flags", auto;
   }
 
   .timezone {
@@ -298,12 +304,32 @@
       display: flex;
       flex-direction: row-reverse;
 
+      &::before {
+        display: none;
+      }
+
       .optional-line-break {
         display: inline;
       }
 
       > div {
         text-align: right;
+      }
+
+      > div + div {
+        text-align: left;
+
+        &::before {
+          content: var(--city-flag-content);
+          display: inline-block;
+          font-size: 1.8rem;
+          margin-right: 5px;
+          vertical-align: middle;
+          margin-inline-end: 10px;
+          /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
+          /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
+          font-family: "Twemoji Country Flags", auto;
+        }
       }
     }
 
@@ -322,13 +348,6 @@
     }
     .time-format {
       text-align: end;
-    }
-  }
-
-  /* todo: Стиль таблицы */
-  .cities-container.cities-table {
-    canvas {
-      display: none;
     }
   }
 
@@ -354,6 +373,27 @@
         padding: 0;
         margin: 0;
       }
+    }
+  }
+
+  /* Стиль таблицы */
+  .cities-container.cities-table {
+    font-size: 1.1rem;
+
+    td {
+      padding: 0.3rem;
+    }
+
+    td.city-flag {
+      /* "Twemoji Country Flags" will be loading by "country-flag-emoji-polyfill" if needed */
+      /* @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/) */
+      font-family: "Twemoji Country Flags", auto;
+    }
+
+    .city-name {
+      font-size: 100%;
+      font-weight: unset;
+      color: unset;
     }
   }
 }
