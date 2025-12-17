@@ -18,7 +18,7 @@ import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
-import { i18n_componentType } from "./state/i18n";
+import { i18n_componentType, i18nString$$ } from "./state/i18n";
 import { routersList } from './state/routers.prebuild';
 
 import SignalAsString1 from "./$components/SignalAsString1";
@@ -29,6 +29,7 @@ import ErrorView from "./$components/ErrorView";
 import AnimatedText from "./$components/AnimatedText";
 import UserCard from "./modules/UserCard";
 import JsonPlaceholderUser from "./modules/JsonPlaceholderUser";
+import DefaultLayout from "./layouts/DefaultLayout";
 
 import './app.module.css';
 
@@ -142,14 +143,22 @@ initNavigation({
     }),
     routes: [
         ...routersList.map(router => {
-            const { Component } = router;
+            const {
+                metadata,
+                Component,
+                Layout = DefaultLayout,
+            } = router;
+            const pageTitle$ = metadata?.menuItemTitle$/* || router.pageTitle$*/;
+            const pageTitle = metadata?.menuItemTitle || router.pageTitle;
 
             return {
                 path: router.routerPath,
                 action() {
-                    return <Suspense fallback={'...Loading'}>
-                        <Component />
-                    </Suspense>;
+                    return <Layout pageTitle={pageTitle} pageTitle$={pageTitle$}>
+                        <Suspense fallback={i18nString$$('...Загрузка')}>
+                            <Component />
+                        </Suspense>
+                    </Layout>;
                 },
             };
         }),

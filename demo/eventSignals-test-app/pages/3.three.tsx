@@ -7,7 +7,6 @@ import DeferredSearchResults, {
     __DeferredSearchResults__setDisabled,
     __DeferredSearchResults__setQuery,
 } from '../modules/DeferredSearchResults';
-import NavBar from "../modules/NavBar";
 
 import { clearCache, setUseRandomError } from "../state/requestData";
 import { requestDataSignal$ } from "../modules/EventSignalSearchResults";
@@ -19,8 +18,6 @@ export default function PageThree() {
 
     return (
         <div className={css.PageThree}>
-            <h1>Page Three</h1>
-            <NavBar/>
             <details>
                 <summary>Hint</summary>
                 <p>Enter &quot;a&quot; in the input below, wait for the results to load, and then edit the input to &quot;ab&quot;</p>

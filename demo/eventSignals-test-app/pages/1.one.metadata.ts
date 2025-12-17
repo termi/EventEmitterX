@@ -2,7 +2,7 @@
 
 import { i18nString$$ } from "../state/i18n";
 
-const menuItemTitle = 'Тест один';
+const menuItemTitle = 'Счетчики';
 const menuItemTitle$ = i18nString$$(menuItemTitle);
 
 export {

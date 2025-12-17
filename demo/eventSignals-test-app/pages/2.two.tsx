@@ -4,7 +4,6 @@
 import * as React from "react";
 import { useState } from "react";
 
-import NavBar from "../modules/NavBar";
 import { mainState } from "../state/AppStates";
 import { randomNumber } from "../lib/utils";
 
@@ -27,8 +26,6 @@ export default function PageTwo() {
     const { 0: counter, 1: setCounter } = useState(0);
 
     return (<>
-        <h1>Page Two</h1>
-        <NavBar/>
         <div className="-w-user-card">{userFullNameObject$}</div>
         <form style={{ marginTop: '10px' }}>
             <fieldset style={{
