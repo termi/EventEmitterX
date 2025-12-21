@@ -32,6 +32,7 @@ import {
     useRealTimers,
     setSystemTime,
     realSleep,
+    advanceTimersByTime,
     advanceTimersByTimeAsync,
 } from "../../../spec_utils/fakeTimers";
 
@@ -1244,6 +1245,116 @@ describe('EventSignal', () => {
                 expect(values).toEqual([ `Counter is: 0`, `Counter is: 1`, `Counter is: destroyed` ]);
                 expect(computed$.get()).toBe(`Counter is: destroyed`);
             });
+
+            it('should recalculate new value and call listener in next tick - 1', async () => {
+                const counter$ = new EventSignal(0);
+                const computed$ = new EventSignal('', function() {
+                    return `test-${counter$.get()}`;
+                });
+                let counter1 = 0;
+
+                counter$.addListener(() => {
+                    counter1++;
+                });
+
+                counter$.set(v => ++v);
+
+                expect(counter1).toBe(0);
+
+                // await next microtask
+                await Promise.resolve();
+
+                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] В тесте ниже мы подписываемся не на counter$, а на computed$
+                //  и наша логика ломается. Так быть не должно.
+                expect(counter1).toBe(1);
+                expect(computed$.get()).toBe(`test-1`);
+
+                counter$.set(v => ++v);
+
+                expect(counter1).toBe(1);
+
+                // await next microtask
+                await Promise.resolve();
+
+                expect(counter1).toBe(2);
+                expect(computed$.get()).toBe(`test-2`);
+            });
+
+            it('should recalculate new value and call listener in next tick - 2', async () => {
+                const counter$ = new EventSignal(0);
+                const computed$ = new EventSignal('', function() {
+                    return `test-${counter$.get()}`;
+                });
+                let counter2 = 0;
+
+                computed$.addListener(() => {
+                    counter2++;
+                });
+
+                counter$.set(v => ++v);
+
+                expect(counter2).toBe(0);
+
+                // await next microtask
+                await Promise.resolve();
+
+                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] Мы должны тут получать новые значения, потому что мы
+                //  подписались на сигнал, который зависит от изменяемого сигнала.
+                void counter2;
+                /*
+                expect(counter2).toBe(1);
+
+                counter$.set(v => ++v);
+
+                expect(counter2).toBe(1);
+
+                // await next microtask
+                await Promise.resolve();
+
+                expect(counter2).toBe(2);
+                */
+            });
+
+            it('should recalculate new value and call listener in next tick - 3', async () => {
+                const counter$ = new EventSignal(0);
+                const computed$ = new EventSignal('', function() {
+                    return `test-${counter$.get()}`;
+                });
+                let counter1 = 0;
+                let counter2 = 0;
+
+                counter$.addListener(() => {
+                    counter1++;
+                });
+                computed$.addListener(() => {
+                    counter2++;
+                });
+
+                counter$.set(v => ++v);
+
+                expect(counter1).toBe(0);
+                expect(counter2).toBe(0);
+
+                // await next microtask
+                await Promise.resolve();
+
+                expect(counter1).toBe(1);
+                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] Мы должны тут получать новые значения, потому что мы
+                //  подписались на сигнал, который зависит от изменяемого сигнала.
+                void counter2;
+                /*
+                expect(counter2).toBe(1);
+
+                counter$.set(v => ++v);
+
+                expect(counter2).toBe(1);
+
+                // await next microtask
+                await Promise.resolve();
+
+                expect(counter2).toBe(2);
+                */
+            });
         });
 
         describe('once', function() {
@@ -2150,6 +2261,338 @@ describe('EventSignal', () => {
                 expect(getEventListeners(__test__signalEventsEmitter, timeValue$.eventName)).toHaveLength(0);
                 expect(getEventListeners(__test__timersTriggerEventsEmitter, counterValue$.eventName)).toHaveLength(0);
                 expect(getEventListeners(__test__timersTriggerEventsEmitter, timeValue$.eventName)).toHaveLength(0);
+            });
+
+            it('force update signal value every X milliseconds 2 - sync without subscriptions', function() {
+                /**
+                 * @example Use custom date
+                 * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+                 * @example Use system date
+                 * nowDate$.set(null);
+                 */
+                const nowDate$ = new EventSignal<Date, Date | number | null>(new Date(), (prevNow, customNow, eventSignal) => {
+                    if (customNow) {
+                        if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
+                            return new Date(customNow);
+                        }
+
+                        return new Date(prevNow.getTime() + 1000);
+                    }
+
+                    return new Date();
+                }, {
+                    trigger: {
+                        type: 'clock',
+                        ms: 1000,
+                    },
+                });
+                const startDate = new Date('2025-12-04T09:05:00+03:00');
+                const newDate = new Date('2025-12-20T02:05:00+03:00');
+
+                setSystemTime(startDate);
+
+                expect(nowDate$.computationsCount).toBe(0);
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(0);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + SECONDS);
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 2));
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(3);
+
+                // Устанавливаем новое время. Нужно учитывать, из него будет вычислено значение только при следующем вызове get().
+                nowDate$.set(newDate);
+
+                expect(nowDate$.computationsCount).toBe(3);
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                // Т.к. это первый get после вызова set, то тут значение будет равное newDate, даже несмотря на то, что
+                //  мы промотали время.
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime());
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + SECONDS);
+
+                advanceTimersByTime(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 2));
+            });
+
+            it('force update signal value every X milliseconds 3 - async with subscription', async function() {
+                /**
+                 * @example Use custom date
+                 * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+                 * @example Use system date
+                 * nowDate$.set(null);
+                 */
+                const nowDate$ = new EventSignal<Date, Date | number | null>(new Date(), (prevNow, customNow, eventSignal) => {
+                    if (customNow) {
+                        if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
+                            return new Date(customNow);
+                        }
+
+                        return new Date(prevNow.getTime() + 1000);
+                    }
+
+                    return new Date();
+                }, {
+                    trigger: {
+                        type: 'clock',
+                        ms: 1000,
+                    },
+                });
+                const nowTime$ = new EventSignal(0, () => {
+                    return nowDate$.get().getTime();
+                });
+                const startDate = new Date('2025-12-04T09:05:00+03:00');
+                const newDate = new Date('2025-12-20T02:05:00+03:00');
+                let counter = 0;
+
+                // Вешаем обработчик изменений на исходный сигнал для которого выставлен trigger
+                nowDate$.addListener(() => {
+                    counter++;
+                });
+
+                setSystemTime(startDate);
+
+                expect(nowDate$.computationsCount).toBe(0);
+                expect(counter).toBe(0);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                // Has subscription, already computed
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(counter).toBe(1);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + SECONDS);
+                expect(nowTime$.get()).toBe(startDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(nowTime$.computationsCount).toBe(1);
+                expect(counter).toBe(1);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(counter).toBe(2);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 2));
+                expect(nowTime$.get()).toBe(startDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(nowTime$.computationsCount).toBe(2);
+                expect(counter).toBe(2);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowTime$.get()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(nowTime$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+
+                // Устанавливаем новое время.
+                // Нужно учитывать, что новое значение пересчитается в после следующей микротаски, т.к. есть подписчики
+                //  навешанные через addListener на этот сигнал.
+                nowDate$.set(newDate);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+
+                await realSleep(-1);
+
+                // Подписка через addListener вынуждает сигнал пересчитать значение на новое после установки через set().
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(counter).toBe(4);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime());
+                expect(nowTime$.get()).toBe(newDate.getTime());
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(nowTime$.computationsCount).toBe(4);
+                expect(counter).toBe(4);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(counter).toBe(5);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + SECONDS);
+                expect(nowTime$.get()).toBe(newDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(nowTime$.computationsCount).toBe(5);
+                expect(counter).toBe(5);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(counter).toBe(6);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 2));
+                expect(nowTime$.get()).toBe(newDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(nowTime$.computationsCount).toBe(6);
+                expect(counter).toBe(6);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(7);
+                expect(counter).toBe(7);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 3));
+                expect(nowTime$.get()).toBe(newDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(7);
+                expect(nowTime$.computationsCount).toBe(7);
+                expect(counter).toBe(7);
+            });
+
+            it('force update signal value every X milliseconds 4 - async with dependent signal and subscriptions', async function() {
+                /**
+                 * @example Use custom date
+                 * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+                 * @example Use system date
+                 * nowDate$.set(null);
+                 */
+                const nowDate$ = new EventSignal<Date, Date | number | null>(new Date(), (prevNow, customNow, eventSignal) => {
+                    if (customNow) {
+                        if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
+                            return new Date(customNow);
+                        }
+
+                        return new Date(prevNow.getTime() + 1000);
+                    }
+
+                    return new Date();
+                }, {
+                    trigger: {
+                        type: 'clock',
+                        ms: 1000,
+                    },
+                });
+                const nowTime$ = new EventSignal(0, () => {
+                    return nowDate$.get().getTime();
+                });
+                const startDate = new Date('2025-12-04T09:05:00+03:00');
+                const newDate = new Date('2025-12-20T02:05:00+03:00');
+                let counter1 = 0;
+                let counter2 = 0;
+
+                // Вешаем обработчик изменений на зависимый сигнал
+                nowDate$.addListener(() => {
+                    counter1++;
+                });
+                nowTime$.addListener(() => {
+                    counter2++;
+                });
+
+                setSystemTime(startDate);
+
+                expect(nowDate$.computationsCount).toBe(0);
+                expect(counter1).toBe(0);
+                expect(counter2).toBe(0);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(counter1).toBe(1);
+                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] Почему мы тут не получили нового значения, хотя были подписаны на нужные изменения.
+                //  При этом по этому тесту дальше мы нормально получаем новые значения в обработчике.
+                //  Смотреть: expect(counter2).toBe(2), expect(counter2).toBe(3) и т.д.
+                expect(counter2).toBe(0);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + SECONDS);
+                expect(nowTime$.get()).toBe(startDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(nowTime$.computationsCount).toBe(1);
+                expect(counter1).toBe(1);
+                expect(counter2).toBe(1);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(counter1).toBe(2);
+                expect(counter2).toBe(2);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 2));
+                expect(nowTime$.get()).toBe(startDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(nowTime$.computationsCount).toBe(2);
+                expect(counter1).toBe(2);
+                expect(counter2).toBe(2);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter1).toBe(3);
+                expect(counter2).toBe(3);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowTime$.get()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(nowTime$.computationsCount).toBe(3);
+                expect(counter1).toBe(3);
+                expect(counter2).toBe(3);
+
+                // Устанавливаем новое время.
+                // Нужно учитывать, что новое значение пересчитается в после следующей микротаски, т.к. есть подписчики
+                //  навешанные через addListener на nowTime$.
+                nowDate$.set(newDate);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter1).toBe(3);
+
+                await realSleep(-1);
+
+                // Подписка через addListener вынуждает сигнал пересчитать значение на новое после установки через set().
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(counter1).toBe(4);
+                expect(counter2).toBe(4);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime());
+                expect(nowTime$.get()).toBe(newDate.getTime());
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(nowTime$.computationsCount).toBe(4);
+                expect(counter1).toBe(4);
+                expect(counter2).toBe(4);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(counter1).toBe(5);
+                expect(counter2).toBe(5);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + SECONDS);
+                expect(nowTime$.get()).toBe(newDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(nowTime$.computationsCount).toBe(5);
+                expect(counter1).toBe(5);
+                expect(counter2).toBe(5);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(counter1).toBe(6);
+                expect(counter2).toBe(6);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 2));
+                expect(nowTime$.get()).toBe(newDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(nowTime$.computationsCount).toBe(6);
+                expect(counter1).toBe(6);
+                expect(counter2).toBe(6);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(7);
+                expect(counter1).toBe(7);
+                expect(counter2).toBe(7);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 3));
+                expect(nowTime$.get()).toBe(newDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(7);
+                expect(nowTime$.computationsCount).toBe(7);
+                expect(counter1).toBe(7);
+                expect(counter2).toBe(7);
             });
         });
     });

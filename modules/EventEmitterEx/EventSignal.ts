@@ -37,6 +37,7 @@ const subscribersEventsEmitter = new EventEmitterX({
 });
 
 const isDev = isRunningInWebDevMode();
+const _is = Object.is;
 let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
@@ -72,6 +73,8 @@ export class EventSignal<T, S=T, D=undefined> {
     private _cv = 0 | 0;
     private _computationPromise: Promise<T> | null | undefined;
     private _recalcPromise: Promise<void> | null | undefined;
+    // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
+    // private _setPromise: Promise<void> | null | undefined;
     private _promise: Promise<T> | undefined;
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
@@ -256,6 +259,8 @@ export class EventSignal<T, S=T, D=undefined> {
 
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
         this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D>)?.initialSourceValue ?? void 0;
+
+        this.set = this.set.bind(this);
 
         // noinspection JSUnusedAssignment
         initialValue = void 0 as Awaited<T>;
@@ -528,6 +533,8 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         this._computationPromise = null;
+        // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
+        // this._setPromise = null;
 
         // // todo: Если будет реализован EventSignal._setComponentOnDestroy, то это нужно убрать
         // if (Object.hasOwn(this, 'type')) {
@@ -833,7 +840,7 @@ export class EventSignal<T, S=T, D=undefined> {
                                 }
                             }
                             else {
-                                isNeedToUpdate = !Object.is(prevValue, newValue);
+                                isNeedToUpdate = !_is(prevValue, newValue);
                             }
                         }
 
@@ -886,7 +893,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         }
                     }
                     else {
-                        isNeedToUpdate = !Object.is(prevValue, newValue);
+                        isNeedToUpdate = !_is(prevValue, newValue);
                     }
                 }
 
@@ -934,7 +941,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         }
                     }
                     else {
-                        isNeedToUpdate = !Object.is(prevValue, newValue);
+                        isNeedToUpdate = !_is(prevValue, newValue);
                     }
                 }
 
@@ -977,6 +984,16 @@ export class EventSignal<T, S=T, D=undefined> {
         if ((stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return this._value;
         }
+
+        // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
+        // // note: Тут нельзя откладывать выполнение если поднят флаг EventSignal.StateFlags.hasThrottle
+        // if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
+        //     const maybePromise = this._calculateValue();
+        //
+        //     if (maybePromise) {
+        //         return maybePromise;
+        //     }
+        // }
 
         return this._value;
     }
@@ -1054,21 +1071,10 @@ export class EventSignal<T, S=T, D=undefined> {
         this._stateFlags |= EventSignal.StateFlags.nextValueShouldBeForceSettled;
     }
 
-    // todo: [tag: SET_WITH_SETTER__QUEUES]
-    //  Пересмотреть концепцию set с setter'ом. Нужно сделать так, чтобы никакие значения не терялись.
-    //  Сейчас при throttle и/или при async computation, в prev будет последнее посчитанное значение для
-    //  каждого `signal.set(setter)` вызванного синхронно друг за другом. Это будет создавать ситуацию, когда часть
-    //  данных будет теряться. Например один и тот де EventSignal будет вести себя по-разному с throttle и без:
-    //   - Без throttle в каждом `signal.set(v => v + 1)` идущем друг за другом предыдущее значение (v) будет новым
-    //     и равным вычисленному в предыдущем `signal.set(v => v + 1)`
-    //   - С throttle или с sync computation в каждом `signal.set(v => v + 1)` идущем друг за другом предыдущее значение (v)
-    //     будет одинаковым и равным последнему вычисленному значению.
-    //  Для решения этой проблемы, выводы `signal.set(setter)` нужно сохраняться в очередь и резолвить эту очередь в момент,
-    //   когда нам нужно пересчитать значение. В случае с sync computation каждый элемент в очереди выполняется асинхронно
-    //   и мы должны дождаться результата.
+    /** setter */
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
-    set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)) {
+    set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)): void {
         if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return;
         }
@@ -1078,9 +1084,29 @@ export class EventSignal<T, S=T, D=undefined> {
             //  в функции-обработчике изменения (или в computation) сигнала А, получается, что сигнал A подписывается на сигнал B.
             //  todo: Тесты нужны
             const currentValue = this._innerGet();
+
+            // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
+            // if (!!currentValue && typeof currentValue === 'object' && typeof currentValue["then"] === 'function') {
+            //     // eslint-disable-next-line promise/prefer-await-to-then
+            //     const setPromise = this._setPromise = (this._setPromise || Promise.resolve()).then(() => {
+            //         // eslint-disable-next-line promise/prefer-await-to-then,promise/no-nesting
+            //         return (currentValue as Promise<T>).then(() => {
+            //             return this.set(newSourceValue as ((prev: Awaited<T>, sourceValue: S, data: D) => S));
+            //         });
+            //         // eslint-disable-next-line promise/prefer-await-to-then
+            //     }).finally(() => {
+            //         if (this._setPromise === setPromise) {
+            //             this._setPromise = null;
+            //         }
+            //     });
+            //
+            //     // note: set может возвращать Promise только если сделать класс наследник AsyncEventSignal и создавать сигнал соответствующего класса из фабрики createSignal
+            //     return;
+            // }
+
             const { _sourceValue } = this;
             const currentSourceValue = (_sourceValue !== void 0 ? _sourceValue : currentValue) as S;
-            const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(currentValue, currentSourceValue, this.data);
+            const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(currentValue as T, currentSourceValue, this.data);
 
             if (this._setSourceValue(_newSourceValue, true)) {
                 this._recalculateIfNeeded();
@@ -1136,7 +1162,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 }
             }
             else {
-                isNeedToUpdate = !Object.is(_sourceValue, newSourceValue);
+                isNeedToUpdate = !_is(_sourceValue, newSourceValue);
             }
         }
 
@@ -1184,18 +1210,20 @@ export class EventSignal<T, S=T, D=undefined> {
     }
 
     private _recalculateIfNeeded() {
-        if (this._checkPendingState()) {
+        if (this._checkPendingState() && (this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
             if (!this._recalcPromise) {
                 // call recalculation in microtask
                 this._recalcPromise = Promise.resolve()
                     // eslint-disable-next-line promise/prefer-await-to-then
                     .then(async () => {
-                        this._recalcPromise = void 0;
+                        this._recalcPromise = null;
 
-                        // call new recalculation value:
-                        //  1. resolving pending promises
-                        //  2. trigger new changes event to subscribers
-                        await this._calculateValue(void 0);
+                        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
+                            // call new recalculation value:
+                            //  1. resolving pending promises
+                            //  2. trigger new changes event to subscribers
+                            await this._calculateValue(void 0);
+                        }
                         // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
                     }).catch(error => {
                         // todo: Не выводить ошибку в консоль, а кидать в signalEventsEmitter событие 'signalError' в
@@ -2544,6 +2572,16 @@ function _shallowEqualObjects(obj1: unknown | null | undefined, obj2: unknown | 
     if (!obj1 || !obj2) {
         return false;
     }
+
+    if (obj1 instanceof Date) {
+        if (obj2 instanceof Date) {
+            return obj1.getTime() === obj2.getTime();
+        }
+
+        return false;
+    }
+
+    // todo: add support for Set, Map, etc
 
     const keys1 = Object.keys(obj1);
 
