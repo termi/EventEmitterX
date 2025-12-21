@@ -72,6 +72,7 @@ describe('EventSignal', () => {
             }, {
                 description: 'computedSignal1',
                 deps: [ signal2$ ],
+                data: { test: 1 },
             });
 
             const value = signal1$.get();
@@ -109,6 +110,8 @@ describe('EventSignal', () => {
                 return prev.replace(/#{(\d+)}/g, function(_, curr) {
                     return `#{${args.shift() || curr || 0}}`;
                 });
+            }, {
+                data: { test: 1 },
             });
 
             expect(computedSignal1$.get()).toBe(`#{1}-#{1}`);
@@ -487,6 +490,7 @@ describe('EventSignal', () => {
                 sourceMap(_eventName, value: { data: number }) {
                     return value.data;
                 },
+                data: { test: 1 },
             });
 
             expect(signal1$.get()).toBe(0);
@@ -631,6 +635,7 @@ describe('EventSignal', () => {
                 description: 'now time',
                 sourceEmitter: ee,
                 sourceEvent: 'update-time',
+                data: { test: 1 },
             });
 
             const now1 = computed$.get();
@@ -1996,7 +2001,7 @@ describe('EventSignal', () => {
         });
 
         describe('only works with computation in triggered signal', function() {
-            it('force update signal value every X milliseconds', async () => {
+            it('force update signal value every X milliseconds 1', async () => {
                 const ac = new AbortController();
                 const timerGroupId = Symbol();
                 // note: replace with `using counterValue$`
@@ -2012,6 +2017,9 @@ describe('EventSignal', () => {
                         ms: SECONDS_30,
                         signal: ac.signal,
                         __proto__: null,
+                    },
+                    data: {
+                        test: 1,
                     },
                 });
                 // note: replace with `using timeValue$`
@@ -2031,6 +2039,9 @@ describe('EventSignal', () => {
                         timerGroupId,
                         ms: MINUTES,
                         __proto__: null,
+                    },
+                    data: {
+                        test: 1,
                     },
                 });
                 const fromTemplate$ = new EventSignal('', (_v, template) => {
@@ -2060,9 +2071,9 @@ describe('EventSignal', () => {
 
                 // fixme: [tag: SET_WITH_SETTER__QUEUES]
                 //  Тут "предыдущее значение" для каждого `signal.set(setter)` должно быть новым и актуальным.
-                //  throttledValue1$.set(v => ++v);
-                //  throttledValue1$.set(v => ++v);
-                //  throttledValue1$.set(v => ++v);
+                //  counterValue$.set(v => ++v);
+                //  counterValue$.set(v => ++v);
+                //  counterValue$.set(v => ++v);
                 counterValue$.set(v => v + 3);
 
                 expect(counterValue$.get()).toBe(4);
@@ -2436,7 +2447,142 @@ describe('EventSignal', () => {
                 throttledComputed$.destructor();
             });
         });
+
+        describe('with trigger', function() {
+            xit('force update signal value every X milliseconds 3 - async with subscriptions', async function() {
+                /**
+                 * @example Use custom date
+                 * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+                 * @example Use system date
+                 * nowDate$.set(null);
+                 */
+                const nowDate$ = new EventSignal<Date, Date | number | null>(new Date(), (prevNow, customNow, eventSignal) => {
+                    if (customNow) {
+                        if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
+                            return new Date(customNow);
+                        }
+
+                        return new Date(prevNow.getTime() + 1000);
+                    }
+
+                    return new Date();
+                }, {
+                    trigger: {
+                        type: 'clock',
+                        ms: 1000,
+                    },
+                    throttle: {
+                        type: 'clock',
+                        ms: 1000,
+                    },
+                });
+                const startDate = new Date('2025-12-04T09:05:00+03:00');
+                const newDate = new Date('2025-12-20T02:05:00+03:00');
+                let counter = 0;
+
+                nowDate$.addListener(() => {
+                    counter++;
+                });
+
+                setSystemTime(startDate);
+
+                expect(nowDate$.computationsCount).toBe(0);
+                expect(counter).toBe(0);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                // Has subscription, already computed
+                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] Тут как-то НЕНАДЁЖНО работает получение нового значения
+                //  в подписчике через addListener - тут ПЛАВАЮЩИЙ баг, когда nowDate$.computationsCount то 0, то 1.
+                //  Воспроизводиться когда запускаются ВСЕ тесты в этом файле, в том числе в DEBUG-режиме.
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(counter).toBe(1);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(1);
+                expect(counter).toBe(1);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(counter).toBe(2);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(2);
+                expect(counter).toBe(2);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+                expect(nowDate$.get().getTime()).toBe(startDate.getTime() + (SECONDS * 3));
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+
+                const prevValue = nowDate$.get().getTime();
+                // Устанавливаем новое время.
+                // Нужно учитывать, что новое значение пересчитается в после следующей микротаски, т.к. есть подписчики
+                //  навешанные через addListener на этот сигнал.
+                nowDate$.set(newDate);
+
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+
+                await realSleep(-1);
+
+                // throttle не дал выполниться пересчету значения
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+                expect(nowDate$.get().getTime()).toBe(prevValue);
+                expect(nowDate$.computationsCount).toBe(3);
+                expect(counter).toBe(3);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(counter).toBe(4);
+                // Первое значение после `nowDate$.set(newDate);` и оно будет равно newDate
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime());
+                expect(nowDate$.computationsCount).toBe(4);
+                expect(counter).toBe(4);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(counter).toBe(5);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + SECONDS);
+                expect(nowDate$.computationsCount).toBe(5);
+                expect(counter).toBe(5);
+
+                await advanceTimersByTimeAsync(SECONDS);
+
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(counter).toBe(6);
+                expect(nowDate$.get().getTime()).toBe(newDate.getTime() + (SECONDS * 2));
+                expect(nowDate$.computationsCount).toBe(6);
+                expect(counter).toBe(6);
+            });
+        });
     });
+
+    // eslint-disable-next-line jest/no-commented-out-tests
+    /*describe('methods', function() {
+        it('common case', function() {
+            const counter$ = new EventSignal(0, {
+                methods: {
+                    increment: (prev: number, arg = 1) => {
+                        return prev + arg;
+                    },
+                },
+            });
+
+            counter$.__
+
+            const _ = counter$._;
+
+            _?.increment()
+
+            counter$._.increment()
+        });
+    });*/
 
     //todo: test case for
     // https://eval.js.hyoo.ru/#!code=%2F%2F%20Article%20about%3A%0A%2F%2F%20https%3A%2F%2Fpage.hyoo.ru%2F%23!%3D3ia3ll_rcpl7b%0A%0Alet%20res%20%3D%20%5B%5D%0A%0Aconst%20numbers%20%3D%20Array.from(%0A%09%7B%20length%3A%205%20%7D%2C%0A%09(%20_%2C%20i%20)%3D%3E%20i%2C%0A)%0A%0Aconst%20fib%20%3D%20n%20%3D%3E%20n%20%3C%202%20%3F%201%0A%09%3A%20fib(%20n%20-%201%20)%20%2B%20fib(%20n%20-%202%20)%0A%0Aconst%20hard%20%3D%20(%20n%2C%20l%20)%3D%3E%20n%20%2B%20fib(18)%0A%0A%2F*const%20hard%20%3D%20(%20n%2C%20l%20)%3D%3E%20%7B%0A%09console.log(%20l%20)%0A%09return%20n%20%2B%20fib(18)%0A%7D*%2F%0A%0A%2F%2F%20https%3A%2F%2Fgithub.com%2FRiim%2Fcellx%2F%0Aconst%20%7B%20cellx%2C%20Cell%20%7D%20%3D%20%24mol_import.module(%0A%09'https%3A%2F%2Fesm.sh%2Fcellx'%0A)%0Aconst%20%7B%20%24mol_compare_deep%3A%20compareValues%20%7D%20%3D%20%24mol_import.module(%0A%09'https%3A%2F%2Fesm.sh%2Fmol_compare_deep%2Fweb'%0A).default%0Aconst%20A%20%3D%20cellx(0)%0Aconst%20B%20%3D%20cellx(0)%0Aconst%20C%20%3D%20cellx(%20()%3D%3E%20A()%252%20%2B%20B()%252%20)%0Aconst%20D%20%3D%20cellx(%20()%3D%3E%20numbers.map(%20i%20%3D%3E%20(%7B%20x%3A%20i%20%2B%20A()%252%20-%20B()%252%20%7D)%20)%2C%20%7B%20compareValues%20%7D%20)%0Aconst%20E%20%3D%20cellx(%20()%3D%3E%20hard(%20C()%20%2B%20A()%20%2B%20D()%5B0%5D.x%2C%20'E'%20)%20)%0Aconst%20F%20%3D%20cellx(%20()%3D%3E%20hard(%20D()%5B2%5D.x%20%7C%7C%20B()%2C%20'F'%20)%20)%0Aconst%20G%20%3D%20cellx(%20()%3D%3E%20C()%20%2B%20(%20C()%20%7C%7C%20E()%252%20)%20%2B%20D()%5B4%5D.x%20%2B%20F()%20)%0Aconst%20H%20%3D%20cellx(%20()%3D%3E%20res.push(%20hard(%20G()%2C%20'H'%20)%20)%20)%0Aconst%20I%20%3D%20cellx(%20()%3D%3E%20res.push(%20G()%20)%20)%0Aconst%20J%20%3D%20cellx(%20()%3D%3E%20res.push(%20hard(%20F()%2C%20'J'%20)%20)%20)%0AH.subscribe(%20()%3D%3E%7B%7D%20)%0AI.subscribe(%20()%3D%3E%7B%7D%20)%0AJ.subscribe(%20()%3D%3E%7B%7D%20)%0A%0Ares.length%20%3D%203%0AB(1)%3B%20A(1%2B0*2)%3B%20%2F*%2F%2F*%2F%20Cell.release()%20%2F%2F%20H%0AA(2%2B0*2)%3B%20B(2)%3B%20%2F*%2F%2F*%2F%20Cell.release()%20%2F%2F%20EH%0A%0A%24mol_assert_like(%20res%2C%0A%5B%208369%2C%204188%2C%208364%2C%208372%2C%204191%2C%208369%2C%204188%20%5D%0A)/run=true

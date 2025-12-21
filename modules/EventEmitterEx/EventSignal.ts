@@ -13,6 +13,8 @@
 
 import type { EventEmitter } from "node:events";
 
+import type { EventSignal_ReactCopy } from "./EventSignal_types";
+
 import { isTest, isIDEDebugger } from 'termi@runEnv';
 import { isUniqueSymbol } from 'termi@type_guards';
 import { EventEmitterX } from "../events";
@@ -39,6 +41,10 @@ let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
 
+// type Method<T, ARGS extends any[]> = (first: T, ...args: ARGS) => T;
+// type MethodsMap<T> = Record<string, Method<T, any[]>>;
+// type InputMethods__<T> = MethodsMap<T> | undefined;
+
 export class EventSignal<T, S=T, D=undefined> {
     public readonly id = ++idIncrement;
     // noinspection JSUnusedGlobalSymbols
@@ -62,9 +68,10 @@ export class EventSignal<T, S=T, D=undefined> {
     private _stateFlags: EventSignal.StateFlags = 0;
     private _version = 0;
     private _computationsCount = 0;
-    private _componentVersion = 0;
-    private _computationPromise: Promise<T> | null = null;
-    private _recalcPromise: Promise<void> | undefined;
+    /** (React) component version. Only usable with {@link registerReactComponentForComponentType} and {@link _subscribeOnNextAnimationFrame} */
+    private _cv = 0 | 0;
+    private _computationPromise: Promise<T> | null | undefined;
+    private _recalcPromise: Promise<void> | null | undefined;
     private _promise: Promise<T> | undefined;
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
@@ -103,7 +110,6 @@ export class EventSignal<T, S=T, D=undefined> {
         }
     };
     private readonly _computation?: EventSignal.ComputationWithSource<T, S, D>;
-    protected _isInReactRenders: Set<EventSignal.ReactFC<any, any, any, any>> | undefined;
     private _sourceValue: S | undefined;
     // todo: add `statusData?: any;`?
     public readonly status?: string;
@@ -113,9 +119,22 @@ export class EventSignal<T, S=T, D=undefined> {
     // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceFilter"];
     private readonly _sourceCleanup: (() => void) | undefined;
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-    // @ts-ignore Ignore: `TS2322: Type 'undefined' is not assignable to type 'D'. \n'D' could be instantiated with an arbitrary type which could be unrelated to 'undefined'`
-    public data: D = void 0;
+    /**
+     * Payload
+     */
+    public data: D = void 0 as unknown as D;
+
+    /*
+    public readonly _: InputMethods extends undefined
+        ? undefined
+        : InputMethods extends Record<string, never>
+            ? undefined
+            : {
+                [K in keyof InputMethods]: InputMethods[K] extends Method<T, infer Args>
+                    ? (...args: Args) => ReturnType<InputMethods[K]>
+                    : undefined;
+            };
+    */
 
     // For React
     public readonly componentType?: EventSignal.NewOptions<T, S, D>["componentType"];
@@ -226,6 +245,13 @@ export class EventSignal<T, S=T, D=undefined> {
         if (typeof _computation === 'function') {
             stateFlags |= (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue);
             this.lastError = void 0;
+
+            Object.defineProperty(_computation, 'name', {
+                value: `computation#${this.id}`,
+                enumerable: false,
+                configurable: true,
+                writable: false,
+            });
         }
 
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
@@ -377,6 +403,26 @@ export class EventSignal<T, S=T, D=undefined> {
                     }
                 }
             }
+
+            /*
+            if (methods) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore `TS2322: Type {} is not assignable to type`
+                const _ = this._ = Object.create(null);
+
+                for (const key of Object.keys(methods)) {
+                    const originalMethod = methods[key];
+
+                    if (typeof originalMethod === 'function') {
+                        _[key] = (...args: any[]) => {
+                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                            // @ts-ignore dont care about 'never' here
+                            return originalMethod(this.get(), ...args);
+                        };
+                    }
+                }
+            }
+            */
         }
 
         this._stateFlags = stateFlags;
@@ -926,7 +972,9 @@ export class EventSignal<T, S=T, D=undefined> {
     };
 
     private _innerGet() {
-        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+        const stateFlags = this._stateFlags;
+
+        if ((stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return this._value;
         }
 
@@ -982,6 +1030,16 @@ export class EventSignal<T, S=T, D=undefined> {
 
     getLast = (): T extends Promise<any> ? Awaited<T> : T => {
         return this._value as (T extends Promise<any> ? Awaited<T> : T);
+    };
+
+    getSync = (): T extends Promise<any> ? Awaited<T> : T => {
+        const newValue = this.get();
+
+        if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
+            return this._value as (T extends Promise<any> ? Awaited<T> : T);
+        }
+
+        return newValue as (T extends Promise<any> ? Awaited<T> : T);
     };
 
     getSourceValue = () => {
@@ -1564,13 +1622,16 @@ export class EventSignal<T, S=T, D=undefined> {
         const { _useSyncExternalStore } = this;
 
         if (_useSyncExternalStore) {
-            _useSyncExternalStore(this.subscribeOnNextAnimationFrame, this.get);
+            // Для асинхронных сигналов, мы не можем вернуть в React Promise (может только если использовать совместно с React.use).
+            // Поэтому используем getSync, который вызовет подсчет нового значения, но если это асинхронная операция,
+            //  то будет возвращено последнее значение. А после того, как promise завершиться, сработает событие обновления.
+            _useSyncExternalStore(this.subscribeOnNextAnimationFrame, this.getSync);
         }
         else {
             console.warn('warning: "useSyncExternalStore" for EventSignal is not set. Please use `if (!EventSignal.reactIsInited) EventSignal.initReact(React)`.');
         }
 
-        return this.get();
+        return this.getLast();
     };
 
     /**
@@ -1601,10 +1662,10 @@ export class EventSignal<T, S=T, D=undefined> {
 
     private _subscribeOnNextAnimationFrame(subscribeToComponentTypeUpdate: boolean, func: () => void, /*subscribeOptions?: { signal: AbortSignal })*/) {
         if (typeof requestAnimationFrame !== 'function') {
-            throw new TypeError('"requestAnimationFrame" is not supported in this realm.');
+            throw new TypeError('"requestAnimationFrame" is not supported in this JS Agent.');
         }
 
-        if (!(typeof (func as unknown) === 'function')) {
+        if (!(typeof (func as unknown) === 'function') || (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return _noop;
         }
 
@@ -1615,7 +1676,7 @@ export class EventSignal<T, S=T, D=undefined> {
 
         if (subscribeToComponentTypeUpdate) {
             _listenerComponentTypeUpdate = () => {
-                this._componentVersion++;
+                this._cv++;
                 _listenerWithAnimFrameDebounce();
             };
 
@@ -1642,13 +1703,15 @@ export class EventSignal<T, S=T, D=undefined> {
     getSnapshotVersion = (): string => {
         let componentSnapshotVersion = `${this._version}`;
 
-        if (this.status) {
+        const { status, _cv } = this;
+
+        if (status) {
             // note: this._computationsCount here is for async computations
-            componentSnapshotVersion += `-${this._computationsCount}-${this.status}`;
+            componentSnapshotVersion += `-${this._computationsCount}-${status}`;
         }
 
-        if (this._componentVersion > 0) {
-            componentSnapshotVersion += `=${this._componentVersion}`;
+        if (_cv) {
+            componentSnapshotVersion += `=${_cv}`;
         }
 
         return componentSnapshotVersion;
@@ -1746,9 +1809,11 @@ export class EventSignal<T, S=T, D=undefined> {
     //     return new EventSignal(initialValue, options);
     // }
 
+    declare private _useSyncExternalStore: UseSyncExternalStore | undefined;
     static reactIsInited = false;
     declare static initReact;
-    declare private _useSyncExternalStore: UseSyncExternalStore | undefined;
+    /** For debug only */
+    declare static _React: unknown;
     //todo: Сейчас не работает
     // declare private static _setComponentOnDestroy;
 
@@ -1762,8 +1827,24 @@ export class EventSignal<T, S=T, D=undefined> {
         Object.setPrototypeOf(this.prototype, null);
 
         // var REACT_PROVIDER_TYPE = Symbol.for("react.provider");
+
+        type _ReactFiber = {
+            return: _ReactFiber | null,
+            type: () => any,
+            pendingProps?: {
+                eventSignal?: EventSignal<any>,
+            },
+        };
+
+        let _React: {
+            __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: {
+                A: {
+                    getOwner(): _ReactFiber,
+                },
+            },
+        } | undefined;
         let _ReactFragment: symbol;
-        let _ReactProfiler: symbol;
+        // let _ReactProfiler: symbol;
         let _React_createElement: ((
             type: Function | string | symbol,
             props?: Object | null,
@@ -1774,21 +1855,30 @@ export class EventSignal<T, S=T, D=undefined> {
             compare?: Function,
         ) => Object) | undefined;
         let _useSyncExternalStore: UseSyncExternalStore | undefined;
+        this.initReact = function(ReactParam: unknown) {
+            const __React = ReactParam as {
+                useSyncExternalStore: UseSyncExternalStore,
+                createContext: () => typeof _EventSignalsContext,
+                useContext: typeof _useContext,
+                createElement?: typeof _React_createElement,
+                memo?: typeof _React_createElement,
+                version?: string,
+            };
+            // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+            const isReactGte19 = Number.parseInt(__React.version || '') >= 19;
 
-        this.initReact = function(hooks: {
-            useSyncExternalStore: UseSyncExternalStore,
-            createElement?: typeof _React_createElement,
-            memo?: typeof _React_createElement,
-            version?: string,
-        }) {
-            if ('useSyncExternalStore' in hooks) {
-                this.prototype._useSyncExternalStore = _useSyncExternalStore = hooks.useSyncExternalStore;
+            if (isDev) {
+                this._React = _React = __React as unknown as typeof _React;
+            }
 
-                if (hooks.createElement) {
-                    _React_createElement = hooks.createElement;
+            if ('useSyncExternalStore' in __React) {
+                this.prototype._useSyncExternalStore = _useSyncExternalStore = __React.useSyncExternalStore;
+
+                if (__React.createElement) {
+                    _React_createElement = __React.createElement;
                 }
-                if (hooks.memo) {
-                    _React_memo = hooks.memo;
+                if (__React.memo) {
+                    _React_memo = __React.memo;
 
                     Object.defineProperties(this.prototype, {
                         type: {
@@ -1803,10 +1893,9 @@ export class EventSignal<T, S=T, D=undefined> {
             }
 
             _ReactFragment = Symbol.for('react.fragment');
-            _ReactProfiler = Symbol.for("react.profiler");
+            // _ReactProfiler = Symbol.for("react.profiler");
 
-            // eslint-disable-next-line @typescript-eslint/no-magic-numbers
-            if (Number.parseInt(hooks.version || '') >= 19) {
+            if (isReactGte19) {
                 Object.defineProperties(this.prototype, {
                     $$typeof: {
                         configurable: true,
@@ -1878,16 +1967,7 @@ export class EventSignal<T, S=T, D=undefined> {
             sFC?: EventSignal.ReactFC<any, any, any> | false,
         }) {
             /**
-             * Детектируем рекурсивный вызов EventSignalComponent(), чтобы избежать ситуации, когда внутри
-             *  зарегистированного React-компонента в JSX возвращается сам EventSignal и мы опять вызываем EventSignalComponent(),
-             *  чтобы вернуть тот же самый зарегистрированный React-компонент.
-             *
-             * todo: Для поддержки StrictMode, нужно Set заменить на Map и разрешать не 1, а 2 срабатывания прежде чем выводить ошибку.
-             *
-             * @see [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
-             * @see [useStrictModeDetector](https://github.com/Oblosys/react-hook-tracer/blob/e3108d8d5c6db0e919cebb164644ed2c70f15421/packages/react-hook-tracer/src/hooks/hookUtil.ts#L16)
              */
-            const _isInReactRenders = isDev ? (eventSignal._isInReactRenders ??= new Set()) : void 0;
             // Вызовем get/getSafe:
             //  1. Чтобы все подписки внутри computation сработали
             //  2. Чтобы выставился правильный status
@@ -1909,15 +1989,27 @@ export class EventSignal<T, S=T, D=undefined> {
 
                 renderReactComponent: if (has_reactFC) {
                     if (isDev) {
-                        // Awaiting [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
-                        if (_isInReactRenders?.has(reactFC)) {
-                            // todo: Это не работает в React strict mode!!!
-                            console.warn(`warning: recursive render detected while rendering "${reactFC.name}". You may need \`.get()\` to eventSignal?`);
+                        /**
+                         * Детектируем рекурсивный вызов EventSignalComponent(), чтобы избежать ситуации, когда внутри
+                         *  зарегистрированного React-компонента в JSX возвращается сам EventSignal и мы опять вызываем EventSignalComponent(),
+                         *  чтобы вернуть тот же самый зарегистрированный React-компонент.
+                         *
+                         * @see [Provide a way to detect infinite component rendering recursion in development #12525](https://github.com/facebook/react/issues/12525)
+                         * @see [useStrictModeDetector](https://github.com/Oblosys/react-hook-tracer/blob/e3108d8d5c6db0e919cebb164644ed2c70f15421/packages/react-hook-tracer/src/hooks/hookUtil.ts#L16)
+                         */
+                        let currentFiber: _ReactFiber | null | undefined = _React?.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE?.A?.getOwner?.();
 
-                            break renderReactComponent;
+                        while (currentFiber) {
+                            currentFiber = currentFiber.return;
+
+                            if (currentFiber?.type === reactFC
+                                && currentFiber.pendingProps?.eventSignal?.id === eventSignal.id
+                            ) {
+                                console.warn(`warning: recursive render detected while rendering "${reactFC.name}". You may need \`.get()\` to eventSignal?`, eventSignal, snapshotVersion);
+
+                                break renderReactComponent;
+                            }
                         }
-
-                        _isInReactRenders?.add(reactFC);
                     }
 
                     const memorizedReactFC: EventSignal.ReactFC<any, any, any> = _React_memo && !("$$typeof" in reactFC)
@@ -1925,8 +2017,9 @@ export class EventSignal<T, S=T, D=undefined> {
                         : reactFC
                     ;
                     const { key, version } = eventSignal;
-                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                    const element = _React_createElement!(memorizedReactFC, {
+                    // noinspection UnnecessaryLocalVariableJS
+                    const element = _React_createElement!(memorizedReactFC, { // eslint-disable-line @typescript-eslint/no-non-null-assertion
+                        __proto__: null,
                         key,
                         eventSignal,
                         version,
@@ -1935,15 +2028,6 @@ export class EventSignal<T, S=T, D=undefined> {
                         ...preDefinedProps,
                         ...otherProps,
                     }, children || null);
-
-                    if (isDev) {
-                        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        return _React_createElement!(_ReactProfiler, {
-                            id: eventSignal.key,
-                            onRender: _isInReactRenders?.delete.bind(_isInReactRenders, reactFC),
-                            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                        }, element);
-                    }
 
                     return element;
                 }
@@ -2221,6 +2305,8 @@ export namespace EventSignal {
         //   setFromDOMEvent(prevValue, event: React.ChangeEvent<HTMLInputElement>) { return String(event.target.value || ''); },
         // }
         // // comes to signal._.increment and signal._.decrement, signal._.setFromDOMEvent
+
+        __proto__?: null,
     };
     export interface NewOptionsWithInitialSourceValue<T, S, D> extends NewOptions<T, S, D> {
         initialSourceValue: S;
