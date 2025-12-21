@@ -19,6 +19,10 @@ import { isTest, isIDEDebugger } from 'termi@runEnv';
 import { isUniqueSymbol } from 'termi@type_guards';
 import { EventEmitterX } from "../events";
 import { arrayContentStringify, stringifyWithCircularHandle, isRunningInWebDevMode } from "./utils";
+import {
+    createEventSignalMagicContext,
+    getReactFunctionComponentFromMagicContext,
+} from "./view_utils";
 
 // todo:
 //  1. Использовать версию EventEmitterX с WeakMap в качестве _events, чтобы не "держать" сигналы от удаления GC.
@@ -1797,7 +1801,8 @@ export class EventSignal<T, S=T, D=undefined> {
         return prev;
     }
 
-    component = (props: Record<string, any> & {
+    // noinspection JSUnusedGlobalSymbols
+    component = Object.assign((props: Record<string, any> & {
         children?: unknown,
         sFC?: EventSignal.ReactFC<T, S, D> | false,
         // sComponents?: Map<ComponentType, EventSignal.ReactFC<any, any, any>>)
@@ -1812,7 +1817,25 @@ export class EventSignal<T, S=T, D=undefined> {
             eventSignal: this,
             ...props,
         }, context);
-    };
+    }, {
+        /**
+         * A BETA version of EventSignal's ViewContext
+         */
+        get ViewContext() {
+            const ViewContext = EventSignal._ContextProvider;
+
+            if (ViewContext) {
+                Object.defineProperty(this, 'ViewContext', {
+                    value: ViewContext,
+                    enumerable: true,
+                    configurable: true,
+                    writable: false,
+                });
+            }
+
+            return ViewContext as EventSignal_ReactCopy.Context<Record<number | string | symbol, (...props: any[]) => any>>["Provider"];
+        },
+    });
 
     static createSignal<T>(initialValue: T): EventSignal<T, T>;
     static createSignal<T, S, D>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D>, options?: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>): EventSignal<T, S, D>;
@@ -1842,6 +1865,10 @@ export class EventSignal<T, S=T, D=undefined> {
     declare static initReact;
     /** For debug only */
     declare static _React: unknown;
+    /**
+     * A BETA version of EventSignal's ViewContext
+     */
+    declare private static _ContextProvider: { (props: Object): null, children: any, value: any, readonly $$typeof: symbol; };
     //todo: Сейчас не работает
     // declare private static _setComponentOnDestroy;
 
@@ -1883,6 +1910,9 @@ export class EventSignal<T, S=T, D=undefined> {
             compare?: Function,
         ) => Object) | undefined;
         let _useSyncExternalStore: UseSyncExternalStore | undefined;
+        let _EventSignalsContext: Object & { Provider: Object, _currentValue: Object | undefined };
+        let _useContext: (key: Object) => (Object | null) = () => null;
+
         this.initReact = function(ReactParam: unknown) {
             const __React = ReactParam as {
                 useSyncExternalStore: UseSyncExternalStore,
@@ -1917,6 +1947,23 @@ export class EventSignal<T, S=T, D=undefined> {
                             __proto__: null,
                         },
                     });
+                }
+
+                /**
+                 * A BETA version of EventSignal's ViewContext
+                 */
+                _EventSignalsContext = createEventSignalMagicContext(__React.createContext, 'EventSignalsContext');
+                _useContext = __React.useContext;
+
+                if (isReactGte19) {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this._ContextProvider = _EventSignalsContext;
+                }
+                else {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this._ContextProvider = _EventSignalsContext.Provider;
                 }
             }
 
@@ -1995,7 +2042,9 @@ export class EventSignal<T, S=T, D=undefined> {
             sFC?: EventSignal.ReactFC<any, any, any> | false,
         }) {
             /**
+             * A BETA version of EventSignal's ViewContext
              */
+            const contextValue = _EventSignalsContext?._currentValue;
             // Вызовем get/getSafe:
             //  1. Чтобы все подписки внутри computation сработали
             //  2. Чтобы выставился правильный status
@@ -2003,7 +2052,9 @@ export class EventSignal<T, S=T, D=undefined> {
             const signalValue = eventSignal.getSafe();
             const { componentType } = eventSignal;
             const reactFCDescriptor = sFC === void 0 && Boolean(_React_createElement)
-                ? eventSignal._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
+                ? (contextValue ? getReactFunctionComponentFromMagicContext(contextValue, componentType, eventSignal.status) as (_ComponentDescription<any, any, any> | null) : void 0)
+                    ?? eventSignal._reactFC
+                    ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
                 : void 0
             ;
             const reactFC = sFC !== void 0 ? sFC : reactFCDescriptor?.[0];
