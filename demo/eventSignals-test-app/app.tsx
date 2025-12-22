@@ -8,12 +8,11 @@ import { Suspense } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from 'react-dom/client';
 
-import { polyfillCountryFlagEmojis } from "country-flag-emoji-polyfill";
-
 import 'termi@polyfills';
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
+import './lib/polyfillEmojis';
 import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
@@ -48,9 +47,6 @@ if (import.meta.hot) {
         console.log('Компоненты обновляются...');
     });
 }
-
-// @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/)
-polyfillCountryFlagEmojis();
 
 (globalThis as unknown as { __React: typeof React }).__React = React;
 
