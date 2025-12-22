@@ -1,6 +1,7 @@
 lockfileVersion: 5.3
 
 overrides:
+  jasmine-console-reporter: npm:noop3@1000.0.0
   react-error-boundary>@babel/runtime: npm:noop3@1000.0.0
 
 specifiers:
@@ -10,6 +11,7 @@ specifiers:
   react-dom: 19.1.0
   react-error-boundary: ^6.0.0
   vite: link:../../node_modules/vite
+  world-countries-capitals: ^3.4.0
 
 dependencies:
   country-flag-emoji-polyfill: 0.1.8
@@ -20,6 +22,7 @@ dependencies:
 devDependencies:
   '@vitejs/plugin-react': 5.1.2
   vite: link:../../node_modules/vite
+  world-countries-capitals: 3.4.0
 
 packages:
 
@@ -363,6 +366,10 @@ packages:
     resolution: {integrity: sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==}
     dev: true
 
+  /noop3/1000.0.0:
+    resolution: {integrity: sha512-OkcS5jjmDBhdLt5rwoHtItQfUHP3+NpWA9voB0SHth+KLIoupZEe+3D76bNvS37qG8vg2FFSqQ61blrEtZj1Yw==}
+    engines: {node: '>=6'}
+
   /picocolors/1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
     dev: true
@@ -413,6 +420,12 @@ packages:
       browserslist: 4.28.1
       escalade: 3.2.0
       picocolors: 1.1.1
+    dev: true
+
+  /world-countries-capitals/3.4.0:
+    resolution: {integrity: sha512-Ff+3kjG00TcJhRHTmTRWAhiioFdVk7aWcI8qYrN2c5lPvlPYHLF2QR8ORg+yng9F9Hiro45xTB/aL7WekdRLwQ==}
+    dependencies:
+      jasmine-console-reporter: /noop3/1000.0.0
     dev: true
 
   /yallist/3.1.1:

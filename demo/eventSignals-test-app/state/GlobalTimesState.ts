@@ -51,11 +51,9 @@ const nowTime$ = new EventSignal<number, number | null>(Date.now(), (prevNow, cu
 
 const _dnCacheOnNew = function(locale: string) {
     return Object.assign(new Intl.DisplayNames(locale, _DisplayNames_options), {
-        getByLocaleSafe(locale: string) {
-            const countryCode = locale.split('-')[1];
-
+        getByRegionCodeSafe(regionCode: string) {
             try {
-                return this.of(countryCode.toUpperCase()) as string;
+                return this.of(regionCode.toUpperCase()) as string;
             }
             catch {
                 // ignore
@@ -83,11 +81,12 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
     const cityTime$ = new EventSignal({} as CityDescription, function(prev, rawCityDescription) {
         const currentLocale = currentLocale$.get();
         const regionNames = _dnCache.getOrNew(currentLocale);
+        const localeInfo = getLocaleInfo(rawCityDescription.locale);
         const timeInfo = formatLocalTime(rawCityDescription, nowTime$.get());
 
         timeOfDay = timeInfo.timeOfDay;
 
-        const country = regionNames.getByLocaleSafe(rawCityDescription.locale) || rawCityDescription.country;
+        const country = regionNames.getByRegionCodeSafe(localeInfo.region) || rawCityDescription.country;
         const cityDescription: CityDescription = {
             id,
             ...rawCityDescription,
@@ -154,6 +153,7 @@ type RawCityDescription = {
     timeZone: string,
     locale: string,
     flag: string,
+    isCapital?: boolean,
 };
 
 function formatLocalTime(city: RawCityDescription, now: number | undefined) {
@@ -218,14 +218,14 @@ function formatLocalTime(city: RawCityDescription, now: number | undefined) {
 // Список популярных городов с их временными зонами и локалями
 function getMostPopularCities(): RawCityDescription[] {
     const date = new Date();
-
-    return [
+    const mostPopularCities: RawCityDescription[] = ([
         {
             name: "Токио",
             country: "Япония",
             timeZone: "Asia/Tokyo",
             locale: "ja-JP",
             flag: "🇯🇵",
+            isCapital: true,
         },
         {
             name: "Пекин",
@@ -233,6 +233,7 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "Asia/Shanghai",
             locale: "zh-CN",
             flag: "🇨🇳",
+            isCapital: true,
         },
         {
             name: "Сингапур",
@@ -240,6 +241,7 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "Asia/Singapore",
             locale: "en-SG",
             flag: "🇸🇬",
+            isCapital: true,
         },
         {
             name: "Москва",
@@ -247,6 +249,7 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "Europe/Moscow",
             locale: "ru-RU",
             flag: "🇷🇺",
+            isCapital: true,
         },
         {
             name: "Дубай",
@@ -261,6 +264,7 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "Europe/Paris",
             locale: "fr-FR",
             flag: "🇫🇷",
+            isCapital: true,
         },
         {
             name: "Лондон",
@@ -268,6 +272,7 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "Europe/London",
             locale: "en-GB",
             flag: "🇬🇧",
+            isCapital: true,
         },
         {
             name: "Нью-Йорк",
@@ -324,9 +329,12 @@ function getMostPopularCities(): RawCityDescription[] {
             timeZone: "America/Mexico_City",
             locale: "es-MX",
             flag: "🇲🇽",
+            isCapital: true,
         },
-        // Сортируем города по часовому поясу (по UTC смещению)
-    ].sort((a, b) => {
+    ] as RawCityDescription[])
+
+    // Сортируем города по часовому поясу (по UTC смещению)
+    return mostPopularCities.sort((a, b) => {
         const timeA = date.toLocaleString('en-US', { timeZone: a.timeZone });
         const timeB = date.toLocaleString('en-US', { timeZone: b.timeZone });
 

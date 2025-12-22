@@ -168,6 +168,21 @@
     .optional-line-break {
       display: none;
     }
+
+    .city-name-inner {
+      /**/
+    }
+  }
+
+  .city-card.city-card-capital {
+    .city-name {
+      .city-name-inner {
+        &::after {
+          display: inline-block;
+          content: '🏛️';
+        }
+      }
+    }
   }
 
   .country {
@@ -215,6 +230,25 @@
     color: #7f8c8d;
     font-size: 0.9rem;
     border-top: 1px solid #eee;
+
+    .legend {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-icon {
+      font-size: 1rem;
+    }
   }
 
   .pip-icon {

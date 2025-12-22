@@ -10,7 +10,8 @@
     "dev:debug": "node --inspect-brk node_modules/vite/bin/vite.js",
     "build": "vite build",
     "build:debug": "node --inspect-brk node_modules/vite/bin/vite.js build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node ./_dev/postinstall/index.cjs"
   },
   "author": "",
   "license": "ISC",
@@ -22,15 +23,21 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",
-    "vite": "link:../../node_modules/vite"
+    "countries-and-timezones": "^3.8.0",
+    "vite": "link:../../node_modules/vite",
+    "world-countries-capitals": "^3.4.0"
   },
   "overrides": {
+    "world-countries-capitals": {
+      "jasmine-console-reporter": "npm:noop3@1000.0.0"
+    },
     "react-error-boundary": {
       "@babel/runtime": "npm:noop3@1000.0.0"
     }
   },
   "pnpm": {
     "overrides": {
+      "world-countries-capitals>jasmine-console-reporter": "npm:noop3@1000.0.0",
       "react-error-boundary>@babel/runtime": "npm:noop3@1000.0.0"
     }
   }
