@@ -10,11 +10,13 @@ import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import { getCurrentTimeZoneOffsetName } from "../lib/i18n";
 import {
     mostPopularCities$,
+    nowDate$,
 } from "../state/GlobalTimesState";
 import { pipPopupWindow$ } from "../state/pipWindowState";
 import { currentLocale$, i18n$$, i18nString$$ } from "../state/i18n";
 
 import { menuItemTitle$, unicodeIcon } from './10.GlobalTimes.metadata';
+import AnalogClock from "../modules/AnalogClock";
 
 import css from './10.GlobalTimes.module.css';
 
@@ -94,31 +96,37 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     return (<>
         <div className={css.PageGlobalTimes}>
             <section className={css.container}>
-                <header>
-                    <h1>{unicodeIcon} {menuItemTitle$}</h1>
-                    <div className={css.subtitle}>{i18n$$`Локальное время в популярных городах мира`}</div>
+                <header className={css.header}>
+                    <div className={css.headerMainContent}>
+                        <h1>{unicodeIcon} {menuItemTitle$}</h1>
+                        <div className={css.subtitle}>{i18n$$`Локальное время в популярных городах мира`}</div>
 
-                    <div className={css.controls}>
-                        <form className={css.viewToggle} action="#"
-                            onChange={viewType$.data.onFormChange}
-                            onSubmit={viewType$.data.onFormSubmit}
-                        >
-                            {viewType$.data.elements.map(elementDescription => {
-                                const checked = elementDescription.value === viewType;
+                        <div className={css.controls}>
+                            <form className={css.viewToggle} action="#"
+                                onChange={viewType$.data.onFormChange}
+                                onSubmit={viewType$.data.onFormSubmit}
+                            >
+                                {viewType$.data.elements.map(elementDescription => {
+                                    const checked = elementDescription.value === viewType;
 
-                                return (<label key={elementDescription.value} className={css.viewLabel}>
-                                    <input type="radio"
-                                        name={viewType$.data.radioName}
-                                        value={elementDescription.value}
-                                        checked={checked}
-                                        // note: 'readonly' attribute applies to all except type = [hidden, range, color, checkbox, radio, buttons].
-                                        // This attribute exists only due React warn: You provided a `checked` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultChecked`. Otherwise, set either `onChange` or `readOnly`.
-                                        readOnly={true}
-                                    />
-                                    <span className={css.btnText}>{elementDescription.label}</span>
-                                </label>);
-                            })}
-                        </form>
+                                    return (<label key={elementDescription.value} className={css.viewLabel}>
+                                        <input type="radio"
+                                            name={viewType$.data.radioName}
+                                            value={elementDescription.value}
+                                            checked={checked}
+                                            // note: 'readonly' attribute applies to all except type = [hidden, range, color, checkbox, radio, buttons].
+                                            // This attribute exists only due React warn: You provided a `checked` prop to a form field without an `onChange` handler. This will render a read-only field. If the field should be mutable use `defaultChecked`. Otherwise, set either `onChange` or `readOnly`.
+                                            readOnly={true}
+                                        />
+                                        <span className={css.btnText}>{elementDescription.label}</span>
+                                    </label>);
+                                })}
+                            </form>
+                        </div>
+                    </div>
+
+                    <div className={css.headerClock}>
+                        <AnalogClock eventSignal={nowDate$} onManualTime={nowDate$.set} onResetClick={nowDate$.data.reset}/>
                     </div>
                 </header>
 
