@@ -22,6 +22,14 @@ import { createCSSHotReloadConfirmPlugin } from "./dev/vite/plugins/cssHotReload
  включен isolatedModules
 */
 export default defineConfig({
+    server: {
+        fs: {
+            allow: [
+                './',
+                import.meta.resolve('cftools'),
+            ],
+        },
+    },
     // ...your vite configuration
     build: {
         rollupOptions: {
@@ -32,7 +40,15 @@ export default defineConfig({
                         return 'react';
                     }
 
-                    if (id.includes('/modules/events/')) {
+                    if (id.includes('cftools')) {
+                        console.log(id);
+                    }
+
+                    if (id.includes('/modules/EventEmitterX/')
+                        // 'cftools/modules/EventEmitterEx' is for backward compatibility
+                        || id.includes('/modules/EventEmitterEx/')
+                        || id.includes('/modules/events')
+                    ) {
                         return 'events';
                     }
 

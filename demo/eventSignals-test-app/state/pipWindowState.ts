@@ -103,7 +103,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
 
             if (pipPopupWindow$.status !== 'pending') {
                 // Только если окно закрывается НЕ ПО ПРИЧИНЕ смены содержимого
-                pipPopupWindow$.set(emptyPipPopupWindowDescription);
+                pipPopupWindow$.set(null);
             }
         });
 
@@ -126,13 +126,9 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
 }, {
     initialSourceValue: null as NewPipWindowOptions | null,
 }), {
-    setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P> | undefined) {
+    setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P> | null | undefined) {
         this.markNextValueAsForced();
-        this.set(newValue ?? {
-            dataId: null,
-            component: null,
-            componentProps: null,
-        });
+        this.set(newValue || null);
     },
 });
 

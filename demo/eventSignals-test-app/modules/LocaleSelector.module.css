@@ -1,6 +1,7 @@
 
 /* Компонент выбора языка */
 .language-selector {
+  position: relative;
   border: none;
   min-width: 15rem;
 
@@ -85,6 +86,7 @@
     visibility: hidden;
     display: none;
     position: absolute;
+    z-index: 10000;
     top: 100%;
     right: 0;
     padding: 2px;

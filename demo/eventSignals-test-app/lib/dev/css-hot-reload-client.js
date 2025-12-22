@@ -276,8 +276,9 @@ async function applyCSSUpdate() {
         applyBtn.disabled = true;
     }
 
+    // Refer to rollup-plugin-import-css https://github.com/jleeson/rollup-plugin-import-css
     /* @vite-ignore */
-    await import(location.origin + '/' + currentUpdateData.relativePath + `?${currentUpdateData.timestamp}`);
+    await import(location.origin + '/' + currentUpdateData.relativePath + `?${currentUpdateData.timestamp}`/*, { assert: { type: 'css' } }*/);
 
     const style = document.querySelectorAll(`style[data-vite-dev-id^="${currentUpdateData.file}"]`)[0];
 
