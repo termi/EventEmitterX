@@ -17,10 +17,21 @@
   "dependencies": {
     "country-flag-emoji-polyfill": "^0.1.8",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-error-boundary": "^6.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.2",
     "vite": "link:../../node_modules/vite"
+  },
+  "overrides": {
+    "react-error-boundary": {
+      "@babel/runtime": "npm:noop3@1000.0.0"
+    }
+  },
+  "pnpm": {
+    "overrides": {
+      "react-error-boundary>@babel/runtime": "npm:noop3@1000.0.0"
+    }
   }
 }
