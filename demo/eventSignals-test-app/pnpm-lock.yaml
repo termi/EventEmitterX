@@ -6,6 +6,7 @@ overrides:
 
 specifiers:
   '@vitejs/plugin-react': ^5.1.2
+  countries-and-timezones: ^3.8.0
   country-flag-emoji-polyfill: ^0.1.8
   react: 19.1.0
   react-dom: 19.1.0
@@ -21,6 +22,7 @@ dependencies:
 
 devDependencies:
   '@vitejs/plugin-react': 5.1.2
+  countries-and-timezones: 3.8.0
   vite: link:../../node_modules/vite
   world-countries-capitals: 3.4.0
 
@@ -304,6 +306,11 @@ packages:
 
   /convert-source-map/2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+    dev: true
+
+  /countries-and-timezones/3.8.0:
+    resolution: {integrity: sha512-+Ze9h5f4dQpUwbzTm0DEkiPiZyim9VHV4/mSnT4zNYJnrnfwsKjAZPtnp7J5VzejCDgySs+2SSc6MDdCnD43GA==}
+    engines: {node: '>=8.x', npm: '>=5.x'}
     dev: true
 
   /country-flag-emoji-polyfill/0.1.8:

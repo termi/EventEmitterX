@@ -185,6 +185,31 @@
     }
   }
 
+  .city-card.city-card-current-locale {
+    /*box-shadow: inset 5px 5px 2px #76d27b, inset -5px -5px 2px #76d27b;*/
+
+    .time-info {
+      .local-time {
+        &::before {
+          display: inline-block;
+          content: '🌐';
+        }
+      }
+    }
+  }
+  .city-card.city-card-current-timezone {
+    /*box-shadow: inset 5px 5px 2px #76d27b, inset -5px -5px 2px #76d27b;*/
+
+    .city-name {
+      .timezone {
+        &::after {
+          display: inline-block;
+          content: '⏰';
+        }
+      }
+    }
+  }
+
   .country {
     font-size: 1rem;
     color: #7f8c8d;
@@ -201,6 +226,7 @@
     font-size: 1.8rem;
     font-weight: 700;
     color: #2c3e50;
+    white-space: nowrap;
   }
 
   .time-format {
@@ -321,7 +347,7 @@
     .city-card {
       flex-direction: column;
       align-items: flex-start;
-      height: 180px;
+      min-height: 180px;
       padding: 20px;
     }
 
@@ -428,6 +454,10 @@
       font-size: 100%;
       font-weight: unset;
       color: unset;
+    }
+
+    .local-time {
+      font-size: 1.2rem;
     }
   }
 }

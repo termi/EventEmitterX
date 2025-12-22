@@ -214,13 +214,36 @@ if (typeof window !== 'undefined' && 'onbeforeunload' in window) {
     window.addEventListener('beforeunload', _saveLocalStorageLocalizations.bind(null, null));
 }
 
+export function getCurrentTimeZoneOffset() {
+    return new Date().getTimezoneOffset();
+}
+
+export function getCurrentTimeZoneOffsetName() {
+    const timeZoneFormatter = new Intl.DateTimeFormat(getCurrentLocale(), {
+        timeZoneName: 'longOffset',
+    });
+    const timeZoneParts = timeZoneFormatter.formatToParts(new Date());
+
+    return timeZoneParts.find(part => part.type === 'timeZoneName')?.value || '';
+}
+
 export function getDefaultLocale() {
     return defaultLocale;
 }
 
+let _currentLocale: string | undefined;
+
 // Получение текущей локали из localStorage или системной
 export function getCurrentLocale() {
-    return localStorage.getItem('i18n.preferredLocale') || getSystemLocale();
+    if (_currentLocale) {
+        return _currentLocale;
+    }
+
+    return _currentLocale = (localStorage.getItem('i18n.preferredLocale') || getSystemLocale());
+}
+
+export function setCurrentLocale(newCurrentLocale: string) {
+    _currentLocale = newCurrentLocale;
 }
 
 /** A copy of {@link import('cftools/common/IntlTools.ts').getCurrentLocale} */
@@ -361,15 +384,26 @@ export function normalizeLocale(locale: string) {
             return 'tr-TR';
         case 'uk':
             return 'uk-UA';
+        case 'bo':
+            return 'bo-CN';
         // todo: add more short locale -> long locale
     }
 
     return locale;
 }
 
+const _getLocaleInfo_cache = new Map<string, ReturnType<typeof getLocaleInfo>>();
+
 export function getLocaleInfo(localeCode: string, getExtendedInfo?: false): getLocaleInfo.Result;
 export function getLocaleInfo(localeCode: string, getExtendedInfo: true): getLocaleInfo.ExtendedResult;
 export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): getLocaleInfo.ExtendedResult | getLocaleInfo.Result {
+    const cacheKey = `${localeCode}-${getExtendedInfo || false}`;
+    const cachedValue = _getLocaleInfo_cache.get(cacheKey);
+
+    if (cachedValue) {
+        return cachedValue;
+    }
+
     const intlLocale = new Intl.Locale(normalizeLocale(localeCode));
     const { language } = intlLocale;
     const region = intlLocale.region || '';
@@ -395,6 +429,7 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         flag,
         language,
         region,
+        defaultNumericSystem: _getLocaleDefaultNumericSystem(localeCode),
         textDirection,
         __proto__: null,
     };
@@ -404,8 +439,25 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         const locale = `${result.language}-${result.region}`;
         const index = capitals.indexByLocale[locale];
         const capital = (index != null ? capitals.capitalsList[index] : null) || '';
+        let defaultTimezone = (index != null ? capitals.capitalTimezonesList[index] : null) || '';
+
+        defaultTimezone: if (defaultTimezone) {
+            if (typeof defaultTimezone === 'number') {
+                defaultTimezone = capitals.capitalTimezonesList[defaultTimezone];
+
+                if (!defaultTimezone) {
+                    break defaultTimezone;
+                }
+            }
+
+            const defaultTimezone_pair = defaultTimezone.split('/');
+            const timezonePrefixIndex = Number.parseInt(defaultTimezone_pair[0], 10) || 0;
+
+            defaultTimezone = `${capitals.timezonePrefixesList[timezonePrefixIndex]}/${defaultTimezone_pair[1] === '*' ? capital.split(' ').join('_') : defaultTimezone_pair[1]}`;
+        }
 
         _result.capital = capital;
+        _result.defaultTimezone = defaultTimezone || 'UTC';
 
         // В файле eventSignals-test-app/static/data/capitals.json название столицы сохранено на английском языке,
         //  а по-умолчанию у нас для переводов используется русский.
@@ -414,6 +466,8 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
     }
 
     Object.freeze(Object.setPrototypeOf(result, null));
+
+    _getLocaleInfo_cache.set(cacheKey, result as getLocaleInfo.ExtendedResult);
 
     return result;
 }
@@ -441,8 +495,339 @@ const _displayNamesMap_newValue = function(locale: string) {
 };
 
 export function getLanguageName(languageCode: string, displayLocale: string) {
-    return _displayNamesMap
+    const langName = _displayNamesMap
         .getOrInsertComputed(displayLocale, _displayNamesMap_newValue)
         .of(languageCode)
     ;
+
+    if (langName.charCodeAt(0) === 98/*'bo '.charCodeAt(0)*/// eslint-disable-line unicorn/prefer-code-point,@typescript-eslint/no-magic-numbers
+        && langName.charCodeAt(1) === 111/*'bo '.charCodeAt(1)*/// eslint-disable-line unicorn/prefer-code-point,@typescript-eslint/no-magic-numbers
+        && langName.charCodeAt(2) === 32/*'bo '.charCodeAt(2)*/// eslint-disable-line unicorn/prefer-code-point,@typescript-eslint/no-magic-numbers
+    ) {
+        return 'Tibetan (China)';
+    }
+
+    return langName;
+}
+
+/**
+ * Warning: This was AI generated! Do not blinded trust this!
+ */
+const numericSystemByLocale = {
+    // Арабский и родственные
+    'ar': 'arab', 'ar-*': 'arab',           // Arabic
+    'fa': 'arabext', 'fa-*': 'arabext',     // Persian (Eastern Arabic)
+    'ps': 'arabext', 'ps-*': 'arabext',     // Pashto
+    'ur': 'arabext', 'ur-*': 'arabext',     // Urdu
+    'uz-Arab': 'arabext',                   // Uzbek (Arabic)
+
+    // Тибетский
+    'bo': 'tibt', 'bo-*': 'tibt',           // Tibetan
+    'dz': 'tibt', 'dz-*': 'tibt',           // Dzongkha
+
+    // Индийские языки (Brahmic scripts)
+    'hi': 'deva', 'hi-*': 'deva',           // Hindi (Devanagari)
+    'ne': 'deva', 'ne-*': 'deva',           // Nepali
+    'mr': 'deva', 'mr-*': 'deva',           // Marathi
+    'kok': 'deva', 'kok-*': 'deva',         // Konkani
+    'sa': 'deva', 'sa-*': 'deva',           // Sanskrit
+
+    'bn': 'beng', 'bn-*': 'beng',           // Bengali
+    'as': 'beng', 'as-*': 'beng',           // Assamese
+
+    'pa': 'guru', 'pa-*': 'guru',           // Punjabi (Gurmukhi)
+    'pa-Arab': 'arabext',                   // Punjabi (Shahmukhi)
+
+    'gu': 'gujr', 'gu-*': 'gujr',           // Gujarati
+
+    'or': 'orya', 'or-*': 'orya',           // Odia
+
+    'ta': 'taml', 'ta-*': 'taml',           // Tamil
+    'te': 'telu', 'te-*': 'telu',           // Telugu
+    'kn': 'knda', 'kn-*': 'knda',           // Kannada
+    'ml': 'mlym', 'ml-*': 'mlym',           // Malayalam
+
+    'si': 'sinh', 'si-*': 'sinh',           // Sinhala
+
+    // Юго-Восточная Азия
+    'my': 'mymr', 'my-*': 'mymr',           // Myanmar (Burmese)
+    'km': 'khmr', 'km-*': 'khmr',           // Khmer
+    'lo': 'laoo', 'lo-*': 'laoo',           // Lao
+    'th': 'thai', 'th-*': 'thai',           // Thai
+
+    // Восточная Азия
+    'zh': 'hanidec', 'zh-*': 'hanidec',     // Chinese (Financial)
+    'ja': 'jpan', 'ja-*': 'jpan',           // Japanese
+    'ko': 'kore', 'ko-*': 'kore',           // Korean
+    'ko-KP': 'kore',                        // Korean (North Korea)
+
+    // Монгольский
+    'mn': 'mong', 'mn-*': 'mong',           // Mongolian
+    'mn-Mong': 'mong',                      // Mongolian (Traditional)
+    'mn-Cyrl': 'cyrl',                      // Mongolian (Cyrillic)
+
+    // Эфиопские языки
+    'am': 'ethi', 'am-*': 'ethi',           // Amharic
+    'ti': 'ethi', 'ti-*': 'ethi',           // Tigrinya
+
+    // Коптский
+    'cop': 'copt', 'cop-*': 'copt',
+
+    // Грузинский
+    'ka': 'geor', 'ka-*': 'geor',           // Georgian
+
+    // Армянский
+    'hy': 'armn', 'hy-*': 'armn',           // Armenian
+
+    // Греческий
+    'el': 'grek', 'el-*': 'grek',           // Greek
+
+    // Иврит и идиш
+    'he': 'hebr', 'he-*': 'hebr',           // Hebrew
+    'yi': 'hebr', 'yi-*': 'hebr',           // Yiddish
+
+    // Кириллица (для языков, которые могут использовать нелатинские цифры)
+    'sr': 'cyrl', 'sr-*': 'cyrl',           // Serbian (Cyrillic)
+    'mk': 'cyrl', 'mk-*': 'cyrl',           // Macedonian
+    'bg': 'cyrl', 'bg-*': 'cyrl',           // Bulgarian
+    'ru': 'cyrl', 'ru-*': 'cyrl',           // Russian
+    'uk': 'cyrl', 'uk-*': 'cyrl',           // Ukrainian
+    'be': 'cyrl', 'be-*': 'cyrl',           // Belarusian
+    'kk': 'cyrl', 'kk-*': 'cyrl',           // Kazakh (Cyrillic)
+    'ky': 'cyrl', 'ky-*': 'cyrl',           // Kyrgyz
+    'tg': 'cyrl', 'tg-*': 'cyrl',           // Tajik
+
+    // Особые случаи для Центральной Азии
+    'ug': 'arabext', 'ug-*': 'arabext',     // Uyghur (Arabic script)
+
+    // Языки с несколькими системами письменности
+    'sd': 'arabext', 'sd-*': 'arabext',     // Sindhi (Arabic)
+    'sd-Deva': 'deva',                      // Sindhi (Devanagari)
+
+    'ks': 'arabext', 'ks-*': 'arabext',     // Kashmiri (Arabic)
+    'ks-Deva': 'deva',                      // Kashmiri (Devanagari)
+
+    // Африканские языки
+    'nqo': 'nkoo', 'nqo-*': 'nkoo',         // N'Ko
+    'vai': 'vaii', 'vai-*': 'vaii',         // Vai
+    'ff-Adlm': 'adlm',                      // Fulah (Adlam)
+    'shi-Tfng': 'tfng',                     // Tachelhit (Tifinagh)
+
+    // Исторические системы
+    'peo': 'xpeo',                          // Old Persian
+    'egy': 'egyp',                          // Egyptian
+    'sux': 'xsux',                          // Sumero-Akkadian
+    'akk': 'xsux',                          // Akkadian
+
+    // Современные с несколькими вариантами
+    'ckb': 'arabext', 'ckb-*': 'arabext',   // Central Kurdish
+    'ku-Arab': 'arabext',                   // Kurdish (Arabic)
+
+    // Bali и родственные
+    'ban': 'bali', 'ban-*': 'bali',         // Balinese
+    'su': 'sund', 'su-*': 'sund',           // Sundanese
+    'jv': 'java', 'jv-*': 'java',           // Javanese
+    'mad': 'java', 'mad-*': 'java',         // Madurese
+
+    // Бугийский
+    'bug': 'bugi', 'bug-*': 'bugi',
+
+    // Батак
+    'bbc': 'batk', 'bbc-*': 'batk',         // Batak Toba
+    'btd': 'batk', 'btd-*': 'batk',         // Batak Dairi
+
+    // Редкие системы
+    'lep': 'lepc',                          // Lepcha
+    'lif': 'limb',                          // Limbu
+    'sat': 'olck',                          // Santali
+    'saz': 'saur',                          // Saurashtra
+    'pra': 'prti',                          // Pahlavi
+    'phn': 'phnx',                          // Phoenician
+    'arc': 'armi',                          // Imperial Aramaic
+    'pal': 'phli',                          // Inscriptional Pahlavi
+    'xpr': 'prti',                          // Parthian
+    'sog': 'sogo',                          // Sogdian
+    'otk': 'orkh',                          // Old Turkic
+    'cmg': 'mtei',                          // Classical Mongolian
+};
+/**
+ * Маппинг для языков, которые могут использовать несколько систем.
+ *
+ * Warning: This was AI generated! Do not blinded trust this!
+ */
+const numericSystemByLocale_scriptOverrides = {
+    'zh-Hant': 'hanidec',   // Traditional Chinese
+    'zh-Hans': 'hanidec',   // Simplified Chinese
+    'zh-TW': 'hanidec',
+    'zh-HK': 'hanidec',
+    'zh-MO': 'hanidec',
+    'zh-CN': 'hanidec',
+    'zh-SG': 'hanidec',
+    'ja-JP': 'jpan',
+    'ko-KR': 'kore',
+    'mn-MN': 'mong',
+    'mn-CN': 'mong',
+    'ug-CN': 'arabext',
+    'ti-ER': 'ethi',
+    'ti-ET': 'ethi',
+};
+/**
+ * Региональные переопределения.
+ *
+ * Warning: This was AI generated! Do not blinded trust this!
+ */
+const numericSystemByLocale_regionOverrides = {
+    // Персидские/арабские цифры в определенных регионах
+    'AF': 'arabext',    // Afghanistan
+    'IR': 'arabext',    // Iran
+    'PK': 'arabext',    // Pakistan
+    'BD': 'beng',       // Bangladesh
+    'NP': 'deva',       // Nepal
+    'LK': 'sinh',       // Sri Lanka
+    'MM': 'mymr',       // Myanmar
+    'KH': 'khmr',       // Cambodia
+    'LA': 'laoo',       // Laos
+    'TH': 'thai',       // Thailand
+    'ET': 'ethi',       // Ethiopia
+    'AM': 'armn',       // Armenia
+    'GE': 'geor',       // Georgia
+    'GR': 'grek',       // Greece
+    'IL': 'hebr',       // Israel
+    'MN': 'mong',       // Mongolia
+    'TJ': 'arabext',    // Tajikistan (Persian influence)
+    'UZ': 'cyrl',       // Uzbekistan (Cyrillic)
+    'UZ-Arab': 'arabext', // Uzbek (Arabic script)
+
+    // Центральная Азия
+    'CN-65': 'arabext', // Xinjiang (Uyghur)
+    'CN-54': 'tibt',    // Tibet
+    'CN-63': 'tibt',    // Qinghai (Tibetan areas)
+
+    // Индийские штаты с официальными языками
+    'IN-TG': 'telu',    // Telangana
+    'IN-TN': 'taml',    // Tamil Nadu
+    'IN-KA': 'knda',    // Karnataka
+    'IN-KL': 'mlym',    // Kerala
+    'IN-GJ': 'gujr',    // Gujarat
+    'IN-MH': 'deva',    // Maharashtra
+    'IN-WB': 'beng',    // West Bengal
+    'IN-OR': 'orya',    // Odisha
+    'IN-PB': 'guru',    // Punjab
+    'IN-AS': 'beng',    // Assam
+    'IN-ML': 'beng',    // Meghalaya (mostly, though English dominant)
+};
+const arabicRegions = new Set([ 'SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'IQ', 'SY', 'JO', 'LB', 'PS', 'SD', 'MA', 'DZ', 'TN', 'LY', 'MR', 'DJ', 'SO' ]);
+const cyrillicRegions = new Set([ 'RU', 'BY', 'UA', 'KZ', 'KG', 'MD', 'RS', 'ME', 'BA', 'MK', 'BG' ]);
+
+function _getLocaleDefaultNumericSystem(locale: string) {
+    if (!locale || typeof locale !== 'string') {
+        return 'latn';
+    }
+
+    // 1. Проверяем точное совпадение в scriptOverrides
+    {
+        const forceNumericSystem = numericSystemByLocale_scriptOverrides[locale];
+
+        if (forceNumericSystem) {
+            return forceNumericSystem;
+        }
+    }
+
+    // 2. Пытаемся получить через Intl.Locale
+    try {
+        const loc = new Intl.Locale(locale);
+
+        if (loc.numberingSystem) {
+            return loc.numberingSystem;
+        }
+    }
+    catch {
+        // ignore
+    }
+
+    // 3. Проверяем региональные переопределения
+    const parts = locale.split('-');
+
+    if (parts.length >= 2) {
+        const lang = parts[0];
+        const region = parts[1].toUpperCase();
+
+        // Проверяем региональное переопределение для языка-региона
+        const langRegion = `${lang}-${region}`;
+        const ns_by_langRegion = numericSystemByLocale_regionOverrides[langRegion];
+
+        if (ns_by_langRegion) {
+            return ns_by_langRegion;
+        }
+
+        // Проверяем общее региональное переопределение
+        const ns_by_region = numericSystemByLocale_regionOverrides[region];
+
+        if (ns_by_region) {
+            return ns_by_region;
+        }
+
+        // Проверяем подрегион (например, CN-65 для Синьцзяна)
+        if (parts.length >= 3) {
+            const subRegion = `${region}-${parts[2]}`;
+            const ns_by_subRegion = numericSystemByLocale_regionOverrides[subRegion];
+
+            if (ns_by_subRegion) {
+                return ns_by_subRegion;
+            }
+        }
+    }
+
+    // 4. Ищем точное совпадение локали
+    const default_ns_by_locale = numericSystemByLocale[locale];
+
+    if (default_ns_by_locale) {
+        return default_ns_by_locale;
+    }
+
+    // 5. Ищем по языку с wildcard
+    const lang = locale.split('-')[0];
+    const wildcardKey = `${lang}-*`;
+    const default_ns_by_langWildcardKey = numericSystemByLocale[wildcardKey];
+
+    if (default_ns_by_langWildcardKey) {
+        return default_ns_by_langWildcardKey;
+    }
+
+    // 6. Ищем только по языку
+    const default_ns_by_lang = numericSystemByLocale[lang];
+
+    if (default_ns_by_lang) {
+        return default_ns_by_lang;
+    }
+
+    // 7. Проверяем script-тег в локали
+    const scriptMatch = locale.match(/-([A-Z][a-z]{3})/);
+
+    if (scriptMatch) {
+        const script = scriptMatch[1];
+        const scriptKey = `${lang}-${script}`;
+        const default_ns_by_scriptKey = numericSystemByLocale[scriptKey];
+
+        if (default_ns_by_scriptKey) {
+            return default_ns_by_scriptKey;
+        }
+    }
+
+    // 8. Фолбэк на основе региона
+    if (parts.length >= 2) {
+        const region = parts[1].toUpperCase();
+
+        // Регионы, где часто используются арабские цифры
+        if (arabicRegions.has(region)) {
+            return 'arab';
+        }
+
+        // Регионы с кириллицей
+        if (cyrillicRegions.has(region)) {
+            return 'cyrl';
+        }
+    }
+
+    return 'latn'; // стандартная система по умолчанию
 }
