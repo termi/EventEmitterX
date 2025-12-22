@@ -90,14 +90,13 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
     const cityTime$ = new EventSignal({} as CityDescription, function(prev, rawCityDescription) {
         const currentLocale = currentLocale$.get();
         const regionNames = _dnCache.getOrNew(currentLocale);
-        const localeInfo = getLocaleInfo(rawCityDescription.locale);
         const nowDate = nowDate$.get();
-        const timeInfo = formatLocalTime(rawCityDescription, nowDate, localeInfo);
+        const timeInfo = formatLocalTime(rawCityDescription, nowDate);
 
-        rawCityDescription.flag ||= localeInfo.flag;
+        rawCityDescription.flag ||= rawCityDescription.localeInfo.flag;
         timeOfDay = timeInfo.timeOfDay;
 
-        const country = regionNames.getByRegionCodeSafe(localeInfo.region) || rawCityDescription.country;
+        const country = regionNames.getByRegionCodeSafe(rawCityDescription.localeInfo.region) || rawCityDescription.country;
         const cityDescription: CityDescription = {
             id,
             ...rawCityDescription,
@@ -169,11 +168,15 @@ type RawCityDescription = {
     locale: string,
     flag: string,
     isCapital?: boolean,
+    localeInfo: ReturnType<typeof getLocaleInfo>,
+    h23localTimeFormatOptions: Intl.DateTimeFormatOptions,
+    timeFormatOptions: Intl.DateTimeFormatOptions,
+    dateFormatOptions: Intl.DateTimeFormatOptions,
 };
 
 const _formattersCacheMap = new Map<string, Intl.DateTimeFormat>();
 
-function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now()), localeInfo = getLocaleInfo(city.locale)) {
+function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now())) {
     // const timeFormatter = new Intl.DateTimeFormat(city.locale, {
     //     timeZone: city.timeZone,
     //     // hour: '2-digit',
@@ -196,9 +199,9 @@ function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now()
         timeZone,
     } = city;
     // Форматируем время и дату
-    const h23localTime = nowDate.toLocaleTimeString(locale, { timeZone, timeStyle: 'short', hour12: false });
-    const time = nowDate.toLocaleTimeString(locale, { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem });
-    const date = nowDate.toLocaleDateString(locale, { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem });
+    const h23localTime = nowDate.toLocaleTimeString(locale, city.h23localTimeFormatOptions);
+    const time = nowDate.toLocaleTimeString(locale, city.timeFormatOptions);
+    const date = nowDate.toLocaleDateString(locale, city.dateFormatOptions);
 
     // Получаем смещение часового пояса
     const timeZoneFormatter = _formattersCacheMap.getOrInsertComputed(`${locale}-${timeZone}`, () => {
@@ -451,6 +454,17 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
             cityDescription.isCapital = true;
         }
 
+        cityDescription.localeInfo = localeInfo;
+
+        const { timeZone } = cityDescription;
+        const f1 = cityDescription.h23localTimeFormatOptions = { timeZone, timeStyle: 'short', hour12: false };
+        const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem };
+        const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem };
+
+        Object.freeze(Object.setPrototypeOf(f1, null));
+        Object.freeze(Object.setPrototypeOf(f2, null));
+        Object.freeze(Object.setPrototypeOf(f3, null));
+
         return cityDescription;
     });
 
@@ -458,15 +472,25 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
         return cityDescription.locale === currentLocale;
     })) {
         const localeInfo = getLocaleInfo(currentLocale, true);
-
-        mostPopularCities.push({
+        const timeZone = localeInfo.defaultTimezone;
+        const cityDescription = {
             name: localeInfo.capital,
             country: '',
-            timeZone: localeInfo.defaultTimezone,
+            timeZone,
             locale: currentLocale,
             flag: localeInfo.flag,
             isCapital: true,
-        });
+            localeInfo,
+        } as RawCityDescription;
+        const f1 = cityDescription.h23localTimeFormatOptions = { timeZone, timeStyle: 'short', hour12: false };
+        const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem };
+        const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem };
+
+        Object.freeze(Object.setPrototypeOf(f1, null));
+        Object.freeze(Object.setPrototypeOf(f2, null));
+        Object.freeze(Object.setPrototypeOf(f3, null));
+
+        mostPopularCities.push(cityDescription);
     }
 
     // Сортируем города по часовому поясу (по UTC смещению)
