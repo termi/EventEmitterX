@@ -71,7 +71,7 @@
 
       &::before {
         display: inline-block;
-        content: url('./static/sliders.svg');
+        content: url('/sliders.svg');
         width: 1.1rem;
         margin-right: .5rem;
       }
@@ -89,7 +89,7 @@
       .section-title {
         &::before {
           display: inline-block;
-          content: url('./static/chart-bar.svg');
+          content: url('/chart-bar.svg');
           width: 1.1rem;
           margin-right: .5rem;
         }

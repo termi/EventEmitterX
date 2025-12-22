@@ -252,7 +252,7 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         <img className={`${css.pipIcon} ${isThisPipOpen ? css.pipIconClose : ''}`}
             data-id={id} data-click-mode={isThisPipOpen ? 'close' : 'open'}
             onClick={_setPopup}
-            src="/static/pip.svg" alt="pip" height="24px"
+            src="/pip.svg" alt="pip" height="24px"
         />
     </div>);
 });
