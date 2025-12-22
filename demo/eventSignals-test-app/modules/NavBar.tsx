@@ -5,7 +5,8 @@ import type { MouseEvent } from 'react';
 import * as React from 'react';
 import { memo } from 'react';
 
-import { routersList } from '../state/routers.prebuild';
+import type { NavigationRouter } from "../state/routing";
+import { currentNavigatorPage$ } from "../state/routing";
 
 import css from './NavBar.module.css';
 
@@ -22,24 +23,57 @@ function handleClick(event: MouseEvent<HTMLElement>) {
 const NavBar = memo(function NavBar() {
     console.log(NavBar.name, 'render');
 
-    return (<ul className={css.NavBar__menu}>
-        {routersList.map(router => {
+    const currentPageRouter = currentNavigatorPage$.use();
+    const { routersList } = currentNavigatorPage$.data;
+
+    return (<div className={css.navContainer}>
+        <ul className={css.navMenu}>
+            {routersList.map(router => {
+                if (router.menuHidden) {
+                    return null;
+                }
+
+                return <MenuItem key={router.key} router={router} currentPageRouter={currentPageRouter} />;
+            })}
+        </ul>
+    </div>);
+});
+
+export default NavBar;
+
+function MenuItem({ className, linkClassName, router, currentPageRouter }: {
+    className?: string,
+    linkClassName?: string,
+    router: NavigationRouter,
+    currentPageRouter: NavigationRouter,
+}) {
+    const {
+        routerPath,
+        pageTitle,
+        subItems,
+    } = router;
+    const menuItemTitle$ = router.metadata?.menuItemTitle$
+        || router.metadata?.menuItemTitle
+        || pageTitle
+    ;
+    const isCurrent = router === currentPageRouter;
+    const $submenu = subItems ? <div className={css.submenu}>
+        {subItems.map(router => {
             if (router.menuHidden) {
                 return null;
             }
 
-            const {
-                routerPath,
-                pageTitle,
-            } = router;
-            const menuItemTitle$ = router.metadata?.menuItemTitle$
-                || router.metadata?.menuItemTitle
-                || pageTitle
-            ;
-
-            return <li key={routerPath}><a href={routerPath} onClick={handleClick}>{menuItemTitle$}</a></li>;
+            return <MenuItem
+                key={router.key} className={css.submenuItem} linkClassName={css.submenuLink}
+                router={router} currentPageRouter={currentPageRouter}
+            />;
         })}
-    </ul>);
-});
+    </div> : null;
 
-export default NavBar;
+    return <li key={routerPath} className={`${css.navItem} ${isCurrent ? css.navItemActive : ''} ${className || ''}`}>
+        <a href={routerPath} onClick={$submenu ? null : handleClick} className={`${css.navLink} ${linkClassName || ''}`}>
+            {menuItemTitle$}
+            {$submenu}
+        </a>
+    </li>;
+}

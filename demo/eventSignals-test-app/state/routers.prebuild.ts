@@ -1,29 +1,39 @@
 'use strict';
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
-import type * as React from "react";
+import type { NavigationRouter } from "./routing";
 
-const routersList: {
-    position: number,
-    pageTitle: string,
-    srcPath: string,
-    routerPath: string,
-    importPath: string,
-    menuHidden?: boolean,
-    metadata?: {
-        menuItemTitle: string,
-        menuItemTitle$: EventSignal<string>,
+const routersList: NavigationRouter[] = [];
+const router404: NavigationRouter = {
+    key: '',
+    position: -1,
+    pageTitle: '404',
+    srcPath: '',
+    routerPath: '',
+    importPath: '',
+    menuHidden: true,
+    Component() {
+        return null;
     },
-    Component: React.FC,
-    Layout?: React.FC,
-}[] = [];
+};
 
-export { routersList };
+export { routersList, router404 };
 
 export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: string, thisFilepath: string }) {
     const path = require('node:path') as typeof import('node:path');
     const fs = require('node:fs') as typeof import('node:fs');
+    const crypto = require('node:crypto') as typeof import('node:crypto');
+    const hashSum = (strings: string[]) => {
+        const hash = crypto.createHash('md5');
+
+        for (const string of strings) {
+            hash.update(string);
+        }
+
+        return hash.digest('hex').toString();
+    };
     const pagesDir = path.join(projectRoot, 'pages');
+    const specialPages = Object.create(null) as Record<string, NavigationRouter>;
+    const page404 = 'Page404';
 
     for (const file of fs.readdirSync(pagesDir)) {
         const fileext = path.extname(file);
@@ -34,13 +44,18 @@ export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: stri
 
         const filename = path.basename(file, fileext);
 
-        if (filename === 'Page404') {
-            routersList.push({
+        if (filename === page404) {
+            const routerPath = '(.*)';
+            const importPath = `./pages/${filename}${fileext}`;
+            const key = hashSum([ routerPath, importPath, file ]);
+
+            routersList.push(specialPages[page404] = {
+                key,
                 position: -1,
                 pageTitle: '404',
                 srcPath: file,
-                routerPath: '(.*)',
-                importPath: `./pages/${filename}${fileext}`,
+                routerPath,
+                importPath,
                 menuHidden: true,
                 Component() {
                     return null;
@@ -57,13 +72,15 @@ export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: stri
             ? filename.substring(positionMatch[0].length)
             : filename
         ;
+        const importPath = `./pages/${filename}${fileext}`;
 
         routersList.push({
+            key: hashSum([ routerPath, importPath, file ]),
             position,
             pageTitle: routerPath,
             srcPath: file,
             routerPath: `/${routerPath}`,
-            importPath: `./pages/${filename}${fileext}`,
+            importPath,
             Component() {
                 return null;
             },
@@ -73,6 +90,13 @@ export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: stri
     routersList.sort((a, b) => {
         return a.position - b.position;
     });
+
+    const reassignmentVariables = Object.create(null) as Record<string, string>;
+
+    // Небольшой костыль, пока не придумал как сделать лучше
+    if (specialPages[page404]) {
+        reassignmentVariables["router404"] = `routersList.find(router => router.key === '${specialPages[page404].key}')`;
+    }
 
     let moduleBody = '';
     const moduleInitializer = routersList.reduce((moduleInitializer, routerDescription, index) => {
@@ -107,5 +131,6 @@ import * as React from 'react';
     return {
         beforeCode: moduleInitializer,
         afterCode: moduleBody,
+        reassignmentVariables,
     };
 }

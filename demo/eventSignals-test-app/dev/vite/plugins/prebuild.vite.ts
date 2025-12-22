@@ -87,6 +87,7 @@ export function createPrebuildPlugin({ projectRoot }: { projectRoot: string }) {
             const onBuildResult: {
                 beforeCode: string,
                 afterCode: string,
+                reassignmentVariables: Record<string, string>,
             } = await onBuild({
                 projectRoot,
                 thisFilepath: file,
@@ -94,7 +95,9 @@ export function createPrebuildPlugin({ projectRoot }: { projectRoot: string }) {
 
             // console.log(onBuildResult);
 
+            const { reassignmentVariables } = onBuildResult;
             let resultCode = `${onBuildResult.beforeCode || ''}\n`;
+            let reassignmentVariableCode = '';
             const keys: string[] = [];
 
             for (const key of Object.keys(moduleFromCode)) {
@@ -114,10 +117,17 @@ export function createPrebuildPlugin({ projectRoot }: { projectRoot: string }) {
                     value = '';
                 }
 
-                resultCode += `\nconst ${key} = ${JSON.stringify(value)};`;
+                const reassignmentVariable = reassignmentVariables[key];
+
+                if (reassignmentVariable) {
+                    reassignmentVariableCode += `\nconst ${key} = ${reassignmentVariable};`;
+                }
+                else {
+                    resultCode += `\nconst ${key} = ${JSON.stringify(value)};`;
+                }
             }
 
-            resultCode += `\nexport { ${keys.join(', ')} };`;
+            resultCode += `${reassignmentVariableCode}\n\nexport { ${keys.join(', ')} };`;
 
             if (onBuildResult.afterCode) {
                 resultCode += `\n${onBuildResult.afterCode}`;
