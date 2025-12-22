@@ -8,6 +8,7 @@ import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import {
     getDefaultLocale,
     getCurrentLocale,
+    setCurrentLocale,
     getSystemLocale,
     getLocaleInfo,
     normalizeLocale,
@@ -26,6 +27,7 @@ export const currentLocale$ = new EventSignal(currentLocale, (prevValue, newLoca
     currentLocale$.data.localInfo = getLocaleInfo(newLocale);
 
     localStorage.setItem('i18n.preferredLocale', newLocale);
+    setCurrentLocale(newLocale);
 
     return newLocale;
 }, {
@@ -345,6 +347,8 @@ function _getAllowedLocalesList() {
         'fr',
         'es',
         'zh-CN',
+        'bo-CN',
+        'zh-Hant-TW',
         'ja',
         'ar',
         'pt',

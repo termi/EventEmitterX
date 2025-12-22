@@ -4,19 +4,22 @@
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import hashSum from 'cftools/common/hashSum';
 import { throttle } from 'cftools/common/FunctionTools';
+
 import { currentLocale$ } from "./i18n";
+import { getCurrentTimeZoneOffset, getLocaleInfo } from "../lib/i18n";
 
 const componentTypeGlobalTimesList = Symbol('GlobalTimes/List');
 const componentTypeGlobalTimesCity = Symbol('GlobalTimes/City');
 
 export const mostPopularCities$ = new EventSignal(
     [] as mostPopularCities$.CityDescriptionEventSignal[],
-    function(_prev, mostPopularCitiesList) {
+    function(_prev) {
+        const mostPopularCitiesList = getMostPopularCities(currentLocale$.get());
+
         return mostPopularCitiesList.map(cityDescription => {
             return _makeCityTime$$(cityDescription);
         });
     }, {
-        initialSourceValue: getMostPopularCities(),
         componentType: componentTypeGlobalTimesList,
         data: {
             elementsComponentType: componentTypeGlobalTimesCity,
@@ -30,18 +33,24 @@ export namespace mostPopularCities$ {
 
 /**
  * @example Use custom date
- * nowTime$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
+ * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
  * @example Use system date
- * nowTime$.set(null);
+ * nowDate$.set(null);
  */
-const nowTime$ = new EventSignal<number, number | null>(Date.now(), (prevNow, customNow, eventSignal) => {
-    return customNow
+export const nowDate$ = new EventSignal(new Date(), (prevNow, customNow, eventSignal) => {
+    return new Date(customNow
         ? (eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0
             ? customNow
-            : (prevNow + 1000)
+            : (prevNow.getTime() + 1000)
         : Date.now()
-    ;
+    );
 }, {
+    initialSourceValue: null as Date | number | null,
+    data: {
+        reset: () => {
+            nowDate$.set(null);
+        },
+    },
     trigger: {
         type: 'clock',
         ms: 1000,
@@ -82,8 +91,10 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
         const currentLocale = currentLocale$.get();
         const regionNames = _dnCache.getOrNew(currentLocale);
         const localeInfo = getLocaleInfo(rawCityDescription.locale);
-        const timeInfo = formatLocalTime(rawCityDescription, nowTime$.get());
+        const nowDate = nowDate$.get();
+        const timeInfo = formatLocalTime(rawCityDescription, nowDate, localeInfo);
 
+        rawCityDescription.flag ||= localeInfo.flag;
         timeOfDay = timeInfo.timeOfDay;
 
         const country = regionNames.getByRegionCodeSafe(localeInfo.region) || rawCityDescription.country;
@@ -97,6 +108,7 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
             date: timeInfo.date,
             time: timeInfo.time,
             timeZoneName: timeInfo.timeZoneName,
+            isCurrentOffset: timeInfo.isCurrentOffset,
             __proto__: null,
         };
 
@@ -134,6 +146,8 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
     return cityTime$;
 }
 
+const currentTimeZoneOffset = getCurrentTimeZoneOffset();
+
 type TimeOfDay = 'day' | 'evening' | 'morning' | 'night';
 
 type CityDescription = RawCityDescription & {
@@ -144,6 +158,7 @@ type CityDescription = RawCityDescription & {
     time: string,
     date: string,
     timeZoneName: string,
+    isCurrentOffset?: boolean,
     __proto__: null,
 };
 
@@ -156,7 +171,9 @@ type RawCityDescription = {
     isCapital?: boolean,
 };
 
-function formatLocalTime(city: RawCityDescription, now: number | undefined) {
+const _formattersCacheMap = new Map<string, Intl.DateTimeFormat>();
+
+function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now()), localeInfo = getLocaleInfo(city.locale)) {
     // const timeFormatter = new Intl.DateTimeFormat(city.locale, {
     //     timeZone: city.timeZone,
     //     // hour: '2-digit',
@@ -174,20 +191,24 @@ function formatLocalTime(city: RawCityDescription, now: number | undefined) {
     // });
     // dateFormatter.format(nowDate);
 
-    const nowDate = new Date(now ?? Date.now());
+    const {
+        locale,
+        timeZone,
+    } = city;
     // Форматируем время и дату
-    const h23localTime = nowDate.toLocaleTimeString(city.locale, { timeZone: city.timeZone, timeStyle: 'short', hour12: false });
-    const time = nowDate.toLocaleTimeString(city.locale, { timeZone: city.timeZone, timeStyle: 'medium' });
-    const date = nowDate.toLocaleDateString(city.locale, { timeZone: city.timeZone, dateStyle: 'full' });
+    const h23localTime = nowDate.toLocaleTimeString(locale, { timeZone, timeStyle: 'short', hour12: false });
+    const time = nowDate.toLocaleTimeString(locale, { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem });
+    const date = nowDate.toLocaleDateString(locale, { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem });
 
     // Получаем смещение часового пояса
-    const timeZoneFormatter = new Intl.DateTimeFormat(city.locale, {
-        timeZone: city.timeZone,
-        timeZoneName: 'longOffset',
+    const timeZoneFormatter = _formattersCacheMap.getOrInsertComputed(`${locale}-${timeZone}`, () => {
+        return new Intl.DateTimeFormat(locale, {
+            timeZone,
+            timeZoneName: 'longOffset',
+        });
     });
-
     const timeZoneParts = timeZoneFormatter.formatToParts(nowDate);
-    const timeZoneName = timeZoneParts.find(part => part.type === 'timeZoneName')?.value || city.timeZone;
+    const timeZoneName = timeZoneParts.find(part => part.type === 'timeZoneName')?.value || timeZone;
 
     // Определяем, день сейчас или ночь
     const currentHour = Number.parseInt(h23localTime.split(':')[0]);
@@ -204,19 +225,104 @@ function formatLocalTime(city: RawCityDescription, now: number | undefined) {
         : '🕐'
     ;
 
+    const enUSIimeZoneFormatter = _formattersCacheMap.getOrInsertComputed(`en-US-${timeZone}`, () => {
+        return new Intl.DateTimeFormat('en-US', {
+            timeZone,
+            timeZoneName: 'longOffset',
+        });
+    });
+    const enUSTimeZoneParts = enUSIimeZoneFormatter.formatToParts(nowDate);
+    const enUSTimeZoneName = enUSTimeZoneParts.find(part => part.type === 'timeZoneName')?.value;
+    let isCurrentOffset = false;
+
+    if (enUSTimeZoneName) {
+        const offset = _parseHoursMinutesStringToOffset(enUSTimeZoneName);
+
+        isCurrentOffset = offset === currentTimeZoneOffset;
+    }
+
     return {
         time,
         date,
         timeOfDay,
         dayLightSign,
         timeZoneName,
+        isCurrentOffset,
         formatted: `${time}`,
         __proto__: null,
     };
 }
 
+const minusSign2212 = '\u{2212}';
+const re_HoursString = /^([0-2]?\d)$/;
+const re_HoursMinutesString = /^([0-2]?\d):([0-5]\d)$/;
+
+function _parseHoursMinutesStringToOffset(timeZoneHoursMinutesString: string) {
+    if (!timeZoneHoursMinutesString) {
+        return Number.NaN;
+    }
+
+    let _string = String(timeZoneHoursMinutesString).trim();
+
+    if (_string.startsWith('GMT') || _string.startsWith('UTC')) {
+        // todo: Есть какая-то разница ТУТ между 'GMT' и 'UTC'?
+        _string = _string.substring(3);
+    }
+
+    const firstSymbol = _string.at(0);
+    const isNegative = firstSymbol === '-' || firstSymbol === minusSign2212;
+    const hasPlusSymbol = !isNegative && _string.at(0) === '+';
+
+    if (isNegative || hasPlusSymbol) {
+        _string = _string.substring(1);
+    }
+
+    const match = _string.match(re_HoursMinutesString) || _string.match(re_HoursString);
+
+    if (match) {
+        const hours = Number.parseInt((match[1] as string), 10);
+        const minutes = Number.parseInt(match[2] || '0', 10);
+
+        if (_isValidHour(hours) && _isValidMinute(minutes)) {
+            return ((hours * 60) + minutes) * (isNegative ? 1 : -1);
+        }
+    }
+
+    return Number.NaN;
+}
+
+const LAST_HOUR_IN_DAY = 23;
+const LAST_MINUTE_IN_HOUR = 59;
+// const LAST_SECOND_IN_MINUTE = 59;
+// const LAST_MS_IN_SECOND = 999;
+
+function _isValidHour(hoursNumber: number | unknown): hoursNumber is Hours {
+    return typeof hoursNumber === 'number'
+        && hoursNumber >= 0 && hoursNumber <= LAST_HOUR_IN_DAY
+    ;
+}
+
+function _isValidMinute(minutesNumber: number | unknown): minutesNumber is From_0_To_59 {
+    return typeof minutesNumber === 'number'
+        && minutesNumber >= 0 && minutesNumber <= LAST_MINUTE_IN_HOUR
+    ;
+}
+
+type Hours =
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+    | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23
+;
+type From_0_To_59 =
+    | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+    | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19
+    | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 | 29
+    | 30 | 31 | 32 | 33 | 34 | 35 | 36 | 37 | 38 | 39
+    | 40 | 41 | 42 | 43 | 44 | 45 | 46 | 47 | 48 | 49
+    | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59
+    ;
+
 // Список популярных городов с их временными зонами и локалями
-function getMostPopularCities(): RawCityDescription[] {
+function getMostPopularCities(currentLocale: string): RawCityDescription[] {
     const date = new Date();
     const mostPopularCities: RawCityDescription[] = ([
         {
@@ -331,7 +437,37 @@ function getMostPopularCities(): RawCityDescription[] {
             flag: "🇲🇽",
             isCapital: true,
         },
-    ] as RawCityDescription[])
+        {
+            name: "Чэнгуань (Лхаса)",
+            country: "Китай",
+            timeZone: "Asia/Shanghai",
+            locale: "bo-CN",
+            flag: "",
+        },
+    ] as RawCityDescription[]).map(cityDescription => {
+        const localeInfo = getLocaleInfo(cityDescription.locale, true);
+
+        if (cityDescription.name === localeInfo.capital) {
+            cityDescription.isCapital = true;
+        }
+
+        return cityDescription;
+    });
+
+    if (!mostPopularCities.some(cityDescription => {
+        return cityDescription.locale === currentLocale;
+    })) {
+        const localeInfo = getLocaleInfo(currentLocale, true);
+
+        mostPopularCities.push({
+            name: localeInfo.capital,
+            country: '',
+            timeZone: localeInfo.defaultTimezone,
+            locale: currentLocale,
+            flag: localeInfo.flag,
+            isCapital: true,
+        });
+    }
 
     // Сортируем города по часовому поясу (по UTC смещению)
     return mostPopularCities.sort((a, b) => {
@@ -522,7 +658,7 @@ const canvasAnimations = new Map<HTMLCanvasElement, TimeCanvas>();
 
 Object.assign(globalThis, {
     __test__canvasAnimations: canvasAnimations,
-    __test__nowTime$: nowTime$,
+    __test__nowTime$: nowDate$,
 });
 
 // https://www.w3schools.com/charsets/ref_utf_misc_symbols.asp

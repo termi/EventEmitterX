@@ -42,14 +42,26 @@ function convertCountriesData() {
         indexByLocale: {},
         /** @type {Record<string, number>} */
         indexByISOv2: {},
+        /** @type {string[]} */
+        capitalTimezonesList: [],
+        /** @type {string[]} */
+        timezonePrefixesList: [],
     };
     const {
         // countriesList,
         capitalsList,
         indexByLocale,
         indexByISOv2,
+        capitalTimezonesList,
+        timezonePrefixesList,
     } = result;
+    /** @type {Record<string, number>} */
+    const timezonePrefixesMap = Object.create(null);
+    /** @type {Record<string, number>} */
+    const capitalTimezonesMap = Object.create(null);
+    const countriesAndTimezones = require('countries-and-timezones');
     const worldCountriesCapitals = require('world-countries-capitals');
+    const countriesAndTimezonesByISOAlpha2 = countriesAndTimezones.getAllCountries();
     /**
      * @type {{
      // 'russia'
@@ -131,6 +143,9 @@ function convertCountriesData() {
         //
         const capital = normalizeCapitalCityName(countryInfo.capital);
         const ISO_alpha_2 = iso.alpha_2.toUpperCase();
+        /** @type { { timezones: string[] } } */
+        const timeZonesInfo = countriesAndTimezonesByISOAlpha2[ISO_alpha_2] || { timezones: [] };
+        const capitalTimezoneCode = capital.split(' ').join('_');
 
         // countriesList[i] = country;
         capitalsList[i] = capital;
@@ -140,6 +155,35 @@ function convertCountriesData() {
         }
 
         indexByISOv2[ISO_alpha_2] = i;
+
+        const defaultTimezone = timeZonesInfo.timezones.find(timezone => {
+            const pair = timezone.split('/');
+
+            return pair[1] === capitalTimezoneCode;
+        }) || timeZonesInfo.timezones[0];
+
+        if (defaultTimezone) {
+            const pair = defaultTimezone.split('/');
+            const timezonePrefix = pair[0];
+            let timezonePrefixIndex = timezonePrefixesMap[timezonePrefix];
+
+            if (timezonePrefixIndex == null) {
+                timezonePrefixIndex = timezonePrefixesList.length;
+                timezonePrefixesMap[timezonePrefix] = timezonePrefixIndex;
+                timezonePrefixesList.push(timezonePrefix);
+            }
+
+            const capitalTimezone = `${timezonePrefixIndex}/${pair[1] === capitalTimezoneCode ? '*' : pair[1]}`;
+            const existedIndex = capitalTimezonesMap[capitalTimezone];
+
+            if (existedIndex) {
+                capitalTimezonesList[i] = existedIndex;
+            }
+            else {
+                capitalTimezonesList[i] = capitalTimezone;
+                capitalTimezonesMap[capitalTimezone] = i;
+            }
+        }
     }
 
     // Пересоздаём, чтобы ключи были отсортированы

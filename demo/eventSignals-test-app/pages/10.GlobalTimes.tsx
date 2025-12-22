@@ -7,6 +7,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef 
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
+import { getCurrentTimeZoneOffsetName } from "../lib/i18n";
 import {
     mostPopularCities$,
 } from "../state/GlobalTimesState";
@@ -148,6 +149,14 @@ function PageGlobalTimesLegend() {
             <span className={css.legendIcon}>🏛️</span>
             <span>{i18n$$`Столица`}</span>
         </div>
+        <div className={css.legendItem}>
+            <span className={css.legendIcon}>🌐</span>
+            <span>{i18n$$`Выбранная локаль: ${currentLocale}`}</span>
+        </div>
+        <div className={css.legendItem}>
+            <span className={css.legendIcon}>⏰</span>
+            <span>{i18n$$`Ваша таймзона: ${getCurrentTimeZoneOffsetName()}`}</span>
+        </div>
     </div>;
 }
 
@@ -221,7 +230,9 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         dayLightSign,
         timeZone,
         timeZoneName,
+        isCurrentOffset,
     } = eventSignal.get();
+    const isCurrentLocale = locale === currentLocale$.get();
     const { data } = eventSignal;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const isThisPipOpen = pipPopupWindow$.use().dataId === id;
@@ -236,7 +247,8 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         data-viewtype={viewType}
         className={`${css.cityCard} ${
             isCapital ? css.cityCardCapital : ''} ${
-            ''}`}
+            isCurrentLocale ? css.cityCardCurrentLocale : ''} ${
+            isCurrentOffset ? css.cityCardCurrentTimezone : ''}`}
         style={{ "--city-flag-content": `"${flag}"` } as React.CSSProperties}
     >
         <div className={css.canvasContainer}>
@@ -324,7 +336,7 @@ function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.
         <td>{locale}</td>
         <td>{timeZone}</td>
         <td>{timeZoneName}</td>
-        <td>{dayLightSign} {time}</td>
+        <td className={css.localTime}>{dayLightSign} {time}</td>
         <td>{date}</td>
     </tr>;
 }
