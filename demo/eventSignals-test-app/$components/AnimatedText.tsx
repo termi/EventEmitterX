@@ -4,12 +4,10 @@ import * as React from "react";
 
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-expect-error
 import css from './AnimatedText.module.css';
 
-export default function AnimatedText({ eventSignal }: { eventSignal: EventSignal<string> }) {
-    const text = eventSignal.get();
+export default function AnimatedText({ eventSignal }: { eventSignal: EventSignal<Promise<string> | string> }) {
+    const text = eventSignal.getSync();
     const letters = text.split('');
     const textLength = text.length;
 

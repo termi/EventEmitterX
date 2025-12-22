@@ -1,16 +1,21 @@
 lockfileVersion: 5.3
 
+overrides:
+  react-error-boundary>@babel/runtime: npm:noop3@1000.0.0
+
 specifiers:
   '@vitejs/plugin-react': ^5.1.2
   country-flag-emoji-polyfill: ^0.1.8
   react: 19.1.0
   react-dom: 19.1.0
+  react-error-boundary: ^6.0.0
   vite: link:../../node_modules/vite
 
 dependencies:
   country-flag-emoji-polyfill: 0.1.8
   react: 19.1.0
   react-dom: 19.1.0_react@19.1.0
+  react-error-boundary: 6.0.0_react@19.1.0
 
 devDependencies:
   '@vitejs/plugin-react': 5.1.2
@@ -369,6 +374,15 @@ packages:
     dependencies:
       react: 19.1.0
       scheduler: 0.26.0
+    dev: false
+
+  /react-error-boundary/6.0.0_react@19.1.0:
+    resolution: {integrity: sha512-gdlJjD7NWr0IfkPlaREN2d9uUZUlksrfOx7SX62VRerwXbMY6ftGCIZua1VG1aXFNOimhISsTq+Owp725b9SiA==}
+    peerDependencies:
+      react: '>=16.13.1'
+    dependencies:
+      '@babel/runtime': /noop3/1000.0.0
+      react: 19.1.0
     dev: false
 
   /react-refresh/0.18.0:

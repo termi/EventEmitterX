@@ -7,6 +7,7 @@ import * as React from 'react';
 import { Suspense } from "react";
 import { createPortal } from "react-dom";
 import { createRoot } from 'react-dom/client';
+import { ErrorBoundary } from 'react-error-boundary';
 
 import 'termi@polyfills';
 
@@ -51,9 +52,10 @@ if (import.meta.hot) {
 (globalThis as unknown as { __React: typeof React }).__React = React;
 
 // Инициализируем EventSignal для работы с React.
-EventSignal.initReact(React);
+EventSignal.initReact(React, ErrorBoundary);
 
 EventSignal.registerReactComponentForComponentType(i18n_componentType, AnimatedText, 'pending');
+EventSignal.registerReactComponentForComponentType(i18n_componentType, () => '⚠️ i18n error', 'error');
 
 // Регистрируем компонент UserCard для отображения EventSignal с componentType == mainState.userFullNameComponentType.
 // Внимание: тут React.memo только для тестирования и демонстрации. ОН НЕ НУЖЕН в вашем коде.
