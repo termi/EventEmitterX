@@ -25,7 +25,8 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "jsx": "react",
-    "newLine": "lf"
+    "newLine": "lf",
+    "resolveJsonModule": false
   },
   "__include": [
     "./types/global.d.ts",

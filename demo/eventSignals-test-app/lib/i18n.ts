@@ -1,5 +1,16 @@
 'use strict';
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-expect-error `TS2732: Cannot find module ../ static/ data/ capitals. json. Consider using --resolveJsonModule to import module with .json extension.`
+import _capitals from '../static/data/capitals.json' assert { type: 'css' };
+
+const capitals = _capitals as {
+    capitalsList: string[],
+    indexByLocale: Record<string, number>,
+    indexByISOv2: Record<string, number>,
+    timezonePrefixesList: string[],
+    capitalTimezonesList: string[],
+};
 const defaultLocale = 'ru-RU';
 /**
  * `65`, `0x41`, `'41'`, `'\u{41}'`, `'\u0041'`
@@ -10,10 +21,11 @@ const regionBaseCodePoint = "A".codePointAt(0);
  */
 const unicodeFlagBaseCodePoint = "🇦".codePointAt(0);
 
+const sourceLanguagesForText: Record<string, string> = Object.create(null);
 let _fetchGoogleTranslateApi_currentRequest: Promise<any> | undefined = void 0;
 
 export async function fetchGoogleTranslateApi(text: string, {
-    sourceLanguage = defaultLocale,
+    sourceLanguage = sourceLanguagesForText[text] ?? defaultLocale,
     targetLanguage = 'en-US',
     delay,
     queueRequests,
@@ -130,6 +142,10 @@ export async function fetchGoogleTranslateApi(text: string, {
         targetLanguage,
         timestamp: Date.now(),
     };
+}
+
+export function setSourceLanguageForText(text: string, sourceLanguage: string) {
+    sourceLanguagesForText[text] = sourceLanguage;
 }
 
 const localStorageLocalizationsByLocaleMap = Object.assign(new Map<string, Partial<Record<string, string>>>(), {
@@ -351,18 +367,13 @@ export function normalizeLocale(locale: string) {
     return locale;
 }
 
-export function getLocaleInfo(localeCode: string): {
-    locale: string,
-    flag: string,
-    language: string,
-    region: string,
-    textDirection: 'ltr' | 'rtl',
-    __proto__: null,
-} {
-    const locale = new Intl.Locale(normalizeLocale(localeCode));
-    const { language } = locale;
-    const region = locale.region || '';
-    const textInfo = locale.getTextInfo?.() ?? (locale.textInfo || {
+export function getLocaleInfo(localeCode: string, getExtendedInfo?: false): getLocaleInfo.Result;
+export function getLocaleInfo(localeCode: string, getExtendedInfo: true): getLocaleInfo.ExtendedResult;
+export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): getLocaleInfo.ExtendedResult | getLocaleInfo.Result {
+    const intlLocale = new Intl.Locale(normalizeLocale(localeCode));
+    const { language } = intlLocale;
+    const region = intlLocale.region || '';
+    const textInfo = intlLocale.getTextInfo?.() ?? (intlLocale.textInfo || {
         direction: "ltr",
     });
     const textDirection = textInfo.direction;
@@ -379,13 +390,48 @@ export function getLocaleInfo(localeCode: string): {
         flag = String.fromCodePoint(unicodeFlagCodePoint0) + String.fromCodePoint(unicodeFlagCodePoint1);
     }
 
-    return {
+    const result: getLocaleInfo.Result = {
         locale: localeCode,
         flag,
         language,
         region,
         textDirection,
         __proto__: null,
+    };
+
+    if (getExtendedInfo) {
+        const _result = result as getLocaleInfo.ExtendedResult;
+        const locale = `${result.language}-${result.region}`;
+        const index = capitals.indexByLocale[locale];
+        const capital = (index != null ? capitals.capitalsList[index] : null) || '';
+
+        _result.capital = capital;
+
+        // В файле eventSignals-test-app/static/data/capitals.json название столицы сохранено на английском языке,
+        //  а по-умолчанию у нас для переводов используется русский.
+        // todo: Сделать как-то более элегантно
+        setSourceLanguageForText(capital, 'en-US');
+    }
+
+    Object.freeze(Object.setPrototypeOf(result, null));
+
+    return result;
+}
+
+export namespace getLocaleInfo {
+    export type Result = {
+        locale: string,
+        flag: string,
+        language: string,
+        region: string,
+        defaultNumericSystem: string,
+        textDirection: 'ltr' | 'rtl',
+        __proto__: null,
+    };
+
+    export type ExtendedResult = Result & {
+        capital: string,
+        defaultTimezone: string,
     };
 }
 

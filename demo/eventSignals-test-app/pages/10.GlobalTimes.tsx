@@ -11,7 +11,7 @@ import {
     mostPopularCities$,
 } from "../state/GlobalTimesState";
 import { pipPopupWindow$ } from "../state/pipWindowState";
-import { i18n$$, i18nString$$ } from "../state/i18n";
+import { currentLocale$, i18n$$, i18nString$$ } from "../state/i18n";
 
 import { menuItemTitle$, unicodeIcon } from './10.GlobalTimes.metadata';
 
@@ -133,10 +133,22 @@ export default function PageGlobalTimes({ viewType, filterById }: {
 
                 <footer className={css.updateTime}>
                     {i18n$$`Время обновляется каждую секунду`}
+                    <PageGlobalTimesLegend/>
                 </footer>
             </section>
         </div>
     </>);
+}
+
+function PageGlobalTimesLegend() {
+    const currentLocale = currentLocale$.use();
+
+    return <div className={css.legend}>
+        <div className={css.legendItem}>
+            <span className={css.legendIcon}>🏛️</span>
+            <span>{i18n$$`Столица`}</span>
+        </div>
+    </div>;
 }
 
 /* todo:
@@ -201,6 +213,7 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         id,
         flag,
         name,
+        isCapital,
         country,
         locale,
         date,
@@ -219,9 +232,11 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
     }, [ data ]);
 
     return (<div
-        className={css.cityCard}
         data-id={id}
         data-viewtype={viewType}
+        className={`${css.cityCard} ${
+            isCapital ? css.cityCardCapital : ''} ${
+            ''}`}
         style={{ "--city-flag-content": `"${flag}"` } as React.CSSProperties}
     >
         <div className={css.canvasContainer}>
@@ -229,7 +244,7 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         </div>
         <div className={css.cityInfo}>
             <div className={css.cityName}>
-                <div title={timeZone}>
+                <div className={css.cityNameInner} title={timeZone}>
                     <span>
                         {i18nString$$(name)}
                         <br className={css.optionalLineBreak}/>{' '}
