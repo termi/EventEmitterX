@@ -118,19 +118,20 @@ function _create_i18n$$<T>(template: TemplateStringsArray, values: T[]) {
     });
 }
 
-function _i18n_computation<T>(_v: string, sourceValue: { template: TemplateStringsArray, values: T[], __proto__: null }, eventSignal?: EventSignal<string, { template: TemplateStringsArray, values: T[], __proto__: null }>) {
+function fulfillTranslationTemplate<T>(translation: string, values: T[]) {
+    return translation.replace(/@{(\d+)}/g, function(_match, indexString) {
+        const i = indexString | 0;
+
+        return String(values[i] ?? '');
+    });
+}
+
+function _i18n_computation<T>(prevValue: string, sourceValue: { template: TemplateStringsArray, values: T[], __proto__: null }, eventSignal?: EventSignal<string, { template: TemplateStringsArray, values: T[], __proto__: null }>) {
     const currentLocale = currentLocale$.get();
     const isDefaultLocale = currentLocale === defaultLocale;
     const translationsMap = translations.getOrInsertComputed(currentLocale, translations.createValue);
     const { template, values } = sourceValue;
     // const isNeedToLoadTranslation = currentLocale !== defaultLocale;
-    const fulfillTranslationTemplate = (translation: string) => {
-        return translation.replace(/@{(\d+)}/g, function(_match, indexString) {
-            const i = indexString | 0;
-
-            return String(values[i] ?? '');
-        });
-    };
 
     let templateString = '';
 
@@ -145,7 +146,7 @@ function _i18n_computation<T>(_v: string, sourceValue: { template: TemplateStrin
     const translation = translationsMap.get(templateString);
 
     if (translation) {
-        return fulfillTranslationTemplate(translation);
+        return fulfillTranslationTemplate(translation, values);
     }
 
     if (isDefaultLocale) {
@@ -168,15 +169,19 @@ function _i18n_computation<T>(_v: string, sourceValue: { template: TemplateStrin
         const temporaryEventSignal = eventSignal ? null : new EventSignal(false);
 
         // eslint-disable-next-line promise/prefer-await-to-then
-        return (result as unknown as Promise<string>).then(result => {
+        const promise = (result as unknown as Promise<string>).then(result => {
             temporaryEventSignal?.set(true);
             temporaryEventSignal?.destructor();
 
-            return fulfillTranslationTemplate(result);
-        }) as unknown as string;
+            return fulfillTranslationTemplate(result, values);
+        }) as Promise<string> & { "pendingValue": string };
+
+        promise["pendingValue"] = prevValue || fulfillTranslationTemplate(templateString, values);
+
+        return promise as unknown as string;
     }
 
-    return fulfillTranslationTemplate(result);
+    return fulfillTranslationTemplate(result, values);
 }
 
 /*
@@ -251,7 +256,7 @@ function _create_i18nString$$(string: string) {
 
 const _promiseCacheMap = new Map<string, Promise<string>>();
 
-function _i18nString$_computation(_v: string, sourceValue: string, eventSignal?: EventSignal<any> | true) {
+function _i18nString$_computation(prevValue: string, sourceValue: string, eventSignal?: EventSignal<any> | true) {
     if (!sourceValue) {
         return '';
     }
@@ -323,12 +328,14 @@ function _i18nString$_computation(_v: string, sourceValue: string, eventSignal?:
     if (allowAsync) {
         if (promise) {
             if (allowTemporarySignal) {
-                /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сиглан текущий сиглан будет подписан. */
+                /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сигнал текущий сигнал будет подписан. */
                 const temporaryEventSignal = new EventSignal(false);
 
                 void promise.then(() => { // eslint-disable-line promise/prefer-await-to-then
                     temporaryEventSignal.set(true);
                     temporaryEventSignal.destructor();
+                }, () => {
+                    // ignore any error
                 });
             }
 
@@ -336,7 +343,7 @@ function _i18nString$_computation(_v: string, sourceValue: string, eventSignal?:
         }
     }
 
-    return translation ?? sourceValue;
+    return translation ?? (prevValue || sourceValue);
 }
 
 function _getAllowedLocalesList() {
