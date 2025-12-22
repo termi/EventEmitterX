@@ -175,7 +175,7 @@ export function saveLocalizationToLocalStorage(text: string, translatedText: str
         delete _saveTimers[locale];
     }
 
-    _saveTimers[locale] = setTimeout(_saveLocalStorageLocalizations.bind(null, locale), 15000);
+    _saveTimers[locale] = setTimeout(_saveLocalStorageLocalizations.bind(null, locale), 15_000);
 }
 
 function _saveLocalStorageLocalizations(locale?: string) {

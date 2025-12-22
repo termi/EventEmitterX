@@ -18,7 +18,7 @@ import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
-import { i18n_componentType, i18nString$$ } from "./state/i18n";
+import { i18nString$$, i18n_componentType } from "./state/i18n";
 import { currentNavigatorPage$ } from './state/routing';
 
 import SignalAsString1 from "./$components/SignalAsString1";
