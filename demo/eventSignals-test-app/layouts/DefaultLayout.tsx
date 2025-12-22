@@ -18,12 +18,16 @@ export default function DefaultLayout({ children, pageTitle, pageTitle$ }: {
 }) {
     return <main>
         <header className={css.pageHeader}>
-            <div className={css.pageHeaderLeft}>
-                <h1>{pageTitle$ || pageTitle || ''}</h1>
+            <div className={css.headerTop}>
+                <h1 className={css.pageTitle}>{pageTitle$ || pageTitle || ''}</h1>
+                <div className={css.headerActions}>
+                    <div className={css.pageHeaderRight}>
+                        <currentLocale$.component sFC={LocaleSelector}/>
+                    </div>
+                </div>
             </div>
-            <NavBar/>
-            <div className={css.pageHeaderRight}>
-                <currentLocale$.component sFC={LocaleSelector} />
+            <div className={css.headerBottom}>
+                <NavBar/>
             </div>
         </header>
         {children || null}

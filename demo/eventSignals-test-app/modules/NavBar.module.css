@@ -1,7 +1,202 @@
 
-.NavBar__menu {
-  li {
-    display: inline-block;
-    padding-right: 20px;
+.nav-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.nav-menu {
+  display: flex;
+  list-style: none;
+  flex: 1;
+  overflow: hidden;
+  padding-right: 40px;
+}
+
+.nav-item {
+  position: relative;
+  white-space: nowrap;
+  margin-right: 2px;
+}
+
+.nav-link {
+  display: block;
+  padding: 12px 18px;
+  text-decoration: none;
+  color: #444;
+  font-weight: 500;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.nav-link:hover {
+  background-color: #f0f7ff;
+  color: #1976d2;
+}
+
+.nav-item.nav-item--active .nav-link {
+  background-color: #1976d2;
+  color: white;
+}
+
+/* Подменю */
+.submenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: white;
+  min-width: 200px;
+  border-radius: 4px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all 0.3s;
+  z-index: 100;
+}
+
+.nav-item:hover .submenu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.submenu-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.submenu-item:last-child {
+  border-bottom: none;
+}
+
+.submenu-link {
+  display: block;
+  padding: 12px 18px;
+  text-decoration: none;
+  color: #444;
+  transition: all 0.2s;
+}
+
+.submenu-link:hover {
+  background-color: #f8f9fa;
+  color: #1976d2;
+  padding-left: 22px;
+}
+
+/* Кнопка "..." для скрытых пунктов меню */
+.menu-overflow {
+  position: relative;
+  display: none;
+}
+
+.overflow-toggle {
+  padding: 12px 18px;
+  cursor: pointer;
+  color: #444;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background: white;
+  min-width: 180px;
+  border-radius: 4px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+  display: none;
+  z-index: 100;
+}
+
+.menu-overflow:hover .overflow-menu {
+  display: block;
+}
+
+/* Мобильное меню (гамбургер) */
+.mobile-toggle {
+  display: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #444;
+  padding: 5px;
+}
+
+/* Адаптивность */
+@media (max-width: 1024px) {
+  .nav-menu {
+    padding-right: 0;
+  }
+
+  /* Прячем элементы, которые не помещаются */
+  .nav-item.overflow-hidden {
+    display: none;
+  }
+
+  .menu-overflow {
+    display: block;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-top {
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .mobile-toggle {
+    display: block;
+  }
+
+  .nav-menu {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    width: 100%;
+    background: white;
+    flex-direction: column;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+    padding: 0;
+  }
+
+  .nav-menu.nav-item--active {
+    max-height: 500px;
+    padding: 15px 0;
+  }
+
+  .nav-item {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .nav-link {
+    padding: 15px 20px;
+    border-radius: 0;
+  }
+
+  .submenu {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    display: none;
+    padding-left: 20px;
+  }
+
+  .nav-item:hover .submenu {
+    display: block;
+  }
+
+  .menu-overflow {
+    display: none;
   }
 }

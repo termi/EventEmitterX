@@ -2,19 +2,22 @@
 
 import type { createRoot } from 'react-dom/client';
 
+import type { NavigationRouter, currentNavigatorPage$ } from "../state/routing";
+
 type Root = ReturnType<typeof createRoot>;
-type Route = { path: string, action(): JSX.Element };
 
 let isInited = false;
 
 export function initNavigation({
+    navigationSignal$,
     root,
-    routes,
     page404,
+    Render,
 }: {
+    navigationSignal$: typeof currentNavigatorPage$,
     root: Root,
-    routes: Route[],
     page404?: () => JSX.Element,
+    Render: (router: NavigationRouter) => JSX.Element,
 }) {
     if (isInited) {
         throw new Error('Already inited');
@@ -22,19 +25,41 @@ export function initNavigation({
 
     isInited = true;
 
+    navigationSignal$.addListener(newValue => {
+        document.title = newValue.pageTitle;
+
+        onNewPage(newValue.routerPath);
+    });
+
+    const routes = navigationSignal$.data.routersList;
     const page404route = routes.find(routItem => {
-        return routItem.path === '(.*)';
-    }) ?? { path: '(.*)', action: page404 ?? (() => '404') };
+        return routItem.routerPath === '(.*)';
+    }) ?? ({
+        key: '404',
+        position: -1,
+        routerPath: '(.*)',
+        pageTitle: '404',
+        importPath: '',
+        srcPath: '',
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error `TS2322: Type (() => Element) | (() => string) is not assignable to type FC<{}>`
+        Component: page404 ?? (() => '404'),
+    } satisfies NavigationRouter) as NavigationRouter;
 
     const onNewPage = (pageUrl = location.pathname) => {
         const pagePair = pageUrl.split('?');
         const pagePath = pagePair[0];
 
-        const routItem = routes.find(routItem => {
-            return routItem.path === pagePath;
+        const newRout = routes.find(routItem => {
+            return routItem.routerPath === pagePath;
         }) ?? page404route;
+        const currentRout = navigationSignal$.get();
 
-        root.render(routItem.action());
+        if (currentRout !== newRout) {
+            navigationSignal$.set(newRout);
+        }
+
+        root.render(Render(newRout));
     };
 
     const _history_pushState = history.pushState;

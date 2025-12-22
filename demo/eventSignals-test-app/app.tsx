@@ -19,7 +19,7 @@ import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
 import { i18n_componentType, i18nString$$ } from "./state/i18n";
-import { routersList } from './state/routers.prebuild';
+import { currentNavigatorPage$ } from './state/routing';
 
 import SignalAsString1 from "./$components/SignalAsString1";
 import SignalAsString2 from "./$components/SignalAsString2";
@@ -136,31 +136,25 @@ pipPopupContainer.render(<pipPopupWindow$.component sFC={function({ eventSignal 
 }} />);
 
 initNavigation({
+    navigationSignal$: currentNavigatorPage$,
     root: createRoot(document.querySelector('#main'), {
         onRecoverableError(error) {
             console.error('onRecoverableError: #main:', error);
         },
     }),
-    routes: [
-        ...routersList.map(router => {
-            const {
-                metadata,
-                Component,
-                Layout = DefaultLayout,
-            } = router;
-            const pageTitle$ = metadata?.menuItemTitle$/* || router.pageTitle$*/;
-            const pageTitle = metadata?.menuItemTitle || router.pageTitle;
+    Render: (router) => {
+        const {
+            metadata,
+            Component,
+            Layout = DefaultLayout,
+        } = router;
+        const pageTitle$ = metadata?.menuItemTitle$/* || router.pageTitle$*/;
+        const pageTitle = metadata?.menuItemTitle || router.pageTitle;
 
-            return {
-                path: router.routerPath,
-                action() {
-                    return <Layout pageTitle={pageTitle} pageTitle$={pageTitle$}>
-                        <Suspense fallback={i18nString$$('...Загрузка')}>
-                            <Component />
-                        </Suspense>
-                    </Layout>;
-                },
-            };
-        }),
-    ],
+        return <Layout pageTitle={pageTitle} pageTitle$={pageTitle$}>
+            <Suspense fallback={i18nString$$('...Загрузка')}>
+                <Component />
+            </Suspense>
+        </Layout>;
+    },
 });
