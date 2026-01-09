@@ -2,6 +2,7 @@
 
 import type { createRoot } from 'react-dom/client';
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import type { NavigationRouter, currentNavigatorPage$ } from "../state/routing";
 
 type Root = ReturnType<typeof createRoot>;
@@ -26,8 +27,6 @@ export function initNavigation({
     isInited = true;
 
     navigationSignal$.addListener(newValue => {
-        document.title = newValue.pageTitle;
-
         onNewPage(newValue.routerPath);
     });
 
@@ -57,6 +56,37 @@ export function initNavigation({
 
         if (currentRout !== newRout) {
             navigationSignal$.set(newRout);
+
+            const {
+                pageTitle,
+                metadata,
+            } = newRout;
+            const {
+                pageTitle: metadata_pageTitle,
+                darkUnicodeIcon,
+                unicodeIcon: _unicodeIcon,
+                darkStaticIconSrc,
+                staticIconSrc: _staticIconSrc,
+            } = metadata || {};
+
+            if (darkUnicodeIcon || _unicodeIcon || darkStaticIconSrc || _staticIconSrc) {
+                const $favIconLink = document.getElementById('link_favicon') as HTMLLinkElement | null; // eslint-disable-line unicorn/prefer-query-selector
+
+                if ($favIconLink) {
+                    const isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
+                    const unicodeIcon = (isDarkMode ? darkUnicodeIcon : null) ?? _unicodeIcon;
+                    const staticIconSrc = (isDarkMode ? darkStaticIconSrc : null) ?? _staticIconSrc;
+
+                    if (staticIconSrc) {
+                        $favIconLink.href = staticIconSrc;
+                    }
+                    else {
+                        $favIconLink.href = unicodeIconToDataUrl(unicodeIcon);
+                    }
+                }
+            }
+
+            document.title = metadata_pageTitle || pageTitle;
         }
 
         root.render(Render(newRout));
@@ -86,4 +116,28 @@ export function initNavigation({
     });
 
     onNewPage();
+}
+
+let canvas: HTMLCanvasElement | undefined;
+let canvasContext: CanvasRenderingContext2D | undefined;
+const ICON_SIZE = 64;
+const CANVAS_GAP = ICON_SIZE / 4;
+
+function unicodeIconToDataUrl(unicodeIcon: string) {
+    if (unicodeIcon.length > 6) {
+        // Support only emoji up to 6 chars.
+        unicodeIcon = unicodeIcon.substring(0, 6);
+    }
+
+    canvas ??= document.createElement("canvas");
+
+    canvas.height = ICON_SIZE + CANVAS_GAP;
+    canvas.width = ICON_SIZE + CANVAS_GAP;
+
+    canvasContext ??= canvas.getContext("2d");
+
+    canvasContext.font = `${ICON_SIZE}px monospace, serif`;
+    canvasContext.fillText(unicodeIcon, 0, ICON_SIZE);
+
+    return canvas.toDataURL();
 }

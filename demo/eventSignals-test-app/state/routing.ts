@@ -4,7 +4,7 @@ import type * as React from "react";
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-import { routersList, router404 } from './routers.prebuild';
+import { routersList, routerEmptyObject } from './routers.prebuild';
 
 export type NavigationRouter = {
     key: string,
@@ -18,12 +18,18 @@ export type NavigationRouter = {
     metadata?: {
         menuItemTitle: string,
         menuItemTitle$: EventSignal<string>,
+        pageTitle: string,
+        darkUnicodeIcon?: string,
+        unicodeIcon?: string,
+        darkStaticIconSrc?: string,
+        staticIconSrc?: string,
     },
     Component: React.FC,
     Layout?: React.FC,
 };
 
-export const currentNavigatorPage$ = new EventSignal(router404, {
+export const currentNavigatorPage$ = new EventSignal(routerEmptyObject, {
+    description: 'currentNavigatorPage',
     data: {
         routersList,
     },
