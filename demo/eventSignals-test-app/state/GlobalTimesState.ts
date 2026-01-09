@@ -95,7 +95,6 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
         const nowDate = nowDate$.get();
         const timeInfo = formatLocalTime(rawCityDescription, nowDate);
 
-        rawCityDescription.flag ||= rawCityDescription.localeInfo.flag;
         timeOfDay = timeInfo.timeOfDay;
 
         const country = regionNames.getByRegionCodeSafe(rawCityDescription.localeInfo.region) || rawCityDescription.country;
@@ -109,7 +108,6 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
             date: timeInfo.date,
             time: timeInfo.time,
             timeZoneName: timeInfo.timeZoneName,
-            isCurrentOffset: timeInfo.isCurrentOffset,
             __proto__: null,
         };
 
@@ -125,21 +123,20 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
                 }
 
                 // Удаляем старую анимацию, если существует
-                if (canvasAnimations.has($canvas)) {
-                    canvasAnimations.get($canvas).destroy();
-                }
+                canvasAnimations.get($canvas)?.destructor();
 
                 // Создаем новую анимацию
-                const animation = new TimeCanvas($canvas, timeOfDay);
+                const animation = new TimeCanvas($canvas, timeOfDay, {
+                    elementsObserverManager,
+                });
 
                 canvasAnimations.set($canvas, animation);
-
                 cityTime$.addListener(animation.updateTimeOfDayFromObject);
 
                 return () => {
-                    cityTime$.removeListener(animation.updateTimeOfDayFromObject);
-                    canvasAnimations.get($canvas)?.destroy();
                     canvasAnimations.delete($canvas);
+                    animation.destructor();
+                    cityTime$.removeListener(animation.updateTimeOfDayFromObject);
                 };
             },
         },
@@ -160,7 +157,6 @@ type CityDescription = RawCityDescription & {
     time: string,
     date: string,
     timeZoneName: string,
-    isCurrentOffset?: boolean,
     __proto__: null,
 };
 
@@ -168,9 +164,11 @@ type RawCityDescription = {
     name: string,
     country: string,
     timeZone: string,
+    timeZoneOffset: number,
     locale: string,
     flag: string,
     isCapital?: boolean,
+    isCurrentOffset: boolean,
     localeInfo: ReturnType<typeof getLocaleInfo>,
     h23localTimeFormatOptions: Intl.DateTimeFormatOptions,
     timeFormatOptions: Intl.DateTimeFormatOptions,
@@ -180,23 +178,6 @@ type RawCityDescription = {
 const _formattersCacheMap = new Map<string, Intl.DateTimeFormat>();
 
 function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now())) {
-    // const timeFormatter = new Intl.DateTimeFormat(city.locale, {
-    //     timeZone: city.timeZone,
-    //     // hour: '2-digit',
-    //     // minute: '2-digit',
-    //     // second: '2-digit',
-    //     // hour12: false,
-    // });
-    // timeFormatter.format(nowDate);
-    // const dateFormatter = new Intl.DateTimeFormat(city.locale, {
-    //     timeZone: city.timeZone,
-    //     // weekday: 'long',
-    //     // year: 'numeric',
-    //     // month: 'long',
-    //     // day: 'numeric',
-    // });
-    // dateFormatter.format(nowDate);
-
     const {
         locale,
         timeZone,
@@ -231,30 +212,12 @@ function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now()
         : '🕐'
     ;
 
-    const enUSIimeZoneFormatter = _formattersCacheMap.getOrInsertComputed(`en-US-${timeZone}`, () => {
-        return new Intl.DateTimeFormat('en-US', {
-            timeZone,
-            timeZoneName: 'longOffset',
-        });
-    });
-    const enUSTimeZoneParts = enUSIimeZoneFormatter.formatToParts(nowDate);
-    const enUSTimeZoneName = enUSTimeZoneParts.find(part => part.type === 'timeZoneName')?.value;
-    let isCurrentOffset = false;
-
-    if (enUSTimeZoneName) {
-        const offset = _parseHoursMinutesStringToOffset(enUSTimeZoneName);
-
-        isCurrentOffset = offset === currentTimeZoneOffset;
-    }
-
     return {
         time,
         date,
         timeOfDay,
         dayLightSign,
         timeZoneName,
-        isCurrentOffset,
-        formatted: `${time}`,
         __proto__: null,
     };
 }
@@ -268,9 +231,13 @@ function _parseHoursMinutesStringToOffset(timeZoneHoursMinutesString: string) {
         return Number.NaN;
     }
 
-    let _string = String(timeZoneHoursMinutesString).trim();
+    let _string = String(timeZoneHoursMinutesString).trim().toUpperCase();
 
     if (_string.startsWith('GMT') || _string.startsWith('UTC')) {
+        if (_string === 'GMT' || _string === 'UTC') {
+            return 0;
+        }
+
         // todo: Есть какая-то разница ТУТ между 'GMT' и 'UTC'?
         _string = _string.substring(3);
     }
@@ -450,26 +417,14 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
             locale: "bo-CN",
             flag: "",
         },
-    ] as RawCityDescription[]).map(cityDescription => {
-        const localeInfo = getLocaleInfo(cityDescription.locale, true);
-
-        if (cityDescription.name === localeInfo.capital) {
-            cityDescription.isCapital = true;
-        }
-
-        cityDescription.localeInfo = localeInfo;
-
-        const { timeZone } = cityDescription;
-        const f1 = cityDescription.h23localTimeFormatOptions = { timeZone, timeStyle: 'short', hour12: false };
-        const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem };
-        const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem };
-
-        Object.freeze(Object.setPrototypeOf(f1, null));
-        Object.freeze(Object.setPrototypeOf(f2, null));
-        Object.freeze(Object.setPrototypeOf(f3, null));
-
-        return cityDescription;
-    });
+        {
+            name: "",
+            country: "",
+            timeZone: "",
+            locale: "ko-KP",
+            flag: "",
+        },
+    ] as RawCityDescription[]);
 
     if (!mostPopularCities.some(cityDescription => {
         return cityDescription.locale === currentLocale;
@@ -485,6 +440,20 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
             isCapital: true,
             localeInfo,
         } as RawCityDescription;
+
+        mostPopularCities.push(cityDescription);
+    }
+
+    for (const cityDescription of mostPopularCities) {
+        const localeInfo = getLocaleInfo(cityDescription.locale, true);
+
+        cityDescription.localeInfo = localeInfo;
+        cityDescription.name ||= localeInfo.capital;
+        cityDescription.timeZone ||= localeInfo.defaultTimezone;
+        cityDescription.flag ||= localeInfo.flag;
+        cityDescription.isCapital ??= cityDescription.name === localeInfo.capital;
+
+        const { timeZone } = cityDescription;
         const f1 = cityDescription.h23localTimeFormatOptions = { timeZone, timeStyle: 'short', hour12: false };
         const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem };
         const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem };
@@ -493,15 +462,23 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
         Object.freeze(Object.setPrototypeOf(f2, null));
         Object.freeze(Object.setPrototypeOf(f3, null));
 
-        mostPopularCities.push(cityDescription);
+        const enUSIimeZoneFormatter = _formattersCacheMap.getOrInsertComputed(`en-US-${timeZone}`, () => {
+            return new Intl.DateTimeFormat('en-US', {
+                timeZone,
+                timeZoneName: 'longOffset',
+            });
+        });
+        const enUSTimeZoneParts = enUSIimeZoneFormatter.formatToParts(date);
+        const enUSTimeZoneName = enUSTimeZoneParts.find(part => part.type === 'timeZoneName')?.value;
+        const timeZoneOffset = _parseHoursMinutesStringToOffset(enUSTimeZoneName);
+
+        cityDescription.timeZoneOffset = timeZoneOffset;
+        cityDescription.isCurrentOffset = timeZoneOffset === currentTimeZoneOffset;
     }
 
     // Сортируем города по часовому поясу (по UTC смещению)
     return mostPopularCities.sort((a, b) => {
-        const timeA = date.toLocaleString('en-US', { timeZone: a.timeZone });
-        const timeB = date.toLocaleString('en-US', { timeZone: b.timeZone });
-
-        return new Date(timeA).getTime() - new Date(timeB).getTime();
+        return b.timeZoneOffset - a.timeZoneOffset;
     });
 }
 
@@ -520,27 +497,57 @@ class TimeCanvas {
         __proto__: null,
     }[] = [];
     animationId = 0;
-    resizeObserver: ResizeObserver | null;
+    _resizeObserver: ResizeObserver | null = null;
+    _unobserveElement: (() => void) | undefined;
+    /** A throttle version of {@link this.resizeCanvas} */
     _resizeCanvas: () => void;
+    /*
+    _wasFirstDraw = false;
+    */
+    _isDestroyed = false;
 
-    constructor(canvas: HTMLCanvasElement, timeOfDay: TimeOfDay) {
+    constructor(canvas: HTMLCanvasElement, timeOfDay: TimeOfDay, options?: {
+        elementsObserverManager: HTMLElementsObserverManager,
+    }) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
         this.timeOfDay = timeOfDay;
-        this.resizeObserver = null;
+        this._resizeObserver = null;
         this._resizeCanvas = throttle(this.resizeCanvas, 300, this);
 
-        this.init();
+        this.init(options?.elementsObserverManager);
     }
 
-    init() {
+    destructor() {
+        this._isDestroyed = true;
+
+        this.stopAnimation();
+
+        this._resizeObserver?.disconnect();
+        this._resizeObserver = null;
+        this._unobserveElement?.();
+        this._unobserveElement = void 0;
+    }
+
+    [Symbol.dispose] = () => {
+        this.destructor();
+    };
+
+    init(elementsObserverManager: HTMLElementsObserverManager | undefined) {
         this.resizeCanvas();
         this.createParticles();
         this.startAnimation();
 
-        // Обработчик изменения размера
-        this.resizeObserver = new ResizeObserver(this._resizeCanvas);
-        this.resizeObserver.observe(this.canvas.parentElement);
+        const { parentElement } = this.canvas;
+
+        if (typeof ResizeObserver !== 'undefined') {
+            // Обработчик изменения размера
+            const resizeObserver = this._resizeObserver = new ResizeObserver(this._resizeCanvas);
+
+            resizeObserver.observe(parentElement);
+        }
+
+        this._unobserveElement = elementsObserverManager?.observeElement(parentElement, this.onVisibilityChanges);
     }
 
     resizeCanvas() {
@@ -573,6 +580,10 @@ class TimeCanvas {
     }
 
     draw() {
+        /*
+        this._wasFirstDraw = true;
+
+        */
         const { ctx, canvas, timeOfDay } = this;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -650,6 +661,12 @@ class TimeCanvas {
     }
 
     startAnimation() {
+        if (this._isDestroyed) {
+            return;
+        }
+
+        this.stopAnimation();
+
         const animate = () => {
             this.draw();
             this.animationId = requestAnimationFrame(animate);
@@ -657,6 +674,32 @@ class TimeCanvas {
 
         animate();
     }
+
+    stopAnimation() {
+        if (this.animationId) {
+            cancelAnimationFrame(this.animationId);
+            this.animationId = 0;
+        }
+    }
+
+    onVisibilityChanges = (entry: IntersectionObserverEntry) => {
+        if (entry.isIntersecting) {
+            if (!this.animationId) {
+                this.startAnimation();
+            }
+        }
+        else {
+            if (this.animationId) {
+                this.stopAnimation();
+            }
+            /*
+
+            if (!this._wasFirstDraw) {
+                this.draw();
+            }
+            */
+        }
+    };
 
     updateTimeOfDayFromObject = (obj: { timeOfDay: TimeOfDay }) => {
         this.updateTimeOfDay(obj.timeOfDay);
@@ -667,25 +710,133 @@ class TimeCanvas {
             this.timeOfDay = timeOfDay;
         }
     }
-
-    destroy() {
-        if (this.animationId) {
-            cancelAnimationFrame(this.animationId);
-            this.animationId = 0;
-        }
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
-    }
 }
 
 // Хранилище canvas анимаций
 const canvasAnimations = new Map<HTMLCanvasElement, TimeCanvas>();
 
+type _IntersectionObserver = IntersectionObserver & { elements: Set<Element> };
+
+class HTMLElementsObserverManager {
+    observersByRoot = new Map<HTMLElement, _IntersectionObserver>();
+    visibilityChanges = new Map<Element, (entry: IntersectionObserverEntry) => void>();
+
+    constructor() {
+        //
+    }
+
+    destructor() {
+        this.disconnectAll();
+    }
+
+    [Symbol.dispose] = () => {
+        this.destructor();
+    };
+
+    observeElement(element: HTMLElement, onVisibilityChanges: (entry: IntersectionObserverEntry) => void, container: HTMLElement | null = null) {
+        if (!element || typeof IntersectionObserver === 'undefined') {
+            return () => {};
+        }
+
+        const root = container || document.documentElement;
+        let observer = this.observersByRoot.get(root);
+
+        if (!observer) {
+            observer = new IntersectionObserver(
+                this.handleCanvasVisibility,
+                {
+                    root: root === document.documentElement ? void 0 : root,
+                    // // Срабатываем при 10% видимости
+                    // threshold: 0.1,
+                    // // Начинаем заранее для плавности
+                    // rootMargin: '50px',
+
+                    // Срабатываем при 90% видимости для очевидности работы
+                    threshold: 0.9,
+                },
+            ) as _IntersectionObserver;
+            this.observersByRoot.set(root, observer);
+
+            observer.elements = new Set<Element>();
+        }
+
+        this.visibilityChanges.set(element, onVisibilityChanges);
+        observer.observe(element);
+        observer.elements.add(element);
+
+        // cleanupElement
+        return () => {
+            this.visibilityChanges.delete(element);
+            observer.unobserve(element);
+            observer.elements.delete(element);
+
+            if (observer.elements.size === 0) {
+                this.cleanupObserver(root, observer);
+            }
+        };
+    }
+
+    handleCanvasVisibility = (entries: IntersectionObserverEntry[]) => {
+        const { visibilityChanges } = this;
+
+        for (const entry of entries) {
+            visibilityChanges.get(entry.target)?.(entry);
+        }
+    };
+
+    cleanupObserver(container: HTMLElement, observer: _IntersectionObserver) {
+        const { observersByRoot, visibilityChanges } = this;
+
+        observer.disconnect();
+        observersByRoot.delete(container);
+
+        if (observer.elements?.size) {
+            for (const element of observer.elements) {
+                visibilityChanges.delete(element);
+            }
+
+            observer.elements.clear();
+        }
+    }
+
+    // Явная очистка при удалении контейнера
+    cleanupContainer(container: HTMLElement) {
+        const { observersByRoot } = this;
+        const observer = observersByRoot.get(container);
+
+        if (observer) {
+            this.cleanupObserver(container, observer);
+        }
+    }
+
+    // Автоматическая очистка всех
+    disconnectAll() {
+        const { observersByRoot, visibilityChanges } = this;
+
+        for (const { 1: observer } of observersByRoot) {
+            if (observer) {
+                observer.disconnect();
+                observer.elements?.clear();
+            }
+        }
+
+        observersByRoot.clear();
+        visibilityChanges.clear();
+    }
+}
+
+const elementsObserverManager = new HTMLElementsObserverManager();
+
+// // При монтировании canvas
+// const unobserve = elementsObserverManager.observeElement(canvas, scrollContainer);
+//
+// // При размонтировании контейнера
+// elementsObserverManager.cleanupContainer(scrollContainer);
+
 Object.assign(globalThis, {
     __test__canvasAnimations: canvasAnimations,
     __test__nowTime$: nowDate$,
+    __test__elementsObserverManager: elementsObserverManager,
 });
 
 // https://www.w3schools.com/charsets/ref_utf_misc_symbols.asp
