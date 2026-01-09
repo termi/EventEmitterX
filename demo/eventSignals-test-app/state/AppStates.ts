@@ -206,6 +206,29 @@ export type JsonPlaceholderUserDTO = {
     },
 };
 
+const emptyJsonPlaceholderUserDTO: JsonPlaceholderUserDTO = {
+    id: 0,
+    name: '',
+    username: '',
+    email: '',
+    address: {
+        street: '',
+        suite: '',
+        city: '',
+        zipcode: '',
+        geo: {
+            lat: '',
+            lng: '',
+        },
+    },
+    phone: '',
+    website: '',
+    company: {
+        name: '',
+        catchPhrase: '',
+        bs: '',
+    },
+};
 const jsonPlaceholderUserComponentType = 'jsonPlaceholderUserComponentType';
 
 const _placeholderUserEventSignalCache: Record<number, ReturnType<typeof _makePlaceholderUserEventSignal>> = Object.create(null);
@@ -217,22 +240,26 @@ export function clearPlaceholderUserEventSignalCache() {
 }
 
 export function makePlaceholderUserEventSignal(id: number, eventSignal?: EventSignal<number, any, any>) {
-    return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(id, eventSignal);
+    return _placeholderUserEventSignalCache[id] ??= _makePlaceholderUserEventSignal(eventSignal?.get() ?? id, eventSignal);
 }
 
+export type PlaceholderUser$ = ReturnType<typeof makePlaceholderUserEventSignal>;
+
+// todo: rename to _makePlaceholderUser$$
 function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: EventSignal<number>) {
     // todo: Перенести этот пример EventSignal в тесты EventSignal_spec.ts
-    return new EventSignal<Promise<number>, number, {
-        currentUserId?: number,
-        userDTO?: JsonPlaceholderUserDTO,
-        abortController?: AbortController,
-    }>(id, async (prevUserId, sourceUserId, eventSignal) => {
+    return new EventSignal(id as unknown as Promise<number>, async (prevUserId, sourceUserId, eventSignal) => {
         // Нужно безусловно вызывать `eventSignalSourceId?.get()`, чтобы сработали подписки на зависимость
         const _newUserId = eventSignalSourceId?.get();
         const newUserid = ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0 ? sourceUserId : null)
             ?? _newUserId
             ?? prevUserId
         ;
+
+        if (prevUserId != null && newUserid === prevUserId && newUserid === eventSignal.getSourceValue()) {
+            // Уже нужный пользователь
+            return void 0;
+        }
 
         // Синхронизируем sourceValue с актуальным значением
         eventSignal.set(newUserid);
@@ -243,7 +270,7 @@ function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: Event
         // }
 
         eventSignal.data.currentUserId = newUserid;
-        eventSignal.data.abortController?.abort(new Error(`request new userId=${newUserid}`));
+        eventSignal.data.abortController.abort(new Error(`request new userId=${newUserid}`));
 
         const abortController = new AbortController();
 
@@ -270,6 +297,8 @@ function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: Event
             throw new Error(`User not found with userId=${newUserid}`);
         }
 
+        assertIsJsonPlaceholderUserDTO(newUserDTO);
+
         // eslint-disable-next-line @typescript-eslint/no-magic-numbers
         if (newUserid === 9) {
             newUserDTO["invalidProp"]["invalidProp"] = 'this will cause error';
@@ -280,13 +309,22 @@ function _makePlaceholderUserEventSignal(id: number, eventSignalSourceId?: Event
 
         return newUserid;
     }, {
+        description: 'PlaceholderUser',
         componentType: jsonPlaceholderUserComponentType,
-        data: {},
+        initialSourceValue: void 0 as number | undefined,
+        data: {
+            currentUserId: 0,
+            userDTO: emptyJsonPlaceholderUserDTO,
+            abortController: new AbortController(),
+            type: void 0 as ('card' | 'mini-card' | 'raw-table' | 'table' | undefined),
+        },
     });
 }
 
-const jsonPlaceholderUser1$ = Object.assign(makePlaceholderUserEventSignal(counter1$.get(), counter1$), {
+let temp: ReturnType<typeof makePlaceholderUserEventSignal>;
+const jsonPlaceholderUser1$ = Object.assign(temp = makePlaceholderUserEventSignal(-1, counter1$), {
     data: {
+        ...temp.data,
         getNextUser: Object.assign(() => {
             return jsonPlaceholderUser1$.set((_, currentUserId) => {
                 return ++currentUserId;
@@ -296,6 +334,20 @@ const jsonPlaceholderUser1$ = Object.assign(makePlaceholderUserEventSignal(count
         }),
     },
 });
+
+function isJsonPlaceholderUserDTO(maybeUserDTO: JsonPlaceholderUserDTO | unknown): maybeUserDTO is JsonPlaceholderUserDTO {
+    return !!maybeUserDTO
+        && typeof (maybeUserDTO as JsonPlaceholderUserDTO).id === 'number'
+        && typeof (maybeUserDTO as JsonPlaceholderUserDTO).name === 'string'
+        && typeof (maybeUserDTO as JsonPlaceholderUserDTO).username === 'string'
+    ;
+}
+
+function assertIsJsonPlaceholderUserDTO(maybeUserDTO: JsonPlaceholderUserDTO | unknown): asserts maybeUserDTO is JsonPlaceholderUserDTO {
+    if (!isJsonPlaceholderUserDTO(maybeUserDTO)) {
+        throw new TypeError('Object should be equal to JsonPlaceholderUserDTO');
+    }
+}
 
 export type JsonPlaceholderUser1$ = typeof jsonPlaceholderUser1$;
 
