@@ -42,8 +42,11 @@ if (has_localStorage) {
     }
 }
 
-if (force_isFlagEmojisSupported === void 0 || force_isFlagEmojisSupported === false) {
-    const isPolyfillApplied = polyfillCountryFlagEmojis(void 0, twemojiCountryFlags_filepath);
+if (force_isFlagEmojisSupported === false) {
+    _documentHeadInsertFlagsEmojiFont("Twemoji Country Flags", twemojiCountryFlags_filepath);
+}
+else if (force_isFlagEmojisSupported === void 0) {
+    const isPolyfillApplied = polyfillCountryFlagEmojis("Twemoji Country Flags", twemojiCountryFlags_filepath);
 
     if (has_localStorage) {
         const flagEmojisSupportedInfo: FlagEmojisSupportedInfo = {
@@ -52,5 +55,20 @@ if (force_isFlagEmojisSupported === void 0 || force_isFlagEmojisSupported === fa
         };
 
         localStorage.setItem('supported.emoji.unicodeFlags', JSON.stringify(flagEmojisSupportedInfo));
+    }
+}
+
+function _documentHeadInsertFlagsEmojiFont(fontFamilyName: string, fontSrc: string) {
+    if (typeof document !== "undefined" && document.head) {
+        const $style = document.createElement("style");
+
+        $style.textContent = `@font-face {
+  font-family: "${fontFamilyName}";
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+  src: url('${fontSrc}') format('woff2');
+  font-display: swap;
+}`;
+
+        document.head.append($style);
     }
 }

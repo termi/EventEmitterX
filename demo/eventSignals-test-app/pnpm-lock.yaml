@@ -1,10 +1,11 @@
 lockfileVersion: 5.3
 
 overrides:
-  jasmine-console-reporter: npm:noop3@1000.0.0
+  world-countries-capitals>jasmine-console-reporter: npm:noop3@1000.0.0
   react-error-boundary>@babel/runtime: npm:noop3@1000.0.0
 
 specifiers:
+  '@oddbird/popover-polyfill': ^0.6.1
   '@vitejs/plugin-react': ^5.1.2
   countries-and-timezones: ^3.8.0
   country-flag-emoji-polyfill: ^0.1.8
@@ -15,6 +16,7 @@ specifiers:
   world-countries-capitals: ^3.4.0
 
 dependencies:
+  '@oddbird/popover-polyfill': 0.6.1
   country-flag-emoji-polyfill: 0.1.8
   react: 19.1.0
   react-dom: 19.1.0_react@19.1.0
@@ -233,6 +235,10 @@ packages:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
     dev: true
+
+  /@oddbird/popover-polyfill/0.6.1:
+    resolution: {integrity: sha512-Papau51NPG+NajXvoEHCNT1CBJv4WIyvIGfH5gpJPLL8MZJt/4giC0jJ/mNZRtJmdzRuXWpUFB6QxkJa1RvMAQ==}
+    dev: false
 
   /@rolldown/pluginutils/1.0.0-beta.53:
     resolution: {integrity: sha512-vENRlFU4YbrwVqNDZ7fLvy+JR1CRkyr01jhSiDpE1u6py3OMzQfztQU2jxykW3ALNxO4kSlqIDeYyD0Y9RcQeQ==}
