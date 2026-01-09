@@ -26,7 +26,7 @@ const NavBar = memo(function NavBar() {
     const currentPageRouter = currentNavigatorPage$.use();
     const { routersList } = currentNavigatorPage$.data;
 
-    return (<div className={css.navContainer}>
+    return (<div className={css.navContainer} role="navigation" aria-label="Main" aria-haspopup="true">
         <ul className={css.navMenu}>
             {routersList.map(router => {
                 if (router.menuHidden) {
@@ -70,7 +70,10 @@ function MenuItem({ className, linkClassName, router, currentPageRouter }: {
         })}
     </div> : null;
 
-    return <li key={routerPath} className={`${css.navItem} ${isCurrent ? css.navItemActive : ''} ${className || ''}`}>
+    return <li
+        key={routerPath}
+        className={`${css.navItem} ${isCurrent ? css.navItemActive : ''} ${className || ''}`}
+    >
         <a href={routerPath} onClick={$submenu ? null : handleClick} className={`${css.navLink} ${linkClassName || ''}`}>
             {menuItemTitle$}
             {$submenu}

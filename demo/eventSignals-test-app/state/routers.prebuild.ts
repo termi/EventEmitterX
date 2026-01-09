@@ -15,8 +15,21 @@ const router404: NavigationRouter = {
         return null;
     },
 };
+/** The initial value. */
+const routerEmptyObject: NavigationRouter = {
+    key: '',
+    position: -1000, // eslint-disable-line @typescript-eslint/no-magic-numbers
+    pageTitle: '',
+    srcPath: '',
+    routerPath: '',
+    importPath: '',
+    menuHidden: true,
+    Component() {
+        return null;
+    },
+};
 
-export { routersList, router404 };
+export { routersList, router404, routerEmptyObject };
 
 export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: string, thisFilepath: string }) {
     const path = require('node:path') as typeof import('node:path');
@@ -95,6 +108,7 @@ export async function onBuild({ projectRoot, thisFilepath }: { projectRoot: stri
 
     // Небольшой костыль, пока не придумал как сделать лучше
     if (specialPages[page404]) {
+        /** Reassignment {@link router404} */
         reassignmentVariables["router404"] = `routersList.find(router => router.key === '${specialPages[page404].key}')`;
     }
 
