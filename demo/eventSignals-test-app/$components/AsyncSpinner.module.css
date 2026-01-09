@@ -24,6 +24,8 @@
   max-height: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: #a60a0a;
+  font-weight: bolder;
 }
 
 @keyframes AsyncSpinnerLoader_rotation {

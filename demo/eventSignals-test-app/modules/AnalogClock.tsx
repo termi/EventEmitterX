@@ -6,7 +6,11 @@ import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-export default function AnalogClock({ eventSignal, onManualTime, onResetClick }: {
+const AnalogClockM = React.memo(AnalogClock);
+
+export default AnalogClockM;
+
+function AnalogClock({ eventSignal, onManualTime, onResetClick }: {
     eventSignal: EventSignal<Date, Date | number | null, unknown>,
     onManualTime?: AnalogClockCanvas["_onManualTime"],
     onResetClick?: React.MouseEventHandler<any>,

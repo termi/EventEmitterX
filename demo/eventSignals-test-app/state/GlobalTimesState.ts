@@ -20,6 +20,7 @@ export const mostPopularCities$ = new EventSignal(
             return _makeCityTime$$(cityDescription);
         });
     }, {
+        description: 'mostPopularCities',
         componentType: componentTypeGlobalTimesList,
         data: {
             elementsComponentType: componentTypeGlobalTimesCity,
@@ -45,6 +46,7 @@ export const nowDate$ = new EventSignal(new Date(), (prevNow, customNow, eventSi
         : Date.now()
     );
 }, {
+    description: 'nowDate',
     initialSourceValue: null as Date | number | null,
     data: {
         reset: () => {
@@ -113,6 +115,7 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
 
         return cityDescription;
     }, {
+        description: `cityTime#${cityDescription.name}`,
         initialSourceValue: cityDescription,
         componentType: componentTypeGlobalTimesCity,
         data: {

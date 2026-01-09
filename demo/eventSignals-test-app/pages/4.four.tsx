@@ -30,7 +30,7 @@ export default function PageFour() {
                 onClick={widgetsList$.data.clearCache}
             >clearCache</button>
         </fieldset>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: '20px' }}>
             <widgetsList$.component context={{
                 //todo: Как оно могло бы быть
                 // onWidgetDelete(id) {

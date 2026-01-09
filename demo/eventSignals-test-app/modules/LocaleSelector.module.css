@@ -89,6 +89,9 @@
     z-index: 10000;
     top: 100%;
     right: 0;
+    max-height: 90vh;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 2px;
     margin-top: 8px;
     background-color: white;
@@ -102,8 +105,17 @@
     /** Allow transition for 'display' see https://stackoverflow.com/a/78304935/1587897 */
     transition-behavior: allow-discrete;
     border: 1px solid #e0e0e0;
-    overflow: hidden;
     pointer-events: none;
+
+  }
+
+  .w-language:focus-within .language-dropdown {
+    opacity: 1;
+    visibility: visible;
+    display: block;
+    transform: translateY(0);
+    transition: all 1s ease;
+    pointer-events: auto;
 
     /* rules are to be set as beginning-state for transitioning
      from "display:none" to a visible display:
@@ -115,18 +127,8 @@
         display: block;
         transform: translateY(-10px);
         opacity: 0;
-        padding: 0;
       }
     }
-  }
-
-  .w-language:focus-within .language-dropdown {
-    opacity: 1;
-    visibility: visible;
-    display: block;
-    transform: translateY(0);
-    transition: all 1s ease;
-    pointer-events: auto;
   }
 
   .language--option:last-child {

@@ -2,9 +2,9 @@
 
 import type { CSSProperties } from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
-
 import * as React from "react";
+
+import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
 import type { mainState } from "../state/AppStates";
 
@@ -22,7 +22,7 @@ export default function Counter({ eventSignal, classes = {}, style, title = even
         incrementButton?: string,
     },
     style?: CSSProperties,
-    title?: EventSignal<string, string> | string,
+    title?: EventSignal<string, unknown, unknown> | string,
 }) {
     console.log('render', String(title));
 

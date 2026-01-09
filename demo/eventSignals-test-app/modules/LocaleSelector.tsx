@@ -19,7 +19,7 @@ export function LocaleSelector({ eventSignal }: { eventSignal: typeof currentLoc
         flag,
     } = data.localInfo;
 
-    return (<div className={css.languageSelector}>
+    return (<div className={css.languageSelector} role="menubar" aria-haspopup="true">
         <div className={css.wLanguage}>
             <LanguageCard
                 locale={currentLocale}
@@ -58,10 +58,10 @@ function LanguageCard({ locale, onClick, flag, currentLocale, otherLocale, isSel
     isCurrent?: boolean,
 }) {
     return (<button
+        role="menuitem"
         data-locale={locale}
         onClick={isSelected ? null : onClick}
         onBlur={onBlurFix}
-        tabIndex={isSelected ? 0 : void 0}
         className={`${css.language} ${
             isCurrent ? css.languageCurrent : css.languageOption
         } ${
