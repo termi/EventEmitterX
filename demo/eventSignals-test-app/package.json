@@ -16,6 +16,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@oddbird/popover-polyfill": "^0.6.1",
     "country-flag-emoji-polyfill": "^0.1.8",
     "react": "19.1.0",
     "react-dom": "19.1.0",
