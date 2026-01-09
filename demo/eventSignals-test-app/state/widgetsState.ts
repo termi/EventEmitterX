@@ -88,6 +88,7 @@ export const widgetsList$ = new EventSignal<(ReturnType<typeof makePlaceholderUs
 
     return idsList.map(id => makePlaceholderUserEventSignal(id));
 }, {
+    description: 'widgetsList',
     data: _$widgetsList_data,
     initialSourceValue: [],
     finaleSourceValue: [],

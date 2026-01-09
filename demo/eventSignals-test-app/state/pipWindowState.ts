@@ -124,6 +124,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
         onClose?.(error as Error | string);
     }
 }, {
+    description: 'pipPopupWindow',
     initialSourceValue: null as NewPipWindowOptions | null,
 }), {
     setPopup<P extends Record<string, any>=Record<string, any>>(newValue: NewPipWindowOptions<P> | null | undefined) {

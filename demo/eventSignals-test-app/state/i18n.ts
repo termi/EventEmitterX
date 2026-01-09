@@ -31,6 +31,7 @@ export const currentLocale$ = new EventSignal(currentLocale, (prevValue, newLoca
 
     return newLocale;
 }, {
+    description: 'currentLocale$',
     componentType: Symbol('currentLocale$'),
     data: {
         localInfo: getLocaleInfo(currentLocale),
@@ -248,9 +249,10 @@ function _i18n_computation<T>(_v: string, sourceValue: { template: TemplateStrin
 
 function _create_i18nString$$(string: string) {
     return new EventSignal(string, _i18nString$_computation, {
+        __proto__: null,
+        description: 'i18n.string',
         initialSourceValue: string,
         componentType: i18n_componentType,
-        __proto__: null,
     });
 }
 

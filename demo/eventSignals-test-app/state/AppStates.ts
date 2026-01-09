@@ -100,6 +100,7 @@ const computed2$ = Object.assign(new EventSignal('', () => {
 const countersSum$ = new EventSignal(0, () => {
     return counter1$.get() + counter2$.get();
 }, {
+    description: 'countersSum',
     data: {
         title: i18n$$`Сумма значений`,
     },
@@ -134,6 +135,7 @@ const style: React.CSSProperties = {
 };
 
 const userFirstName$ = new EventSignal('Вася', {
+    description: 'userFirstName',
     data: {
         title: 'First name',
         cssClasses: 'form-input first-name',
@@ -144,6 +146,7 @@ const userFirstName$ = new EventSignal('Вася', {
     },
 });
 const userSecondName$ = new EventSignal('Пупкин', {
+    description: 'userSecondName',
     data: {
         title: 'Second name',
         cssClasses: 'form-input seconds-name',
@@ -174,6 +177,7 @@ const userFullNameObject$ = new EventSignal({
         icon: isNewIcon ? happySymbols_array[randomNumber(0, happySymbols_max)] : prevValue.icon,
     };
 }, {
+    description: 'userFullNameObject',
     componentType: userFullNameComponentType,
     data: { test: 1 },
 });
@@ -318,5 +322,8 @@ export const mainState = {
     jsonPlaceholderUserComponentType,
 };
 
-globalThis.__mainState = mainState;
-globalThis.EventSignal = EventSignal;
+Object.assign(globalThis, {
+    EventSignal,
+    __test__mainState: mainState,
+    __test__placeholderUserEventSignalCache: _placeholderUserEventSignalCache,
+});
