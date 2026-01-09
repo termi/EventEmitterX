@@ -4,13 +4,6 @@
 // @ts-expect-error `TS2732: Cannot find module ../ static/ data/ capitals. json. Consider using --resolveJsonModule to import module with .json extension.`
 import _capitals from '../static/data/capitals.json' assert { type: 'css' };
 
-const capitals = _capitals as {
-    capitalsList: string[],
-    indexByLocale: Record<string, number>,
-    indexByISOv2: Record<string, number>,
-    timezonePrefixesList: string[],
-    capitalTimezonesList: string[],
-};
 const defaultLocale = 'ru-RU';
 /**
  * `65`, `0x41`, `'41'`, `'\u{41}'`, `'\u0041'`
@@ -23,6 +16,17 @@ const unicodeFlagBaseCodePoint = "🇦".codePointAt(0);
 
 const sourceLanguagesForText: Record<string, string> = Object.create(null);
 let _fetchGoogleTranslateApi_currentRequest: Promise<any> | undefined = void 0;
+const capitals = _capitals as {
+    capitalsList: string[],
+    indexByLocale: Record<string, number>,
+    indexByISOv2: Record<string, number>,
+    timezonePrefixesList: string[],
+    capitalTimezonesList: string[],
+};
+
+Object.freeze(Object.setPrototypeOf(capitals.indexByLocale, null));
+Object.freeze(Object.setPrototypeOf(capitals.indexByISOv2, null));
+Object.freeze(Object.setPrototypeOf(capitals, null));
 
 export async function fetchGoogleTranslateApi(text: string, {
     sourceLanguage = sourceLanguagesForText[text] ?? defaultLocale,
@@ -186,23 +190,33 @@ export function saveLocalizationToLocalStorage(text: string, translatedText: str
 
     _localizationFromLocalStorage[text] = translatedText;
 
-    if (_saveTimers[locale]) {
-        clearTimeout(_saveTimers[locale]);
-        delete _saveTimers[locale];
-    }
-
-    _saveTimers[locale] = setTimeout(_saveLocalStorageLocalizations.bind(null, locale), 15_000);
+    _saveTimers[locale] ??= setTimeout(_saveLocalStorageLocalizations.bind(null, locale), 15_000);
 }
 
 function _saveLocalStorageLocalizations(locale?: string) {
     if (locale != null) {
+        if (!locale) {
+            // eslint-disable-next-line no-debugger
+            debugger;
+        }
+
+        if (_saveTimers[locale]) {
+            clearTimeout(_saveTimers[locale]);
+            delete _saveTimers[locale];
+        }
+
         localStorage.setItem(`i18n.LocalizationStore.${locale}`, JSON.stringify(localStorageLocalizationsByLocaleMap.get(locale)));
     }
     else {
         for (const { 0: locale } of localStorageLocalizationsByLocaleMap) {
-            if (locale === void 0) {
+            if (!locale) {
                 // eslint-disable-next-line no-debugger
                 debugger;
+            }
+
+            if (_saveTimers[locale]) {
+                clearTimeout(_saveTimers[locale]);
+                delete _saveTimers[locale];
             }
 
             localStorage.setItem(`i18n.LocalizationStore.${locale}`, JSON.stringify(localStorageLocalizationsByLocaleMap.get(locale)));
@@ -716,6 +730,11 @@ const numericSystemByLocale_regionOverrides = {
     'IN-AS': 'beng',    // Assam
     'IN-ML': 'beng',    // Meghalaya (mostly, though English dominant)
 };
+
+Object.freeze(Object.setPrototypeOf(numericSystemByLocale, null));
+Object.freeze(Object.setPrototypeOf(numericSystemByLocale_scriptOverrides, null));
+Object.freeze(Object.setPrototypeOf(numericSystemByLocale_regionOverrides, null));
+
 const arabicRegions = new Set([ 'SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'IQ', 'SY', 'JO', 'LB', 'PS', 'SD', 'MA', 'DZ', 'TN', 'LY', 'MR', 'DJ', 'SO' ]);
 const cyrillicRegions = new Set([ 'RU', 'BY', 'UA', 'KZ', 'KG', 'MD', 'RS', 'ME', 'BA', 'MK', 'BG' ]);
 
