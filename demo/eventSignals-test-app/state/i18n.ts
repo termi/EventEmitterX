@@ -4,7 +4,7 @@
 import {} from 'cftools/ts_types/index';
 import type { MouseEventHandler } from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal, isEventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import {
     getDefaultLocale,
     getCurrentLocale,
@@ -73,7 +73,7 @@ EventSignal.registerReactComponentForComponentType(i18n_componentType, function 
     return i18nString$$('...Загрузка');
 }, 'pending');
 
-const i18nStringCache = new Map<string, EventSignal<string, any>>();
+const i18nStringCache = new Map<string, ReturnType<typeof _create_i18nString$$>>();
 const translations = Object.assign(new Map() as Map<string, Map<string, string>>, {
     createValue() {
         return new Map<string, string>();
@@ -87,7 +87,20 @@ export function i18n<T>(template: TemplateStringsArray, ...values: T[]) {
         return i18nString(template[0]);
     }
 
-    return _i18n_computation<T>('', { template, values, __proto__: null });
+    const result = _i18n_computation<T>('', { template, values, __proto__: null });
+
+    // _i18nString$_computation МОЖЕТ (несмотря на типизацию) вернуть Promise.
+    // Но нам нельзя тут возвращать Promise, поэтому возвращаем исходное значение.
+    // Если возвращать Promise, то это будет провоцировать React Suspense механизм.
+    if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') { // eslint-disable-line promise/prefer-await-to-then
+        return (result as unknown as Promise<string> & { "pendingValue": string })["pendingValue"]
+            ?? fulfillTranslationTemplate(template.reduce((string, val, index) => {
+                return `${string}${val}@{${index}}`;
+            }, ''), values)
+        ;
+    }
+
+    return result;
 }
 
 export function i18n$$<T>(template: TemplateStringsArray, ...values: T[]) {
@@ -104,7 +117,16 @@ export function i18n$$<T>(template: TemplateStringsArray, ...values: T[]) {
 }
 
 export function i18nString(string: string) {
-    return _i18nString$_computation('', string);
+    const result = _i18nString$_computation('', string);
+
+    // _i18nString$_computation МОЖЕТ (несмотря на типизацию) вернуть Promise.
+    // Но нам нельзя тут возвращать Promise, поэтому возвращаем исходное значение.
+    // Если возвращать Promise, то это будет провоцировать React Suspense механизм.
+    if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') { // eslint-disable-line promise/prefer-await-to-then
+        return (result as unknown as Promise<string> & { "pendingValue": string })["pendingValue"] ?? string;
+    }
+
+    return result;
 }
 
 export function i18nString$$(string: string) {
@@ -113,6 +135,7 @@ export function i18nString$$(string: string) {
 
 function _create_i18n$$<T>(template: TemplateStringsArray, values: T[]) {
     return new EventSignal('', _i18n_computation, {
+        description: 'i18n.template',
         initialSourceValue: { template, values, __proto__: null },
         componentType: i18n_componentType,
         __proto__: null,
@@ -120,8 +143,8 @@ function _create_i18n$$<T>(template: TemplateStringsArray, values: T[]) {
 }
 
 function fulfillTranslationTemplate<T>(translation: string, values: T[]) {
-    return translation.replace(/@{(\d+)}/g, function(_match, indexString) {
-        const i = indexString | 0;
+    return translation.replace(/@{(\d+)}/g, function(_match, indexString: string) {
+        const i = Number.parseInt(indexString, 10);
 
         return String(values[i] ?? '');
     });
@@ -162,12 +185,12 @@ function _i18n_computation<T>(prevValue: string, sourceValue: { template: Templa
         return result;
     }
 
-    const result = _i18nString$_computation('', templateString, true);
+    const result = _getOrLoadI18NTranslate('', templateString, true);
 
     // eslint-disable-next-line promise/prefer-await-to-then
     if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') {
         /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сигнал текущий сигнал будет подписан. */
-        const temporaryEventSignal = eventSignal ? null : new EventSignal(false);
+        const temporaryEventSignal = eventSignal ? null : new EventSignal(false, { description: 'i18n.-temporary-' });
 
         // eslint-disable-next-line promise/prefer-await-to-then
         const promise = (result as unknown as Promise<string>).then(result => {
@@ -182,7 +205,7 @@ function _i18n_computation<T>(prevValue: string, sourceValue: { template: Templa
         return promise as unknown as string;
     }
 
-    return fulfillTranslationTemplate(result, values);
+    return fulfillTranslationTemplate((result as string), values);
 }
 
 /*
@@ -253,12 +276,20 @@ function _create_i18nString$$(string: string) {
         description: 'i18n.string',
         initialSourceValue: string,
         componentType: i18n_componentType,
+        // data: {
+        //     // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+        //     delay: string === '...Загрузка' ? 30_000 : 0,
+        // },
     });
 }
 
 const _promiseCacheMap = new Map<string, Promise<string>>();
 
-function _i18nString$_computation(prevValue: string, sourceValue: string, eventSignal?: EventSignal<any> | true) {
+function _i18nString$_computation(prevValue: string, sourceValue: string, eventSignal?: EventSignal<string, string, { delay: number } | undefined>) {
+    return _getOrLoadI18NTranslate(prevValue, sourceValue, eventSignal);
+}
+
+function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSignal?: EventSignal<string, string, { delay: number } | undefined> | true) {
     if (!sourceValue) {
         return '';
     }
@@ -303,7 +334,17 @@ function _i18nString$_computation(prevValue: string, sourceValue: string, eventS
                     queueRequests: true,
                 })
                     // eslint-disable-next-line promise/prefer-await-to-then
-                    .then(result => {
+                    .then(async (result) => {
+                        if (isEventSignal<EventSignal<string, string, { delay: number }>>(eventSignal)
+                            && eventSignal.data?.delay
+                        ) {
+                            await new Promise(resolve => {
+                                setTimeout(resolve, eventSignal.data.delay);
+                            });
+
+                            console.log('_getOrLoadI18NTranslate on timeout', eventSignal.data.delay);
+                        }
+
                         const { translatedText } = result;
 
                         resolve(translatedText);
@@ -330,8 +371,9 @@ function _i18nString$_computation(prevValue: string, sourceValue: string, eventS
     if (allowAsync) {
         if (promise) {
             if (allowTemporarySignal) {
+                // todo: Добавлять description только в DEV-режиме
                 /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сигнал текущий сигнал будет подписан. */
-                const temporaryEventSignal = new EventSignal(false);
+                const temporaryEventSignal = new EventSignal(false, { description: 'i18n.-temporary-' });
 
                 void promise.then(() => { // eslint-disable-line promise/prefer-await-to-then
                     temporaryEventSignal.set(true);
@@ -364,6 +406,7 @@ function _getAllowedLocalesList() {
         'it',
         'he',
         'uk',
+        'ko-KP',
     ].map(locale => getLocaleInfo(normalizeLocale(locale)));
 }
 
