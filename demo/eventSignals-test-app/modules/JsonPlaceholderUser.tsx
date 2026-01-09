@@ -2,35 +2,97 @@
 
 import * as React from "react";
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
-import type { JsonPlaceholderUserDTO } from "../state/AppStates";
+
+import type { PlaceholderUser$ } from "../state/AppStates";
+
+import { i18nString$$ } from "../state/i18n";
 
 import css from './JsonPlaceholderUser.module.css';
 
-export default function JsonPlaceholderUser({ eventSignal, componentType, version, textColor, backgroundColor }: {
-    eventSignal: EventSignal<number, any, {
-        userDTO?: JsonPlaceholderUserDTO,
-        abortController?: AbortController,
-    }>,
-    componentType: string,
+export default function JsonPlaceholderUser({ eventSignal, current$Value, version, textColor, backgroundColor }: {
+    // todo: rename to 'current$'?
+    eventSignal: PlaceholderUser$,
+    current$Value: ReturnType<typeof eventSignal.getSync>,
+    // todo: rename to 'current$Version'?
     version: number,
-    textColor: string,
-    backgroundColor: string,
+    textColor?: string,
+    backgroundColor?: string,
 }) {
-    const { userDTO } = eventSignal.data;
+    const { userDTO, type = 'card' } = eventSignal.data;
+    const style = {
+        color: textColor,
+        "--backgroundColor": backgroundColor ? `${backgroundColor}` : void 0,
+    } as React.CSSProperties;
+    const $content = type === 'card'
+        ? UserCard(userDTO)
+        : ObjectToTable(userDTO)
+    ;
 
     return (<div
         className={css.JsonPlaceholderUser}
-        data-user-id={eventSignal.get()}
-        data-componenttype={componentType}
+        data-user-id={current$Value}
+        data-componenttype={eventSignal.componentType}
         data-version={version}
-        style={{ color: textColor, backgroundColor }}
+        style={style}
     >
-        {ObjectToTable({ obj: userDTO })}
+        {$content}
     </div>);
 }
 
-function ObjectToTable({ obj }: { obj: Object }) {
+function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"]) {
+    const {
+        id,
+        name,
+        username,
+        company,
+        address,
+        email,
+        phone,
+        website,
+    } = userDTO;
+    const companyName = company.name;
+    const userCardProps = [
+        { title: i18nString$$('Электронная почта'), key: 'email', value: email, iconClassName: css.miniIconEmail, __proto__: null },
+        { title: i18nString$$('Телефон'), key: 'phone', value: phone, iconClassName: css.miniIconTelephone, __proto__: null },
+        { title: i18nString$$('Веб-сайт'), key: 'website', value: website, iconClassName: css.miniIconWeb, __proto__: null },
+        { title: i18nString$$('Город'), key: 'address.city', value: address.city, iconClassName: css.miniIconCity, __proto__: null },
+        { title: i18nString$$('Улица'), key: 'address.street', value: address.street, iconClassName: css.miniIconStreet, __proto__: null },
+        { title: i18nString$$('Сфера деятельности'), key: 'company.bs', value: company.bs, iconClassName: css.miniIconScope, __proto__: null },
+    ] satisfies {
+        title: EventSignal<string, string, unknown>,
+        iconClassName: string,
+        key: string,
+        value: string,
+        __proto__: null,
+    }[];
+
+    return (<div className={css.miniCardContainer} data-user-id={id}>
+        <div className={css.miniCard}>
+            <div className={css.miniHeader}>
+                <div className={`${css.miniAvatar} ${css.miniAvatarIconUser}`} />
+                <div>
+                    <h3 className={css.miniName}>{name} ({id})</h3>
+                    <p className={css.miniUsername}>{username} • {companyName}</p>
+                </div>
+            </div>
+            <div className={css.miniDetails}>
+                {userCardProps.map(prop => {
+                    return <div className={css.miniInfo} key={prop.key}>
+                        <div className={`${css.miniIcon} ${prop.iconClassName}`} />
+                        <div>
+                            <div style={ { fontSize: '14px', color: '#7f8c8d' } }>{prop.title}</div>
+                            <div>{prop.value}</div>
+                        </div>
+                    </div>;
+                })}
+            </div>
+        </div>
+    </div>);
+}
+
+function ObjectToTable(obj: Object) {
     const keys = Object.keys(obj);
 
     return (<table>
@@ -42,7 +104,7 @@ function ObjectToTable({ obj }: { obj: Object }) {
                 let value = obj[key];
 
                 if (typeof value === 'object' && value) {
-                    value = ObjectToTable({ obj: value });
+                    value = ObjectToTable(value);
                 }
 
                 return <td key={key}>{value}</td>;

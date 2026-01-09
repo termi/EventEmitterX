@@ -1,10 +1,152 @@
 
 .JsonPlaceholderUser {
+  --backgroundColor: white;
+
   table {
+    background: var(--backgroundColor);
     border-spacing: 0;
 
     th, td {
       border: 1px solid gray;
+    }
+  }
+}
+
+/* Мини-карточка */
+.mini-card-container {
+  display: flex;
+  justify-content: center;
+
+  .mini-card {
+    background: var(--backgroundColor);
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    width: 100%;
+    max-width: 500px;
+    transition: transform 0.3s ease;
+  }
+
+  .mini-card:hover {
+    transform: translateY(-5px);
+  }
+
+  .mini-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+  }
+
+  .mini-avatar {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: linear-gradient(to right, #e74c3c, #c0392b);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    color: white;
+    margin-right: 20px;
+  }
+
+  .mini-avatar-icon--user {
+    &::before {
+      display: inline-block;
+      background-size: 1em 1em;
+      width: 1em;
+      height: 1em;
+      content: "";
+      /** https://icons.getbootstrap.com/icons/person-vcard/ */
+      background-image: url(./person-vcard.svg);
+    }
+  }
+
+  .mini-name {
+    font-size: 22px;
+    color: #2c3e50;
+    margin-bottom: 5px;
+  }
+
+  .mini-username {
+    color: #7f8c8d;
+    font-size: 16px;
+  }
+
+  .mini-details {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .mini-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    word-break: break-word;
+  }
+
+  .mini-icon {
+    min-width: 36px;
+    width: 36px;
+    height: 36px;
+    background: #f1f8ff;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #3498db;
+
+    &::before {
+      display: inline-block;
+      background-size: 1em 1em;
+      width: 1em;
+      height: 1em;
+      content: "";
+    }
+  }
+
+  .mini-icon--email {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/envelope/ */
+      background-image: url(./envelope.svg);
+    }
+  }
+
+  .mini-icon--telephone {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/telephone/ */
+      background-image: url(./telephone.svg);
+    }
+  }
+
+  .mini-icon--web {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/globe/ */
+      background-image: url(./globe.svg);
+    }
+  }
+
+  .mini-icon--city {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/geo-alt-fill/ */
+      background-image: url(./geo-alt-fill.svg);
+    }
+  }
+
+  .mini-icon--street {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/signpost/ */
+      background-image: url(./signpost.svg);
+    }
+  }
+
+  .mini-icon--scope {
+    &::before {
+      /** https://icons.getbootstrap.com/icons/suitcase-lg/ */
+      background-image: url(./suitcase-lg.svg);
     }
   }
 }
