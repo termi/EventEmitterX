@@ -25,7 +25,7 @@ import SignalAsString1 from "./$components/SignalAsString1";
 import SignalAsString2 from "./$components/SignalAsString2";
 import AsyncSpinner from "./$components/AsyncSpinner";
 import AsyncSpinner2 from "./$components/AsyncSpinner2";
-import ErrorView from "./$components/ErrorView";
+import ErrorView, { ErrorViewSimple } from "./$components/ErrorView";
 import AnimatedText from "./$components/AnimatedText";
 import UserCard from "./modules/UserCard";
 import JsonPlaceholderUser from "./modules/JsonPlaceholderUser";
@@ -55,7 +55,7 @@ if (import.meta.hot) {
 EventSignal.initReact(React, ErrorBoundary);
 
 EventSignal.registerReactComponentForComponentType(i18n_componentType, AnimatedText, 'pending');
-EventSignal.registerReactComponentForComponentType(i18n_componentType, () => '⚠️ i18n error', 'error');
+EventSignal.registerReactComponentForComponentType(i18n_componentType, () => '⚠️ i18n error', 'error-boundary');
 
 // Регистрируем компонент UserCard для отображения EventSignal с componentType == mainState.userFullNameComponentType.
 // Внимание: тут React.memo только для тестирования и демонстрации. ОН НЕ НУЖЕН в вашем коде.
@@ -149,9 +149,12 @@ initNavigation({
         const pageTitle$ = metadata?.menuItemTitle$/* || router.pageTitle$*/;
         const pageTitle = metadata?.menuItemTitle || router.pageTitle;
 
+        // noinspection RequiredAttributes
         return <Layout pageTitle={pageTitle} pageTitle$={pageTitle$}>
             <Suspense fallback={i18nString$$('...Загрузка')}>
-                <Component />
+                <ErrorBoundary FallbackComponent={ErrorViewSimple} resetKeys={[ router.key ]}>
+                    <Component />
+                </ErrorBoundary>
             </Suspense>
         </Layout>;
     },
