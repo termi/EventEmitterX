@@ -797,15 +797,18 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
 
         if (has_newListener_listener) {
             // todo: Разобраться, почему тут TypeScript ругается, хотя описание для 'newListener' в DefaultEventMap есть.
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore `TS2345: Argument of type [ EventKey, EMD<EventMap>[EventKey] ] is not assignable to parameter of type Parameters<EMD<EventMap>["newListener"]`
             this.emit('newListener', event, listener);
         }
 
         if (_checkBit(_f, EventEmitterX_Flags_listenerOncePerEventType) && handler) {
-            // todo: Для полноценной работы флага listenerOncePerEventType, нужно запоминать с какими опциями был
-            //  добавлен listener (prepend/once) и если происходит добавление listener с другими опциями, то нужно считать,
-            //  что это новый listener
+            // note: Судя по тестам EventTarget:
+            //  * Если listener без once уже добавлен и мы пытаемся добавить тот же
+            //    listener, но с once, то второй раз listener не добавиться.
+            //  * Если listener добавлен с once и мы пытаемся добавить тот же listener без once,
+            //    то второй раз listener не добавиться, так и сам listener удалиться при первом
+            //    срабатывании под действием once.
             let isListenerAlreadyExisted = false;
 
             if (existedHandlerIsFunction) {
@@ -841,9 +844,9 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
 
             if (isListenerAlreadyExisted) {
                 if (_checkBit(_f, EventEmitterX_Flags_has_duplicatedListener_listener)) {
-                    // todo: Добавить 'duplicatedListener' в DefaultEventMap и убрать "@ts-ignore"
-                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                    // @ts-expect-error
+                    // todo: Переделать 'duplicatedListener' на Symbol('duplicatedListener') и добавить его в DefaultEventMap и убрать "@ts-ignore"
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
                     this.emit('duplicatedListener', event, listener);
                 }
 
@@ -2090,6 +2093,8 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
     // domain is not supported
     static readonly usingDomains = false;
 
+    static addAbortListener = addAbortListener;
+
     static EventEmitter = EventEmitterX;
     /** @deprecated use {@link EventEmitterX} */
     static EventEmitterEx = EventEmitterX;
@@ -2147,6 +2152,42 @@ export {
     EventEmitterX as EventEmitter,
     EventEmitterX as default,
 };
+
+/**
+ * Listens once to the abort event on the provided signal.
+ *
+ * Listening to the abort event on abort signals is unsafe and may lead to resource leaks since another third party with the signal can call e.stopImmediatePropagation(). Unfortunately Node.js cannot change this since it would violate the web standard. Additionally, the original API makes it easy to forget to remove listeners.
+ *
+ * This API allows safely using AbortSignals in Node.js APIs by solving these two issues by listening to the event such that stopImmediatePropagation does not prevent the listener from running.
+ *
+ * Returns a disposable so that it may be unsubscribed from more easily.
+ *
+ * import { addAbortListener } from 'node:events';
+ *
+ * @example
+ * function example(signal) {
+ *   let disposable;
+ *   try {
+ *     signal.addEventListener('abort', (e) => e.stopImmediatePropagation());
+ *     disposable = addAbortListener(signal, (e) => {
+ *       // Do something when signal is aborted.
+ *     });
+ *   } finally {
+ *     disposable?.[Symbol.dispose]();
+ *   }
+ * }
+ *
+ * @see [events.default.addAbortListener](https://bun.com/reference/node/events/default/addAbortListener)
+ */
+export function addAbortListener(signal: AbortSignal, resource: (event: Event) => void): Disposable {
+    if (!signal || signal.aborted) {
+        return Object.setPrototypeOf({ [Symbol.dispose]: _noop }, null);
+    }
+
+    signal.addEventListener('abort', resource);
+
+    return Object.setPrototypeOf({ [Symbol.dispose]: signal.removeEventListener.bind(signal, 'abort', resource) }, null);
+}
 
 function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = false) {
     let { stack = '' } = error;
@@ -2871,15 +2912,17 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
     }
 
     static ABORT_ERR = ABORT_ERR;
-}
 
-const tagEventEmitterProxy = 'EventEmitterProxy';
+    static {
+        const tagEventEmitterProxy = 'EventEmitterProxy';
 
-EventEmitterProxy.prototype[Symbol.toStringTag] = tagEventEmitterProxy;
+        this.prototype[Symbol.toStringTag] = tagEventEmitterProxy;
 
-if (EventEmitterProxy.constructor.name !== tagEventEmitterProxy) {
-    // Fix class name after minification (UglifyJS/Terser or GCC)
-    Object.defineProperty(EventEmitterProxy.constructor, 'name', Object.setPrototypeOf({ value: tagEventEmitterProxy, configurable: true, enumerable: false, writable: false }, null));
+        if (this.constructor.name !== tagEventEmitterProxy) {
+            // Fix class name after minification (UglifyJS/Terser or GCC)
+            Object.defineProperty(this.constructor, 'name', Object.setPrototypeOf({ value: tagEventEmitterProxy, configurable: true, enumerable: false, writable: false }, null));
+        }
+    }
 }
 
 // noinspection JSUnusedGlobalSymbols
