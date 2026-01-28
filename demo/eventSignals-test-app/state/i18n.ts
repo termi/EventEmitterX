@@ -84,6 +84,7 @@ EventSignal.registerReactComponentForComponentType(i18n_componentType, function 
     return i18nString$$('...Загрузка');
 }, 'pending');
 
+const i18nNumberCache = new Map<number, ReturnType<typeof _create_i18nNumber$$>>();
 const i18nStringCache = new Map<string, ReturnType<typeof _create_i18nString$$>>();
 const translations = Object.assign(new Map() as Map<string, Map<string, string>>, {
     createValue() {
@@ -92,6 +93,53 @@ const translations = Object.assign(new Map() as Map<string, Map<string, string>>
 });
 
 _fillDefaultTranslation();
+
+// const numberFormatOptions$ = new EventSignal(null as ReturnType<typeof getLocaleInfo>["numberFormatOptions"], function() {
+//     const currentLocale = currentLocale$.get();
+//     const localeInfo = getLocaleInfo(currentLocale);
+//
+//     return localeInfo.numberFormatOptions;
+// });
+
+/**
+ * @see [@internationalized/number - The NumberParser class can be used perform locale-aware parsing of numbers from Unicode strings, as well as validation of partial user input.](https://www.npmjs.com/package/@internationalized/number)
+ * @see [React Aria / How we internationalized our number field](https://react-aria.adobe.com/blog/how-we-internationalized-our-numberfield)
+ */
+export const i18nNumber = Object.assign(function i18nNumber(num: number) {
+    const currentLocale = currentLocale$.get();
+    const localeInfo = getLocaleInfo(currentLocale);
+
+    return (num ?? 0).toLocaleString(currentLocale, localeInfo.numberFormatOptions);
+}, {
+    /**
+     * <u>Hook</u> to subscribe on current locale [numberFormatOptions]{@link NumberFormatOptions} changes.
+     *
+     * **Only for using inside React components!**
+     */
+    use() {
+        // return numberFormatOptions$.use();
+        return currentLocale$.use(currentLocale => {
+            return getLocaleInfo(currentLocale).numberFormatOptions;
+        });
+    },
+});
+
+export function i18nNumber$$(num: number) {
+    return i18nNumberCache.getOrInsertComputed(num, _create_i18nNumber$$);
+}
+
+function _create_i18nNumber$$(num: number) {
+    return new EventSignal('', _i18nNumber$$_computation, {
+        initialSourceValue: num ?? 0,
+    });
+}
+
+function _i18nNumber$$_computation(_: string, sourceValue: number) {
+    const currentLocale = currentLocale$.get();
+    const localeInfo = getLocaleInfo(currentLocale);
+
+    return sourceValue.toLocaleString(currentLocale, localeInfo.numberFormatOptions);
+}
 
 export function i18n<T>(template: TemplateStringsArray, ...values: T[]) {
     if (template.length === 1 && values.length === 0) {
