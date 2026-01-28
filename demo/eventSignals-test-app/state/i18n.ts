@@ -127,7 +127,7 @@ export function i18n$$<T>(template: TemplateStringsArray, ...values: T[]) {
     */
 }
 
-export function i18nString(string: string) {
+export const i18nString = Object.assign(function i18nString(string: string) {
     const result = _i18nString$_computation('', string);
 
     // _i18nString$_computation МОЖЕТ (несмотря на типизацию) вернуть Promise.
@@ -138,7 +138,14 @@ export function i18nString(string: string) {
     }
 
     return result;
-}
+}, {
+    /**
+     * <u>Hook</u> to subscribe on current locale changes.
+     *
+     * **Only for using inside `React` components!**
+     */
+    use: currentLocale$.use,
+});
 
 export function i18nString$$(string: string) {
     return i18nStringCache.getOrInsertComputed(string, _create_i18nString$$);
@@ -200,8 +207,14 @@ function _i18n_computation<T>(prevValue: string, sourceValue: { template: Templa
 
     // eslint-disable-next-line promise/prefer-await-to-then
     if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') {
-        /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сигнал текущий сигнал будет подписан. */
-        const temporaryEventSignal = eventSignal ? null : new EventSignal(false, { description: 'i18n.-temporary-' });
+        /** Если мы в данный момент находимся в EventSignal computation, то на это новое значение текущий сигнал уже будет подписан и временный сигнал не нужен. */
+        const temporaryEventSignal = isEventSignal(eventSignal)
+            ? null
+            : new EventSignal(false, { description: 'i18n.-temporary-' })
+        ;
+
+        // Подписываем текущий сигнал на этот временный сигнал
+        temporaryEventSignal?.get();
 
         // eslint-disable-next-line promise/prefer-await-to-then
         const promise = (result as unknown as Promise<string>).then(result => {
@@ -218,68 +231,6 @@ function _i18n_computation<T>(prevValue: string, sourceValue: { template: Templa
 
     return fulfillTranslationTemplate((result as string), values);
 }
-
-/*
-function _i18n_computation<T>(_v: string, sourceValue: { template: TemplateStringsArray, values: T[], __proto__: null }, eventSignal?: EventSignal<any>) {
-    const currentLocale = currentLocale$.get();
-    const isDefaultLocale = currentLocale === defaultLocale;
-    const translationsMap = translations.getOrInsertComputed(currentLocale, translations.createValue);
-    const { template, values } = sourceValue;
-    // const isNeedToLoadTranslation = currentLocale !== defaultLocale;
-    const translationStrings: string[] = [];
-    let promise: Promise<void> | undefined;
-
-    for (let i = 0, len = template.length ; i < len ; i++) {
-        const string = template[i];
-        const translation = translationsMap.get(string);
-
-        if (translation) {
-            translationStrings[i] = translation;
-        }
-        else if (isDefaultLocale) {
-            translationStrings[i] = string;
-        }
-        else {
-            promise = (promise || Promise.resolve()).then(async () => {// eslint-disable-line promise/prefer-await-to-then
-                translationStrings[i] = await (_i18nString$_computation('', string, true) as unknown as Promise<string>);
-            }, error => {// eslint-disable-line promise/prefer-await-to-callbacks
-                console.error(error);
-            });
-        }
-    }
-
-    if (promise) {
-        /!** Если мы в данный момент находимся в EventSignal computation, то на этот новый сиглан текущий сиглан будет подписан. *!/
-        const temporaryEventSignal = eventSignal ? null : new EventSignal(false);
-
-        return promise.then(() => {// eslint-disable-line promise/prefer-await-to-then
-            temporaryEventSignal?.set(true);
-            temporaryEventSignal?.destructor();
-
-            let result = '';
-
-            for (let i = 0, len = translationStrings.length ; i < len ; i++) {
-                const translation = translationStrings[i];
-
-                result += (translation ?? template[i]) + (String(values[i] ?? ''));
-            }
-
-            return result;
-        }, error => {// eslint-disable-line promise/prefer-await-to-callbacks
-            console.error(error);
-        }) as unknown as string;
-    }
-
-    let result = '';
-
-    for (let i = 0, len = translationStrings.length ; i < len ; i++) {
-        const translation = translationStrings[i];
-
-        result += (translation ?? template[i]) + (String(values[i] ?? ''));
-    }
-
-    return result;
-}*/
 
 function _create_i18nString$$(string: string) {
     return new EventSignal(string, _i18nString$_computation, {
@@ -305,24 +256,77 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
         return '';
     }
 
+    let textForTranslation = sourceValue;
+    let sourceValueLocale = defaultLocale;
     const currentLocale = currentLocale$.get();
     const translationsMap = translations.getOrInsertComputed(currentLocale, translations.createValue);
     // const isNeedToLoadTranslation = currentLocale !== defaultLocale;
 
-    const allowAsync = eventSignal === true || (!!eventSignal && eventSignal instanceof EventSignal);
+    const allowAsync = eventSignal === true || (!!eventSignal && isEventSignal(eventSignal));
     const allowTemporarySignal = allowAsync && eventSignal !== true;
     const translation = translationsMap.get(sourceValue);
     let promise: Promise<string> | undefined;
 
     translation: if (!translation) {
-        if (currentLocale === defaultLocale) {
+        /**
+         * @example
+         'Крестики-Нолики PRO||<en-US>||:Tic tac toe PRO||es-ES||:Tres en raya PRO'.split(/\|\|(<?\w{2}-\w{2}>?)\|\|:/g);
+         ['Крестики-Нолики PRO', '<en-US>', 'Tic tac toe PRO', 'es-ES', 'Tres en raya PRO']
+         */
+        const preTranslatedValues = sourceValue.split(/\|\|(<?\w{2}-\w{2}>?)\|\|:/g);
+
+        if (preTranslatedValues.length > 2) {
+            const stringInDefaultLanguage = preTranslatedValues.shift();
+
+            if (stringInDefaultLanguage) {
+                textForTranslation = stringInDefaultLanguage;
+            }
+            else {
+                // В этом случае, изначальная строка может быть не на языке по-умолчанию (например, русском ru-RU),
+                //  а на английском (en-US) и эту строку нужно перевести на язык по-умолчанию.
+                sourceValueLocale = preTranslatedValues.shift();
+                textForTranslation = preTranslatedValues.shift();
+            }
+
+            for (let i = 0, len = preTranslatedValues.length ; i < len ; i += 2) {
+                const _locale = preTranslatedValues[i];
+                const translatedValue = preTranslatedValues[i + 1];
+
+                if (!_locale || translatedValue == null) {
+                    continue;
+                }
+
+                const isSelectedLocaleForTranslation = _locale.startsWith('<') && _locale.endsWith('>');
+                const locale = isSelectedLocaleForTranslation ? _locale.substring(1, _locale.length - 1) : _locale;
+                const isCurrentLocale = locale === currentLocale;
+
+                translations.getOrInsertComputed(locale, translations.createValue)
+                    .set(sourceValue, translatedValue)
+                ;
+
+                if (isSelectedLocaleForTranslation || isCurrentLocale) {
+                    translations.getOrInsertComputed(sourceValueLocale, translations.createValue)
+                        .set(sourceValue, textForTranslation)
+                    ;
+
+                    sourceValueLocale = locale;
+                    textForTranslation = translatedValue;
+
+                    if (isCurrentLocale) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (currentLocale === sourceValueLocale) {
             if (!allowAsync) {
-                return sourceValue;
+                return textForTranslation;
             }
 
             promise = new Promise<string>(resolve => {
                 setTimeout(() => {
-                    resolve(sourceValue);
+                    resolve(textForTranslation);
                 }, 1500);
             });
 
@@ -339,7 +343,8 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
 
         promise = _promiseCacheMap.getOrInsertComputed(sourceValue, () => {
             return new Promise<string>(resolve => {
-                fetchGoogleTranslateApi(sourceValue, {
+                fetchGoogleTranslateApi(textForTranslation, {
+                    sourceLanguage: sourceValueLocale,
                     targetLanguage: currentLocale,
                     delay: 500,
                     queueRequests: true,
@@ -370,7 +375,9 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
                     }, error => {
                         console.error(error);
 
-                        resolve(sourceValue);
+                        _promiseCacheMap.delete(sourceValue);
+
+                        resolve(textForTranslation);
                     })
                 ;
             });
@@ -381,6 +388,10 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
 
     if (allowAsync) {
         if (promise) {
+            if (textForTranslation !== sourceValue) {
+                promise["pendingValue"] = textForTranslation;
+            }
+
             if (allowTemporarySignal) {
                 // todo: Добавлять description только в DEV-режиме
                 /** Если мы в данный момент находимся в EventSignal computation, то на этот новый сигнал текущий сигнал будет подписан. */
@@ -398,7 +409,7 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
         }
     }
 
-    return translation ?? (prevValue || sourceValue);
+    return translation ?? (prevValue || textForTranslation);
 }
 
 function _getAllowedLocalesList() {

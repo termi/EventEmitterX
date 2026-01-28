@@ -230,6 +230,7 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         id,
         flag,
         name,
+        nameLocale,
         isCapital,
         country,
         locale,
@@ -240,6 +241,11 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
         timeZoneName,
         isCurrentOffset,
     } = eventSignal.get();
+    /**
+     * * Translated value from default language: `Лондон`
+     * * Translated value from custom language: `||es-US||:Pyongyang`
+     */
+    const translatedCityName = nameLocale ? `||${nameLocale}||:${name}` : name;
     const isCurrentLocale = locale === currentLocale$.get();
     const { data } = eventSignal;
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -266,7 +272,7 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
             <div className={css.cityName}>
                 <div className={css.cityNameInner} title={timeZone}>
                     <span>
-                        {i18nString$$(name)}
+                        {i18nString$$(translatedCityName)}
                         <br className={css.optionalLineBreak}/>{' '}
                         ({timeZoneName})
                     </span>
@@ -327,6 +333,7 @@ function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.
     const {
         id,
         name,
+        nameLocale,
         flag,
         country,
         locale,
@@ -336,10 +343,15 @@ function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.
         timeZone,
         timeZoneName,
     } = eventSignal.get();
+    /**
+     * * Translated value from default language: `Лондон`
+     * * Translated value from custom language: `||es-US||:Pyongyang`
+     */
+    const translatedCityName = nameLocale ? `||${nameLocale}||:${name}` : name;
 
     return <tr key={id} data-id={id}>
         <td className={css.cityFlag}>{flag}</td>
-        <td className={css.cityName}>{i18nString$$(name)}</td>
+        <td className={css.cityName}>{i18nString$$(translatedCityName)}</td>
         <td className={css.country}>{country}</td>
         <td>{locale}</td>
         <td>{timeZone}</td>

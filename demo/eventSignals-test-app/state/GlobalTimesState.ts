@@ -162,6 +162,7 @@ type CityDescription = RawCityDescription & {
 
 type RawCityDescription = {
     name: string,
+    nameLocale?: string,
     country: string,
     timeZone: string,
     timeZoneOffset: number,
@@ -433,6 +434,7 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
         const timeZone = localeInfo.defaultTimezone;
         const cityDescription = {
             name: localeInfo.capital,
+            nameLocale: localeInfo.capitalOriginateLocale,
             country: '',
             timeZone,
             locale: currentLocale,
@@ -448,15 +450,20 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
         const localeInfo = getLocaleInfo(cityDescription.locale, true);
 
         cityDescription.localeInfo = localeInfo;
-        cityDescription.name ||= localeInfo.capital;
+
+        if (!cityDescription.name) {
+            cityDescription.name = localeInfo.capital;
+            cityDescription.nameLocale = localeInfo.capitalOriginateLocale;
+        }
+
         cityDescription.timeZone ||= localeInfo.defaultTimezone;
         cityDescription.flag ||= localeInfo.flag;
         cityDescription.isCapital ??= cityDescription.name === localeInfo.capital;
 
         const { timeZone } = cityDescription;
         const f1 = cityDescription.h23localTimeFormatOptions = { timeZone, timeStyle: 'short', hour12: false };
-        const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumericSystem };
-        const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumericSystem };
+        const f2 = cityDescription.timeFormatOptions = { timeZone, timeStyle: 'medium', numberingSystem: localeInfo.defaultNumberingSystem };
+        const f3 = cityDescription.dateFormatOptions = { timeZone, dateStyle: 'full', numberingSystem: localeInfo.defaultNumberingSystem };
 
         Object.freeze(Object.setPrototypeOf(f1, null));
         Object.freeze(Object.setPrototypeOf(f2, null));
