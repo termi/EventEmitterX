@@ -16,7 +16,7 @@ type NewPipWindowOptions<P extends Record<string, any>=Record<string, any>> = {
 
 const emptyPipPopupWindowDescription: PipPopupWindowDescription = {
     window: null as Window | null,
-    dataId: void 0,
+    dataId: void 0 as number | string | undefined,
     component: null,
     componentProps: null,
 };
@@ -38,12 +38,9 @@ type PipPopupWindowDescription = {
 //     componentProps: { filterBydId: '1' }
 // });
 
-export const pipPopupWindow$ = Object.assign(new EventSignal({
-    window: null as Window | null,
-    dataId: undefined as number | string | undefined,
-    component: null,
-    componentProps: null,
-} satisfies PipPopupWindowDescription, async function(prev, newPipWindowOptions) {
+export const pipPopupWindow$ = Object.assign(new EventSignal((
+    emptyPipPopupWindowDescription
+), async function(prev, newPipWindowOptions) {
     if (newPipWindowOptions == null || !newPipWindowOptions.component) {
         prev.window?.close();
 
@@ -117,6 +114,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal({
             dataId,
             component,
             componentProps,
+            __proto__: null,
         } as PipPopupWindowDescription;
     }
     catch (error) {

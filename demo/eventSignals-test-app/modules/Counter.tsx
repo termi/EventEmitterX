@@ -24,7 +24,7 @@ export default function Counter({ eventSignal, classes = {}, style, title = even
     style?: CSSProperties,
     title?: EventSignal<string, unknown, unknown> | string,
 }) {
-    console.log('render', String(title));
+    console.log('render Counter', String(title));
 
     return (<div style={style} role="counter-wrapper" className={classes.className}>
         <h2 role="counter-title" className={classes.title}>{title}</h2>

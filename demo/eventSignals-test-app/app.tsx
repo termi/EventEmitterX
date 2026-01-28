@@ -6,6 +6,7 @@
 import * as React from 'react';
 import { Suspense } from "react";
 import { createPortal } from "react-dom";
+import * as ReactDOM from "react-dom";
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -13,7 +14,7 @@ import 'termi@polyfills';
 
 import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-import './lib/polyfillEmojis';
+import './lib/polyfills/emojis';
 import { initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
@@ -31,15 +32,21 @@ import UserCard from "./modules/UserCard";
 import JsonPlaceholderUser from "./modules/JsonPlaceholderUser";
 import DefaultLayout from "./layouts/DefaultLayout";
 
-import './app.module.css';
-
-if (import.meta.env.DEV) {
+if (import.meta.env?.DEV) {
     // eslint-disable-next-line promise/prefer-await-to-then
     import('./lib/dev/css-hot-reload-client').then(module => {
         module.setupCSSHotReload();
         // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
     }).catch(error => {
         console.warn('Failed to load CSS hot reload:', error);
+    });
+
+    Object.assign(globalThis as unknown as {
+        __React: typeof React,
+        __ReactDOM: typeof ReactDOM,
+    }, {
+        __React: React,
+        __ReactDOM: ReactDOM,
     });
 }
 
@@ -48,8 +55,6 @@ if (import.meta.hot) {
         console.log('Компоненты обновляются...');
     });
 }
-
-(globalThis as unknown as { __React: typeof React }).__React = React;
 
 // Инициализируем EventSignal для работы с React.
 EventSignal.initReact(React, ErrorBoundary);
