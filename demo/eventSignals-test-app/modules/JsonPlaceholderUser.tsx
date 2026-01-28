@@ -1,6 +1,7 @@
 'use strict';
 
 import * as React from "react";
+import { useState } from "react";
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
@@ -11,7 +12,14 @@ import { i18nString$$ } from "../state/i18n";
 
 import css from './JsonPlaceholderUser.module.css';
 
-export default function JsonPlaceholderUser({ eventSignal, current$Value, version, textColor, backgroundColor }: {
+export default function JsonPlaceholderUser({
+    eventSignal,
+    current$Value,
+    version,
+    textColor,
+    backgroundColor,
+    forceRenderType,
+}: {
     // todo: rename to 'current$'?
     eventSignal: PlaceholderUser$,
     current$Value: ReturnType<typeof eventSignal.getSync>,
@@ -19,15 +27,17 @@ export default function JsonPlaceholderUser({ eventSignal, current$Value, versio
     version: number,
     textColor?: string,
     backgroundColor?: string,
+    forceRenderType?: 'card' | 'table',
 }) {
     const { userDTO, type = 'card' } = eventSignal.data;
     const style = {
         color: textColor,
         "--backgroundColor": backgroundColor ? `${backgroundColor}` : void 0,
     } as React.CSSProperties;
-    const $content = type === 'card'
-        ? UserCard(userDTO)
-        : ObjectToTable(userDTO)
+    const isUserCardRender = (forceRenderType ?? type) === 'card';
+    const $content = isUserCardRender
+        ? UserCard(userDTO, eventSignal)
+        : ObjectToTable(userDTO, eventSignal)
     ;
 
     return (<div
@@ -37,11 +47,20 @@ export default function JsonPlaceholderUser({ eventSignal, current$Value, versio
         data-version={version}
         style={style}
     >
-        {$content}
+        {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+        {/* @ts-expect-error fixme: [TYPINGS / typings] Исправить тут типизацию */}
+        <eventSignal.component.ViewContext value={{
+            [eventSignal.componentType as unknown as string]: isUserCardRender
+                ? [ JsonPlaceholderUser, { forceRenderType: 'table' } ]
+                : [ JsonPlaceholderUser, { forceRenderType: 'card' } ]
+            ,
+        }}>
+            {$content}
+        </eventSignal.component.ViewContext>
     </div>);
 }
 
-function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"]) {
+function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"], user$: PlaceholderUser$) {
     const {
         id,
         name,
@@ -67,6 +86,7 @@ function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"]) {
         value: string,
         __proto__: null,
     }[];
+    const [ popupShow, setPopupShow ] = useState(false);
 
     return (<div className={css.miniCardContainer} data-user-id={id}>
         <div className={css.miniCard}>
@@ -88,27 +108,52 @@ function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"]) {
                     </div>;
                 })}
             </div>
+            <div>
+                <button onClick={() => setPopupShow(v => !v)}>{
+                    popupShow
+                        ? i18nString$$('Скрыть пользователя')
+                        : i18nString$$('Отрендерить пользователя ещё раз||<en-US>||:Render the user again')
+                }</button>
+                {popupShow ? <user$.component sIgnoreRecursive={true} /> : null}
+            </div>
         </div>
     </div>);
 }
 
-function ObjectToTable(obj: Object) {
+function ObjectToTable(obj: Object, user$?: PlaceholderUser$) {
+    const [ popupShow, setPopupShow ] = useState(false);
     const keys = Object.keys(obj);
 
-    return (<table>
-        <thead><tr>
-            {keys.map(key => <th key={key}>{key}</th>)}
-        </tr></thead>
-        <tbody><tr>
-            {keys.map(key => {
-                let value = obj[key];
+    return (<div>
+        <table>
+            <thead>
+                <tr>
+                    {keys.map(key => <th key={key}>{key}</th>)}
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    {keys.map(key => {
+                        let value = obj[key];
 
-                if (typeof value === 'object' && value) {
-                    value = ObjectToTable(value);
-                }
+                        if (typeof value === 'object' && value) {
+                            value = ObjectToTable(value);
+                        }
 
-                return <td key={key}>{value}</td>;
-            })}
-        </tr></tbody>
-    </table>);
+                        return <td key={key}>{value}</td>;
+                    })}
+                </tr>
+            </tbody>
+        </table>
+        <div>
+            {user$ ? <>
+                <button onClick={() => setPopupShow(v => !v)}>{
+                    popupShow
+                        ? i18nString$$('Скрыть пользователя')
+                        : i18nString$$('Отрендерить пользователя ещё раз||<en-US>||:Render the user again')
+                }</button>
+                {popupShow ? <user$.component sIgnoreRecursive={true}/> : null}
+            </> : null}
+        </div>
+    </div>);
 }

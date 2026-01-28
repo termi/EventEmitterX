@@ -8,6 +8,7 @@ import type { NavigationRouter, currentNavigatorPage$ } from "../state/routing";
 type Root = ReturnType<typeof createRoot>;
 
 let isInited = false;
+const defaultUnicodeIcon = 'Ⓢ';
 
 export function initNavigation({
     navigationSignal$,
@@ -68,11 +69,10 @@ export function initNavigation({
                 darkStaticIconSrc,
                 staticIconSrc: _staticIconSrc,
             } = metadata || {};
+            const $favIconLink = document.getElementById('link_favicon') as HTMLLinkElement | null; // eslint-disable-line unicorn/prefer-query-selector
 
-            if (darkUnicodeIcon || _unicodeIcon || darkStaticIconSrc || _staticIconSrc) {
-                const $favIconLink = document.getElementById('link_favicon') as HTMLLinkElement | null; // eslint-disable-line unicorn/prefer-query-selector
-
-                if ($favIconLink) {
+            if ($favIconLink) {
+                if (darkUnicodeIcon || _unicodeIcon || darkStaticIconSrc || _staticIconSrc) {
                     const isDarkMode = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false;
                     const unicodeIcon = (isDarkMode ? darkUnicodeIcon : null) ?? _unicodeIcon;
                     const staticIconSrc = (isDarkMode ? darkStaticIconSrc : null) ?? _staticIconSrc;
@@ -83,6 +83,9 @@ export function initNavigation({
                     else {
                         $favIconLink.href = unicodeIconToDataUrl(unicodeIcon);
                     }
+                }
+                else {
+                    $favIconLink.href = unicodeIconToDataUrl(defaultUnicodeIcon);
                 }
             }
 
@@ -122,8 +125,15 @@ let canvas: HTMLCanvasElement | undefined;
 let canvasContext: CanvasRenderingContext2D | undefined;
 const ICON_SIZE = 64;
 const CANVAS_GAP = ICON_SIZE / 4;
+const dataUrlCanvasCache: Record<string, string> = Object.create(null);
 
 function unicodeIconToDataUrl(unicodeIcon: string) {
+    const dataUrl = dataUrlCanvasCache[unicodeIcon];
+
+    if (dataUrl) {
+        return dataUrl;
+    }
+
     if (unicodeIcon.length > 6) {
         // Support only emoji up to 6 chars.
         unicodeIcon = unicodeIcon.substring(0, 6);
@@ -139,5 +149,5 @@ function unicodeIconToDataUrl(unicodeIcon: string) {
     canvasContext.font = `${ICON_SIZE}px monospace, serif`;
     canvasContext.fillText(unicodeIcon, 0, ICON_SIZE);
 
-    return canvas.toDataURL();
+    return dataUrlCanvasCache[unicodeIcon] = canvas.toDataURL();
 }
