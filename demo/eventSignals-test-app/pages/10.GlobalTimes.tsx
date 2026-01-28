@@ -15,15 +15,19 @@ import {
 import { pipPopupWindow$ } from "../state/pipWindowState";
 import { currentLocale$, i18n$$, i18nString$$ } from "../state/i18n";
 
-import { menuItemTitle$, unicodeIcon } from './10.GlobalTimes.metadata';
 import AnalogClock from "../modules/AnalogClock";
+
+import { menuItemTitle$, unicodeIcon } from './10.GlobalTimes.metadata';
 
 import css from './10.GlobalTimes.module.css';
 
-type ViewType$ = ReturnType<typeof makeViewType$>;
+type ViewType$ = ReturnType<typeof makeViewType$$>;
 
 const ViewType$Context = createContext(null as ViewType$ | null);
-const makeViewType$ = () => {
+const makeViewType$$ = () => {
+    const global = (globalThis as unknown as {
+        __test__viewType$set: ViewType$[],
+    });
     let destructor: (() => void) | undefined;
     const viewType$ = Object.assign(new EventSignal('list' as 'grid' | 'list' | 'table', {
         description: 'viewType$',
@@ -54,18 +58,29 @@ const makeViewType$ = () => {
                 },
             ],
         },
+        onDestroy() {
+            const index = global.__test__viewType$set.indexOf(viewType$);
+
+            if (index !== -1) {
+                global.__test__viewType$set.splice(index, 1);
+            }
+        },
     }), {
         effectWithDestructor: () => {
             return destructor ??= viewType$.destructor.bind(viewType$);
         },
     });
 
-    (globalThis as unknown as Record<string, any>).__test__viewType$ = viewType$;
+    // Use this global value to emulate viewType$ changes from some other component/place.
+    //  set('grid' | 'list' | 'table')
+    //  globalThis.__test__viewType$set[0].set('table')
+    //  globalThis.__test__viewType$set[0].set(prev => prev === 'table' ? 'grid' : 'table')
+    (global.__test__viewType$set ??= []).push(viewType$);
 
     return viewType$;
 };
-const useViewType$ = (viewType?: ReturnType<ViewType$["get"]>) => {
-    const viewType$ = useMemo(makeViewType$, []);
+const useViewType$$ = (viewType?: ReturnType<ViewType$["get"]>) => {
+    const viewType$ = useMemo(makeViewType$$, []);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(viewType$.effectWithDestructor, [ viewType$ ]);
@@ -73,8 +88,6 @@ const useViewType$ = (viewType?: ReturnType<ViewType$["get"]>) => {
     // Только если мы только что создали viewType$ и нужно указать ему первоначальное значение
     if (viewType && viewType$.version === 0) {
         viewType$.set(viewType);
-        // Форсируем получение нового значения. Это нужно потому что (на данный момент) viewType$.use() вызывает viewType$.getLastValue().
-        viewType$.get();
     }
 
     return viewType$;
@@ -84,11 +97,11 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     viewType?: ReturnType<ViewType$["get"]>,
     filterById?: string,
 }) {
-    const viewType$ = useViewType$(viewType);
+    const viewType$ = useViewType$$(viewType);
 
     // Получаем актуальное значение и подписываемся на изменения сигнала.
-    // Подписка нужна, чтобы обновлять controllable интупы формы, если сигнал viewType$ измениться "снаружи".
-    // note: Если гарантировано не будет измениться "снаружи", то можно тут использовать get и сделать инпуты uncontrollable.
+    // Подписка нужна, чтобы обновлять controllable input's формы, если сигнал viewType$ измениться "снаружи".
+    // note: Если гарантировано не будет изменяться "снаружи", то можно тут использовать viewType$.get() и сделать uncontrollable input's.
     viewType = viewType$.use();
 
     console.log(PageGlobalTimes.name, 'render');
@@ -134,9 +147,11 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                 <mostPopularCities$.component.ViewContext value={viewType === 'table' ? {
                     [mostPopularCities$.componentType as string]: GlobalTimesTable,
                     [mostPopularCities$.data.elementsComponentType]: GlobalTimesTableRow,
-                } : void 0}>
+                } : {
+                    [mostPopularCities$.data.elementsComponentType]: GlobalTimesCity,
+                }}>
                     <ViewType$Context.Provider value={viewType$}>
-                        <mostPopularCities$.component filterById={filterById}/>
+                        <mostPopularCities$.component filterById={filterById} sDefaultFC={GlobalTimesList}/>
                     </ViewType$Context.Provider>
                 </mostPopularCities$.component.ViewContext>
 
@@ -179,26 +194,26 @@ EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesTable, {
 });
 */
 
-EventSignal.registerReactComponentForComponentType(mostPopularCities$.componentType, function GlobalTimesList({
+/** @see [Each item component]{@link GlobalTimesCity} */
+function GlobalTimesList({
     eventSignal,
     filterById,
 }: {
     eventSignal: typeof mostPopularCities$,
     filterById?: string,
 }) {
+    /** note: for `'table'` value there is another component to render: {@link GlobalTimesTable} */
     const viewType = useContext(ViewType$Context)?.use();
-    const classNameMode = viewType === 'grid' ? css.citiesGrid
-        : viewType === 'table' ? css.citiesTable
-        : ''
+    const classNameMode = viewType === 'grid' ? css.citiesGrid : '';
+    const cities = filterById
+        ? eventSignal.get().filter(item => item.get().id === filterById)
+        : eventSignal.get()
     ;
 
     return (<div className={`${css.citiesContainer} ${classNameMode}`}>
-        {filterById
-            ? eventSignal.get().filter(item => item.get().id === filterById)
-            : eventSignal.get()
-        }
+        {cities}
     </div>);
-});
+}
 
 function _setPopup(event: MouseEvent<HTMLDivElement>) {
     const { currentTarget } = event;
@@ -220,7 +235,7 @@ function _setPopup(event: MouseEvent<HTMLDivElement>) {
     }
 }
 
-EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.elementsComponentType, function GlobalTimesCity({
+function GlobalTimesCity({
     eventSignal,
 }: {
     eventSignal: mostPopularCities$.CityDescriptionEventSignal,
@@ -296,8 +311,9 @@ EventSignal.registerReactComponentForComponentType(mostPopularCities$.data.eleme
             src="/pip.svg" alt="pip" height="24px"
         />
     </div>);
-});
+}
 
+/** @see [Each item component]{@link GlobalTimesTableRow} */
 function GlobalTimesTable({
     eventSignal,
     filterById,
