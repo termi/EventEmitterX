@@ -67,7 +67,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     private _value: T;
     private readonly _finaleValue: T | undefined;
     private readonly _finaleSourceValue: S | undefined;
-    private readonly _subscriptionsToDeps = new Set<number | string | symbol>();
+    private _subscriptionsToDeps: Set<number | string | symbol> | null = null;
     // // this symbol MUST using only for subscriptions
     // private readonly _signalSymbol: symbol;
     // // this symbol can be used for any public-related data, such as logging, counters etc
@@ -87,6 +87,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     private _resolve: ((newValue: T) => void) | undefined;
     private _triggerCleanUp: (() => void) | undefined;
     private _throttleCleanUp: (() => void) | undefined;
+    private _onDestroy: (() => void) | undefined;
     private readonly _abortSignal?: AbortSignal;
     private readonly _oneOfDepUpdated = (noEventSignalDepUpdate?: boolean) => {
         const stateFlags = this._stateFlags;
@@ -247,7 +248,6 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         const {
-            _subscriptionsToDeps,
             _computation,
             _oneOfDepUpdated,
         } = this;
@@ -288,9 +288,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 reactFC,
                 trigger,
                 throttle,
+                onDestroy,
             } = options as EventSignal.NewOptionsWithSource<T, S, D, R>;
 
             if (Array.isArray(deps) && deps.length > 0) {
+                const _subscriptionsToDeps = this._subscriptionsToDeps ??= new Set();
+
                 stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
 
                 for (const { eventName } of deps) {
@@ -356,7 +359,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             if (_abortSignal) {
                 this._abortSignal = _abortSignal;
 
-                _abortSignal.addEventListener('abort', this._abortHandler);
+                _abortSignal.addEventListener('abort', this[Symbol.dispose]);
             }
 
             if (reactFC) {
@@ -368,7 +371,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
             if (trigger && typeof trigger === 'object') {
                 // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
-                const _onThrottleTrigger = () => {
+                const _onTrigger = () => {
                     if ((this._stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0) {
                         this._stateFlags |= (EventSignal.StateFlags.isNeedToCalculateNewValue | EventSignal.StateFlags.wasForceUpdateTrigger);
 
@@ -376,7 +379,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     }
                 };
 
-                const triggerCleanUp = this._subscribeToTrigger(trigger, _onThrottleTrigger);
+                const triggerCleanUp = this._subscribeToTrigger(trigger, _onTrigger);
 
                 if (triggerCleanUp) {
                     this._triggerCleanUp = triggerCleanUp;
@@ -419,6 +422,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 }
             }
 
+            if (onDestroy) {
+                this._onDestroy = onDestroy;
+            }
+
             /*
             if (methods) {
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
@@ -459,6 +466,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     destructor() {
+        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+            return;
+        }
+
         const {
             _finaleValue,
             _finaleSourceValue,
@@ -474,6 +485,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             _sourceCleanup,
             _triggerCleanUp,
             _throttleCleanUp,
+            _onDestroy,
         } = this;
         const has_finaleValue = _finaleValue !== void 0;
         const has_finaleSourceValue = _finaleSourceValue !== void 0;
@@ -541,8 +553,6 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             // @ts-ignore ignore readonly attribute
             this.status = void 0;
         }
-
-        this._computationPromise = null;
         // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
         // this._setPromise = null;
 
@@ -554,7 +564,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         // }
 
         if (_abortSignal) {
-            _abortSignal.removeEventListener('abort', this._abortHandler);
+            _abortSignal.removeEventListener('abort', this[Symbol.dispose]);
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore readonly attribute
@@ -597,11 +607,13 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
          * Удаляем подписки которые были повешены в функции [on]{@link on}.
          */
         subscribersEventsEmitter.removeAllListeners(_signalSymbol);
+
+        _onDestroy?.();
     }
 
-    [Symbol.dispose]() {
+    [Symbol.dispose] = () => {
         this.destructor();
-    }
+    };
 
     get destroyed() {
         return (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0;
@@ -613,19 +625,17 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             _oneOfDepUpdated,
         } = this;
 
-        /**
-         * Удаляем подписки на другие EventSignal.
-         */
-        for (const eventName of _subscriptionsToDeps) {
-            signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
+        if (_subscriptionsToDeps) {
+            /**
+             * Удаляем подписки на другие EventSignal.
+             */
+            for (const eventName of _subscriptionsToDeps) {
+                signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
+            }
+
+            _subscriptionsToDeps.clear();
         }
-
-        _subscriptionsToDeps.clear();
     }
-
-    private _abortHandler = () => {
-        this.destructor();
-    };
 
     get eventName() {
         return this._signalSymbol;
@@ -660,12 +670,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
         else if (trigger.type === 'emitter') {
             const {
-                emitter: _emitter,
+                emitter,
             } = trigger;
-            const isWeakRef = _isWeakRef(_emitter);
-            const emitter = isWeakRef ? _emitter.deref() : _emitter;
 
-            if (emitter && _emitter) {
+            if (emitter) {
                 const { event, filter, once } = trigger;
 
                 triggerCleanUp = _eventTargetAddListeners(emitter, listener, {
@@ -1202,7 +1210,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     toString() {
-        const signalValue = this.get();
+        const signalValue = this.getSync();
 
         if (typeof signalValue === 'object' && signalValue) {
             if (Array.isArray(signalValue)) {
@@ -1388,7 +1396,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     private _subscribeTo(signalSymbol: symbol) {
-        const { _subscriptionsToDeps } = this;
+        const _subscriptionsToDeps = this._subscriptionsToDeps ??= new Set();
         const hasSubscription = _subscriptionsToDeps.has(signalSymbol);
 
         if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
@@ -1448,11 +1456,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 return this;
             }
 
-            return {
-                unsubscribe: _noop,
-                closed: true,
-                __proto__: null,
-            };
+            return _emptySubscription;
         }
 
         /**
@@ -1472,11 +1476,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
         else if (!listener) {
             // note: in this case `shouldReturnThis` should always be `false`.
-            return {
-                unsubscribe: _noop,
-                closed: true,
-                __proto__: null,
-            };
+            return _emptySubscription;
         }
 
         const eventName = this._signalSymbol;
@@ -1503,6 +1503,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         let closed = false;
+        let suspended = false;
         const unsubscribe = () => {
             closed = true;
 
@@ -1512,6 +1513,48 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         return {
             // Cancels the subscription
             unsubscribe,
+            suspend: () => {
+                if (suspended) {
+                    return false;
+                }
+
+                this._removeListener(ignoredEventName, listener, true);
+
+                suspended = true;
+
+                return true;
+            },
+            resume() {
+                // listener SHOULD be defined. This check is only for TypeScript.
+                if (listener && suspended) {
+                    // Copy & Paste this code block from above for performance reason
+                    if ((subscriptionFlags & 1 << 1) !== 0) { // isUseOnce
+                        if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
+                            subscribersEventsEmitter.prependOnceListener(eventName, listener);
+                        }
+                        else {
+                            subscribersEventsEmitter.once(eventName, listener);
+                        }
+                    }
+                    else {
+                        if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
+                            subscribersEventsEmitter.prependListener(eventName, listener);
+                        }
+                        else {
+                            subscribersEventsEmitter.on(eventName, listener);
+                        }
+                    }
+
+                    suspended = false;
+
+                    return true;
+                }
+
+                return false;
+            },
+            get suspended() {
+                return suspended;
+            },
             // A boolean value indicating whether the subscription is closed
             get closed() {
                 return closed;
@@ -1740,6 +1783,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         return this._version;
     }
 
+    getVersion = () => {
+        return this._version;
+    };
+
     getSnapshotVersion = (): string => {
         let componentSnapshotVersion = `${this._version}`;
 
@@ -1868,6 +1915,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //     return new EventSignal(initialValue, options);
     // }
 
+    static get currentSignal() {
+        return currentSignal;
+    }
+
     declare private _useSyncExternalStore: UseSyncExternalStore | undefined;
     static reactIsInited = false;
     declare static initReact;
@@ -1933,7 +1984,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             // eslint-disable-next-line @typescript-eslint/no-magic-numbers
             const isReactGte19 = Number.parseInt(__React.version || '') >= 19;
 
-            if (isDev) {
+            if (isDev || isTest) {
                 this._React = _React = __React as unknown as typeof _React;
             }
 
@@ -2389,6 +2440,7 @@ export namespace EventSignal {
         //todo: Не применять throttle к некоторым источникам
         // throttle?: TriggerDescription & { ignore?: 'set' | 'source' | 'trigger' },
         throttle?: TriggerDescription,
+        onDestroy?: () => void,
         //todo:
         // methods: {
         //   increment<number | void>(prevValue, arg = 1) { return prevValue + arg; },
@@ -2424,6 +2476,11 @@ export namespace EventSignal {
     export type Subscription = {
         // Cancels the subscription
         unsubscribe: () => void,
+        /** Suspend this subscription. Returns `true` if subscription was not suspended. */
+        suspend: () => boolean,
+        /** Resume/unsuspend this subscription. Returns `true` if subscription was suspended. */
+        resume: () => boolean,
+        suspended: boolean,
         // A boolean value indicating whether the subscription is closed
         closed: boolean,
         __proto__?: null,
@@ -2455,6 +2512,17 @@ export namespace EventSignal {
 const tagEventSignal = 'EventSignal';
 
 EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
+
+const _emptySubscription: EventSignal.Subscription = {
+    unsubscribe: _noop,
+    suspend: _noopFalse,
+    resume: _noopFalse,
+    suspended: false,
+    closed: true,
+    __proto__: null,
+};
+
+Object.freeze(_emptySubscription);
 
 export function isEventSignal<T extends EventSignal<unknown, unknown, unknown, unknown>>(maybeEventSignal: T | unknown): maybeEventSignal is T {
     return !!maybeEventSignal
@@ -2586,6 +2654,7 @@ function _getAndSubTimerGroup(
             return;
         }
 
+        /** note: {@link unsubscribe} will call {@link onRemoveSubscription} internally */
         signal.addEventListener('abort', unsubscribe, { once: true });
 
         abortCleanup = signal.removeEventListener.bind(signal, 'abort', unsubscribe);
@@ -2677,24 +2746,36 @@ function _defineNonEnumValue<T = unknown>(obj: Object, propName: string, value: 
     return value;
 }
 
+let _nextAnimationFrameCounter = 0;
 let _nextAnimationFrameTimer: ReturnType<typeof requestAnimationFrame> | undefined = void 0;
-const _nextAnimationFrameQueue: (() => void)[] = [];
+const PREDEFINED_QUEUE_POOL_SIZE = 64;
+const REDUCE_ARRAY_EACH = 100;
+const _nextAnimationFrameQueue: (() => void)[] = new Array(PREDEFINED_QUEUE_POOL_SIZE).fill(_noop);
+let _nextAnimationFrameQueueLen = 0;
 const _onNextAnimationFrame = () => {
     _nextAnimationFrameTimer = void 0;
+    _nextAnimationFrameCounter++;
 
     try {
-        for (let i = 0, len = _nextAnimationFrameQueue.length ; i < len ; i++) {
+        for (let i = 0 ; i < _nextAnimationFrameQueueLen ; i++) {
             (_nextAnimationFrameQueue[i] as NonNullable<typeof _nextAnimationFrameQueue[0]>)();
+            _nextAnimationFrameQueue[i] = _noop;
         }
     }
     catch (error) {
         console.error('EventSignal~subscribeOnNextAnimationFrame~onNextAnimationFrame: error:', error);
     }
 
-    _nextAnimationFrameQueue.length = 0;
+    _nextAnimationFrameQueueLen = 0;
+
+    if ((_nextAnimationFrameCounter % REDUCE_ARRAY_EACH) === 0
+        && _nextAnimationFrameQueue.length > PREDEFINED_QUEUE_POOL_SIZE
+    ) {
+        _nextAnimationFrameQueue.length = PREDEFINED_QUEUE_POOL_SIZE;
+    }
 };
 const _awaitNextAnimationFrame = (func: () => void) => {
-    _nextAnimationFrameQueue.push(func);
+    _nextAnimationFrameQueue[_nextAnimationFrameQueueLen++] = func;
 
     if (!_nextAnimationFrameTimer) {
         _nextAnimationFrameTimer = requestAnimationFrame(_onNextAnimationFrame);
@@ -2704,7 +2785,7 @@ const _unAwaitNextAnimationFrame = (func: () => void) => {
     const index = _nextAnimationFrameQueue.indexOf(func);
 
     if (index !== -1) {
-        _nextAnimationFrameQueue.splice(index, 1);
+        _nextAnimationFrameQueue[index] = _noop;
     }
 };
 
@@ -2816,7 +2897,7 @@ function _setReactFunctionComponent(
  * @throws {TypeError} 'Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
  */
 function _eventTargetAddListeners(
-    emitter: EventEmitter | EventTarget | WeakRef<EventEmitter | EventTarget>,
+    emitter: EventEmitter | EventTarget | WeakRef<EventEmitter | EventTarget> | undefined,
     listener: (...args: unknown[]) => void,
     options: {
         eventName: (number | string | symbol)[] | number | string | symbol,
@@ -2830,15 +2911,18 @@ function _eventTargetAddListeners(
         __proto__?: null,
     },
 ) {
-    const isWeakRefEmitter = _isWeakRef(emitter);
-    /** WeakRef or replacement object */
-    const emitterWeakRef = isWeakRefEmitter ? emitter : _weakRefFabric(emitter);
     const { signal, onEnd } = options;
 
-    if (signal?.aborted) {
+    if (signal?.aborted || !emitter) {
         return;
     }
 
+    const isWeakRefEmitter = _isWeakRef(emitter);
+    /** WeakRef or replacement object */
+    const emitterWeakRef = isWeakRefEmitter
+        ? emitter as WeakRef<EventEmitter | EventTarget>
+        : _weakRefFabric(emitter as EventEmitter | EventTarget)
+    ;
     const subscriptions: { 0: number | string | symbol, 1: typeof listener, __proto__: null }[] = [];
     const cancel = function() {
         const emitter = emitterWeakRef.deref();
@@ -2862,11 +2946,14 @@ function _eventTargetAddListeners(
     }
 
     {
-        const _emitter = isWeakRefEmitter ? emitter.deref() : emitter;
+        const _emitter = isWeakRefEmitter
+            ? (emitter as WeakRef<EventEmitter | EventTarget>).deref()
+            : emitter as EventEmitter | EventTarget
+        ;
 
         if (_emitter) {
             const { eventName, filter, once, passive, addEventNameToListener } = options;
-            const flags = { once, passive };
+            const flags = { once, passive, __proto__: null };
 
             for (const _eventName of Array.isArray(eventName) ? eventName : [ eventName ]) {
                 const _listener = (filter || addEventNameToListener)
@@ -2896,9 +2983,12 @@ function _eventTargetAddListeners(
         else {
             abortCleanup?.();
 
-            return _noop;
+            return;
         }
     }
+
+    // noinspection JSUnusedAssignment
+    emitter = void 0;
 
     return cancel;
 }
@@ -2912,7 +3002,7 @@ function _eventTargetAgnosticAddListener<T>(
     emitter: EventEmitter | EventTarget,
     name: number | string | symbol,
     listener: (newValue: T) => void,
-    flags?: { once?: boolean, signal?: AbortSignal },
+    flags?: { once?: boolean, signal?: AbortSignal, __proto__?: null },
 ) {
     if (typeof (emitter as EventEmitter).on === 'function') {
         if (flags?.once) {
@@ -3003,6 +3093,10 @@ function _checkEventSignalEventName(ignoredEventName: EventSignal.IgnoredEventNa
 
 function _noop() {
     // nothing
+}
+
+function _noopFalse() {
+    return false;
 }
 
 const _WeakRef_native_support = (function() {
