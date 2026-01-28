@@ -63,7 +63,7 @@ export function createEventSignalMagicContext(createContext: () => ReactContextL
 
 export function getReactFunctionComponentFromMagicContext(
     magicContextValue: Object,
-    componentType: EventSignal.NewOptions<any, any, any>["componentType"],
+    componentType: EventSignal.NewOptions<any, any, any, any>["componentType"],
     status?: string,
 ) {
     const type = typeof componentType;

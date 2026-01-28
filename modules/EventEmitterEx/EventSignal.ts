@@ -50,7 +50,10 @@ let currentSignal: EventSignal<any, any, any> | null = null;
 // type MethodsMap<T> = Record<string, Method<T, any[]>>;
 // type InputMethods__<T> = MethodsMap<T> | undefined;
 
-export class EventSignal<T, S=T, D=undefined> {
+// Вспомогательный тип для определения возвращаемого типа
+type ReturnTypeOrPromise<T> = T extends Promise<infer U> ? Promise<U> : T;
+
+export class EventSignal<T, S=T, D=undefined, R=T> {
     public readonly id = ++idIncrement;
     // noinspection JSUnusedGlobalSymbols
     public readonly isEventSignal = true;
@@ -116,15 +119,15 @@ export class EventSignal<T, S=T, D=undefined> {
             this._recalculateIfNeeded();
         }
     };
-    private readonly _computation?: EventSignal.ComputationWithSource<T, S, D>;
+    private readonly _computation?: EventSignal.ComputationWithSource<T, S, D, R>;
     private _sourceValue: S | undefined;
     // todo: add `statusData?: any;`?
     public readonly status?: string;
     public readonly lastError?: Error | string | undefined;
     // todo: Заменить на _sourceMapAndFilterFn
-    private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceMap"];
+    private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D, R>["sourceMap"];
     // todo: Заменить на _sourceMapAndFilterFn
-    private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D>["sourceFilter"];
+    private readonly _sourceFilterFn?: EventSignal.NewOptionsWithSource<T, S, D, R>["sourceFilter"];
     private readonly _sourceCleanup: (() => void) | undefined;
     /**
      * Payload
@@ -143,10 +146,11 @@ export class EventSignal<T, S=T, D=undefined> {
             };
     */
 
+    // todo: Разрешить ТОЛЬКО string | number | symbol, потому что от поддержки function | Object тут только усложняется код
     // For React
-    public readonly componentType?: EventSignal.NewOptions<T, S, D>["componentType"];
+    public readonly componentType?: EventSignal.NewOptions<T, S, D, R>["componentType"];
     // For React
-    private _reactFC?: _ComponentDescription<T, S, D>;
+    private _reactFC?: _ComponentDescription<T, S, D, R>;
 
     // Reserved for React
     declare readonly $$typeof: symbol;
@@ -155,10 +159,10 @@ export class EventSignal<T, S=T, D=undefined> {
      *
      * React component function (React.FC) despite of type `string` here.
      */
-    declare readonly type: ({ eventSignal }: { eventSignal: EventSignal<T, S, D>, __proto__?: null }, context?: Object) => { type: any, props: any, key: string };
+    declare readonly type: ({ eventSignal }: { eventSignal: EventSignal<T, S, D, R>, __proto__?: null }, context?: Object) => { type: any, props: any, key: string };
     // Reserved for React
     // declare readonly type: (props: {
-    //     eventSignal: EventSignal<T, S, D>,
+    //     eventSignal: EventSignal<T, S, D, R>,
     // }) => any;
     // Reserved for React
     declare readonly props: { eventSignal: EventSignal<any> };
@@ -197,19 +201,19 @@ export class EventSignal<T, S=T, D=undefined> {
     //    изменений в EventSignal для которого есть 2 и более зависимостей.
     constructor(initialValue: Awaited<T> | T);
     // constructor(initialValue: Awaited<T>, asyncComputation: EventSignal.AsyncComputationWithSource<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, options: Omit<EventSignal.NewOptions<T, S, D>, 'trigger'> | Omit<EventSignal.NewOptionsWithSource<T, S, D>, 'trigger'>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource2<T, S, D>, options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>, options: EventSignal.NewOptionsWithSource<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D>, options: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithInitialSourceValue<T, S, D>);
+    constructor(initialValue: Awaited<T> | T, options: Omit<EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>, 'trigger'> | Omit<EventSignal.NewOptionsWithSource<ReturnTypeOrPromise<R>, S, D, R>, 'trigger'>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource2<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptionsWithInitialSourceValue<ReturnTypeOrPromise<R>, S, D, R>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptionsWithSource<ReturnTypeOrPromise<R>, S, D, R>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R> | EventSignal.NewOptionsWithInitialSourceValue<ReturnTypeOrPromise<R>, S, D, R>);
     constructor(
         initialValue: Awaited<T>,
         computationOrOptions?:// eslint-disable-next-line callforce/sort-type-constituents
             // | EventSignal.AsyncComputationWithSource<T, S, D>
-            | EventSignal.ComputationWithSource<T, S, D>
-            | EventSignal.NewOptions<T, S, D>
+            | EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>
+            | EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>
         ,
-        options?: EventSignal.NewOptions<T, S, D>
+        options?: EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>
     ) {
         const isSecondParameterComputation = typeof computationOrOptions === 'function';
 
@@ -217,6 +221,8 @@ export class EventSignal<T, S=T, D=undefined> {
             options = computationOrOptions;
         }
 
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
         this._computation = isSecondParameterComputation
             ? computationOrOptions
             : void 0// (options as EventSignal.NewOptionsWithComputation<T, S, D> | EventSignal.NewOptionsWithSourceAndComputation<T, S, D> | undefined)?.computation
@@ -231,7 +237,7 @@ export class EventSignal<T, S=T, D=undefined> {
         const finaleValue = options?.finaleValue;
 
         if (finaleValue !== void 0) {
-            this._finaleValue = finaleValue;
+            this._finaleValue = finaleValue as unknown as T;
         }
 
         const finaleSourceValue = options?.finaleSourceValue;
@@ -262,7 +268,7 @@ export class EventSignal<T, S=T, D=undefined> {
         }
 
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
-        this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D>)?.initialSourceValue ?? void 0;
+        this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D, R>)?.initialSourceValue ?? void 0;
 
         this.set = this.set.bind(this);
 
@@ -282,7 +288,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 reactFC,
                 trigger,
                 throttle,
-            } = options as EventSignal.NewOptionsWithSource<T, S, D>;
+            } = options as EventSignal.NewOptionsWithSource<T, S, D, R>;
 
             if (Array.isArray(deps) && deps.length > 0) {
                 stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
@@ -774,7 +780,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 throw new Error(`Now in computing state (cycle deps?)`);
             }
 
-            const _computation = this._computation as NonNullable<EventSignal<T, S, D>["_computation"]>;
+            const _computation = this._computation as NonNullable<EventSignal<T, S, D, R>["_computation"]>;
             const prev_currentSignal = currentSignal;
 
             //todo: Сделать у EventSignal состояние со значениями PENDING и DONE, а также свойства-объекты типа
@@ -792,7 +798,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 this._computationsCount++;
 
                 // Если в _computation нужны _updateFlags они должны быть прочитаны сразу, в синхронном коде.
-                const newValue = _computation(prevValue, _sourceValue, this);
+                const newValue = _computation(prevValue as unknown as Awaited<T>, _sourceValue, this) as unknown as T;
 
                 // this._updateFlags = 0;this._isNeedToCompute = false;
                 this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCalculateNewValue
@@ -1013,7 +1019,7 @@ export class EventSignal<T, S=T, D=undefined> {
             }
             */
 
-            return this._value;
+            return this._value as unknown as R;
         }
 
         if (currentSignal && currentSignal !== this) {
@@ -1032,7 +1038,7 @@ export class EventSignal<T, S=T, D=undefined> {
                 // todo: Это только набросок поддержки async computation. Он не доделан.
                 //  Поэтому, НЕЛЬЗЯ у get() делать в типизации в качестве возвращаемого значения Promise.
                 //  Если и делать Promise у get() то только через generic или перегрузку.
-                return maybePromise as T;
+                return maybePromise as unknown as R;
             }
         }
 
@@ -1049,18 +1055,18 @@ export class EventSignal<T, S=T, D=undefined> {
         }
     };
 
-    getLast = (): T extends Promise<any> ? Awaited<T> : T => {
-        return this._value as (T extends Promise<any> ? Awaited<T> : T);
+    getLast = (): Awaited<T> => {
+        return this._value as Awaited<T>;
     };
 
-    getSync = (): T extends Promise<any> ? Awaited<T> : T => {
+    getSync = (): Awaited<T> => {
         const newValue = this.get();
 
         if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
-            return this._value as (T extends Promise<any> ? Awaited<T> : T);
+            return this._value as Awaited<T>;
         }
 
-        return newValue as (T extends Promise<any> ? Awaited<T> : T);
+        return newValue as Awaited<T>;
     };
 
     getSourceValue = () => {
@@ -1315,6 +1321,8 @@ export class EventSignal<T, S=T, D=undefined> {
         }
     }
 
+    toPromise(): Promise<T>;
+    toPromise(onFulfilled?: (result: T) => void, onRejected?: (error: unknown) => void): Promise<T> | Promise<void>;
     toPromise(onFulfilled?: (result: T) => void, onRejected?: (error: unknown) => void) {
         let currentPromise: typeof this._promise;
 
@@ -1419,12 +1427,12 @@ export class EventSignal<T, S=T, D=undefined> {
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
         subscriptionFlags?: number,
-    ): EventSignal.Subscription | EventSignal<T, S, D>;
+    ): EventSignal.Subscription | EventSignal<T, S, D, R>;
     protected _addListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
         subscriptionFlags = 0,
-    ): EventSignal.Subscription | EventSignal<T, S, D> {
+    ): EventSignal.Subscription | EventSignal<T, S, D, R> {
         let shouldReturnThis = false;
 
         if (typeof ignoredEventName === 'function') {
@@ -1516,7 +1524,7 @@ export class EventSignal<T, S=T, D=undefined> {
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
         listener: ((newValue: T) => void) | undefined,
         makeItEasyAndFastAndUseSubscription?: boolean,
-    ): EventSignal<T, S, D> | undefined {
+    ): EventSignal<T, S, D, R> | undefined {
         let shouldReturnThis = false;
 
         if (!makeItEasyAndFastAndUseSubscription) {
@@ -1547,43 +1555,43 @@ export class EventSignal<T, S=T, D=undefined> {
         return;
     }
 
-    once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     once(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     once(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._addListener(arg1, arg2, 1 << 1);
     }
 
-    on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     on(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     on(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._addListener(arg1, arg2);
     }
 
-    addListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    addListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     addListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     addListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._addListener(arg1, arg2);
     }
 
-    prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     prependListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     prependListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._addListener(arg1, arg2, 1 << 2);
     }
 
-    prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     prependOnceListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
     prependOnceListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._addListener(arg1, arg2, (1 << 1) | (1 << 2));
     }
 
-    off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     off(callbackFn: (newValue: T) => void): void;
     off(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._removeListener(arg1, arg2);
     }
 
-    removeListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D>;
+    removeListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
     removeListener(callbackFn: (newValue: T) => void): void;
     removeListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
         return this._removeListener(arg1, arg2);
@@ -1763,7 +1771,7 @@ export class EventSignal<T, S=T, D=undefined> {
     // }
 
     // note: Другое возможное название: createAction
-    createMethod<INPUT=void>(computation: (currentValue: T, input: INPUT extends void ? undefined : INPUT, currentSourceValue: S, eventSignal: EventSignal<T, S, D>) => S) {
+    createMethod<INPUT=void>(computation: (currentValue: T, input: INPUT extends void ? undefined : INPUT, currentSourceValue: S, eventSignal: EventSignal<T, S, D, R>) => S) {
         return (input: INPUT) => {
             const currentValue = this._value;
             const { _sourceValue } = this;
@@ -1789,11 +1797,11 @@ export class EventSignal<T, S=T, D=undefined> {
         //       Argument of type '() => CR' is not assignable to parameter of type 'ComputationWithSource<CR, S, undefined>'.
         // `
         return new EventSignal<CR, S>(void 0 as CR, () => {
-            return computation(this.get());
+            return computation(this.get() as unknown as T);
         });
     }
 
-    setReactFC(reactFC?: EventSignal.NewOptions<T, S, D>["reactFC"] | false, preDefinedProps?: Object | undefined) {
+    setReactFC<FC extends EventSignal.NewOptions<T, S, D, R>["reactFC"] | false>(reactFC?: FC, preDefinedProps?: FC extends (...args: any) => any ? Partial<Parameters<FC>[0]> : never | undefined) {
         const prev = this._reactFC;
 
         this._reactFC = { 0: reactFC, 1: preDefinedProps, __proto__: null };
@@ -1804,13 +1812,13 @@ export class EventSignal<T, S=T, D=undefined> {
     // noinspection JSUnusedGlobalSymbols
     component = Object.assign((props: Record<string, any> & {
         children?: unknown,
-        sFC?: EventSignal.ReactFC<T, S, D> | false,
-        // sComponents?: Map<ComponentType, EventSignal.ReactFC<any, any, any>>)
+        sFC?: EventSignal.ReactFC<T, S, D, R> | false,
+        // sComponents?: Map<ComponentType, EventSignal.ReactFC<any, any, any, any>>)
     }, context?: Object) => {
         const { type } = this;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-expect-error
-        const _type: EventSignal<T, S, D>["type"] = 'type' in type ? type.type : type;
+        const _type: EventSignal<T, S, D, R>["type"] = 'type' in type ? type.type : type;
 
         return _type({
             __proto__: null,
@@ -1838,14 +1846,14 @@ export class EventSignal<T, S=T, D=undefined> {
     });
 
     static createSignal<T>(initialValue: T): EventSignal<T, T>;
-    static createSignal<T, S, D>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D>, options?: EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>): EventSignal<T, S, D>;
-    static createSignal<T, S, D>(initialValue: T, options: EventSignal.NewOptionsWithSource<T, S, D>): EventSignal<T, S, D>;
-    static createSignal<T, S, D>(initialValue: T, options: EventSignal.NewOptions<T, S, D>): EventSignal<T, T>;
-    static createSignal<T, S, D>(
+    static createSignal<T, S, D, R = T>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D, T>, options?: EventSignal.NewOptions<T, S, D, R> | EventSignal.NewOptionsWithSource<T, S, D, R>): EventSignal<T, S, D, R>;
+    static createSignal<T, S, D, R = T>(initialValue: T, options: EventSignal.NewOptionsWithSource<T, S, D, R>): EventSignal<T, S, D, R>;
+    static createSignal<T, S, D, R>(initialValue: T, options: EventSignal.NewOptions<T, S, D, R>): EventSignal<T, T>;
+    static createSignal<T, S, D, R = T>(
         initialValue: T,
-        computationOrOptions?: EventSignal.ComputationWithSource<T, S, D> | EventSignal.NewOptions<T, S, D> | EventSignal.NewOptionsWithSource<T, S, D>,
-        options?: EventSignal.NewOptions<T, S, D>,
-    ): EventSignal<T, S, D> {
+        computationOrOptions?: EventSignal.ComputationWithSource<T, S, D, R> | EventSignal.NewOptions<T, S, D, R> | EventSignal.NewOptionsWithSource<T, S, D, R>,
+        options?: EventSignal.NewOptions<T, S, D, R>,
+    ): EventSignal<T, S, D, R> {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore
         return new EventSignal(initialValue, computationOrOptions, options);
@@ -2014,10 +2022,10 @@ export class EventSignal<T, S=T, D=undefined> {
             });
         };
         */
-        const memorizedComponents = new WeakMap<EventSignal.ReactFC<any, any, any>, EventSignal.ReactFC<any, any, any>>();
-        const memorizedComponents_onNew = function(key: EventSignal.ReactFC<any, any, any>) {
+        const memorizedComponents = new WeakMap<EventSignal.ReactFC<any, any, any, any>, EventSignal.ReactFC<any, any, any, any>>();
+        const memorizedComponents_onNew = function(key: EventSignal.ReactFC<any, any, any, any>) {
             return _React_memo
-                ? _React_memo(key) as EventSignal.ReactFC<any, any, any>
+                ? _React_memo(key) as EventSignal.ReactFC<any, any, any, any>
                 : key
             ;
         };
@@ -2039,7 +2047,7 @@ export class EventSignal<T, S=T, D=undefined> {
         }: {
             eventSignal: EventSignal<any>,
             children?: Object,
-            sFC?: EventSignal.ReactFC<any, any, any> | false,
+            sFC?: EventSignal.ReactFC<any, any, any, any> | false,
         }) {
             /**
              * A BETA version of EventSignal's ViewContext
@@ -2052,7 +2060,7 @@ export class EventSignal<T, S=T, D=undefined> {
             const signalValue = eventSignal.getSafe();
             const { componentType } = eventSignal;
             const reactFCDescriptor = sFC === void 0 && Boolean(_React_createElement)
-                ? (contextValue ? getReactFunctionComponentFromMagicContext(contextValue, componentType, eventSignal.status) as (_ComponentDescription<any, any, any> | null) : void 0)
+                ? (contextValue ? getReactFunctionComponentFromMagicContext(contextValue, componentType, eventSignal.status) as (_ComponentDescription<any, any, any, any> | null) : void 0)
                     ?? eventSignal._reactFC
                     ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
                 : void 0
@@ -2091,7 +2099,7 @@ export class EventSignal<T, S=T, D=undefined> {
                         }
                     }
 
-                    const memorizedReactFC: EventSignal.ReactFC<any, any, any> = _React_memo && !("$$typeof" in reactFC)
+                    const memorizedReactFC: EventSignal.ReactFC<any, any, any, any> = _React_memo && !("$$typeof" in reactFC)
                         ? memorizedComponents.getOrInsertComputed(reactFC, memorizedComponents_onNew)
                         : reactFC
                     ;
@@ -2212,70 +2220,75 @@ export class EventSignal<T, S=T, D=undefined> {
         T=unknown,
         S=T,
         D=unknown,
-        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D>["componentType"],
+        R=T,
+        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
         },
     >(
         componentType: CT,
-        reactFC: EventSignal.ReactFC<any, any, any, PROPS>,
+        reactFC: EventSignal.ReactFC<any, any, any, any, PROPS>,
         status: number | string | symbol,
         preDefinedProps?: _PreDefinedProps<PROPS>,
-    ): EventSignal.ReactFC<any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, PROPS>> | null;
+    ): EventSignal.ReactFC<any, any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, any, PROPS>> | null;
     static registerReactComponentForComponentType<
         T=unknown,
         S=T,
         D=unknown,
-        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D>["componentType"],
+        R=T,
+        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
         },
     >(
         componentType: CT,
-        reactFC: EventSignal.ReactFC<any, any, any, PROPS>,
+        reactFC: EventSignal.ReactFC<any, any, any, any, PROPS>,
         preDefinedProps?: _PreDefinedProps<PROPS>,
-    ): EventSignal.ReactFC<any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, PROPS>> | null;
+    ): EventSignal.ReactFC<any, any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, any, PROPS>> | null;
     static registerReactComponentForComponentType<
         T=unknown,
         S=T,
         D=unknown,
-        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D>["componentType"],
+        R=T,
+        CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D>,
+            eventSignal: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
         },
     >(
         componentType: CT,
-        reactFC: EventSignal.ReactFC<any, any, any, PROPS>,
+        reactFC: EventSignal.ReactFC<any, any, any, any, PROPS>,
         arg3?: _PreDefinedProps<PROPS> | number | string | symbol,
         arg4?: _PreDefinedProps<PROPS>,
-    ): EventSignal.ReactFC<any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, PROPS>> | null {
+    ): EventSignal.ReactFC<any, any, any, any, PROPS> | Record<string, EventSignal.ReactFC<any, any, any, any, PROPS>> | null {
         const status: string | undefined = typeof arg3 === 'string' || typeof arg3 === 'number' ? arg3 as string : void 0;
         const preDefinedProps: Omit<Partial<PROPS>, 'componentType' | 'eventSignal' | 'version'> | undefined = status === void 0
             ? arg3 as _PreDefinedProps<PROPS>
             : arg4 as _PreDefinedProps<PROPS>
         ;
 
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+        // @ts-ignore `TS2345: Argument of type ReactFC<any, any, any, any, PROPS> is not assignable to parameter of type ReactFC<any, any, any, any, {}>`
         const reactFCDescriptor = _setReactFunctionComponent(componentType, reactFC, status, preDefinedProps);
         const prev_reactFC = reactFCDescriptor?.[0] || null;
 
@@ -2292,13 +2305,11 @@ export namespace EventSignal {
     // export type AsyncComputationWithSource<T, S, D> = {
     //     async (prevValue: T, sourceValue: R | undefined, data: D): T | undefined,
     // } | void;
-    export type ComputationWithSource<T, S, D> = T extends Promise<infer TT>
-        ? (prevValue: TT, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | undefined)
-        : (prevValue: T, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D>) => (T | undefined)
+    export type ComputationWithSource<T, S, D, R> =
+        (prevValue: Awaited<T>, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D, R>) => (R | undefined)
     ;
-    export type ComputationWithSource2<T, S, D> = T extends Promise<infer TT>
-        ? (prevValue: TT, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | undefined)
-        : (prevValue: T, sourceValue: S, eventSignal: EventSignal<T, S, D>) => (T | undefined)
+    export type ComputationWithSource2<T, S, D, R> =
+        (prevValue: Awaited<T>, sourceValue: S, eventSignal: EventSignal<T, S, D, R>) => (R | undefined)
     ;
 
     export type TriggerDescriptionTimerGroupId = number | string | symbol;
@@ -2348,19 +2359,19 @@ export namespace EventSignal {
 
     export type TriggerDescription = TriggerDescriptionClock | TriggerDescriptionEmitter | TriggerDescriptionEventSignal;
 
-    export type ReactFC<T, S, D, PROPS={}> = (props: {
-        eventSignal: EventSignal<T, S, D>,
+    export type ReactFC<T, S, D, R, PROPS={}> = (props: {
+        eventSignal: EventSignal<T, S, D, R>,
         version?: number,
         children?: any,
         [key: string]: any,
     } & PROPS) => any;
 
-    export type NewOptions<T, S, D> = {
+    export type NewOptions<T, S, D, R> = {
         description?: string,
         /**
          * Value after [EventSignal]{@link EventSignal} destroyed.
          */
-        finaleValue?: T,
+        finaleValue?: Awaited<R>,
         /**
          * Source value after [EventSignal]{@link EventSignal} destroyed.
          */
@@ -2371,8 +2382,9 @@ export namespace EventSignal {
         data?: D,
         /** An [AbortSignal]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal} from [AbortController]{@link https://developer.mozilla.org/en-US/docs/Web/API/AbortController} */
         signal?: AbortSignal,
+        // todo: Разрешить ТОЛЬКО string | number | symbol, потому что от поддержки function | Object тут только усложняется код
         componentType?: Object | number | string | symbol | undefined,
-        reactFC?: ReactFC<T, S, D>,
+        reactFC?: ReactFC<T, S, D, R>,
         trigger?: TriggerDescription,
         //todo: Не применять throttle к некоторым источникам
         // throttle?: TriggerDescription & { ignore?: 'set' | 'source' | 'trigger' },
@@ -2387,10 +2399,10 @@ export namespace EventSignal {
 
         __proto__?: null,
     };
-    export interface NewOptionsWithInitialSourceValue<T, S, D> extends NewOptions<T, S, D> {
+    export interface NewOptionsWithInitialSourceValue<T, S, D, R> extends NewOptions<T, S, D, R> {
         initialSourceValue: S;
     }
-    export type NewOptionsWithSource<T, S, D> = NewOptions<T, S, D> & {
+    export type NewOptionsWithSource<T, S, D, R> = NewOptions<T, S, D, R> & {
         sourceEmitter: EventEmitter | EventEmitterX | EventTarget | undefined,
         sourceEvent: (number | string | symbol)[] | number | string | symbol,
         // todo: добавить sourceMapAndFilter, который может быть использован вместо пары sourceMap/sourceFilter
@@ -2444,7 +2456,7 @@ const tagEventSignal = 'EventSignal';
 
 EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
 
-export function isEventSignal(maybeEventSignal: EventSignal<any> | unknown): maybeEventSignal is EventSignal<any> {
+export function isEventSignal<T extends EventSignal<unknown, unknown, unknown, unknown>>(maybeEventSignal: T | unknown): maybeEventSignal is T {
     return !!maybeEventSignal
         && ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
     ;
@@ -2711,9 +2723,9 @@ const _hasWeekMapSymbolsSupport = (function() {
     }
 })();
 
-type _ComponentDescription<T, S, D> = {
+type _ComponentDescription<T, S, D, R> = {
     // reactFC
-    0: EventSignal.ReactFC<T, S, D> | false | undefined,
+    0: EventSignal.ReactFC<T, S, D, R> | false | undefined,
     // preDefinedProps
     1?: Object,
     __proto__: null,
@@ -2722,16 +2734,16 @@ type _ComponentDescription<T, S, D> = {
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
 // @ts-ignore `TS2344: Type symbol | object does not satisfy the constraint object`
 const _reactFunctionComponentByComponentType_WeakMap = new WeakMap<object | symbol, {
-    [status: string]: _ComponentDescription<any, any, any>,
+    [status: string]: _ComponentDescription<any, any, any, any>,
 }>();
 const _reactFunctionComponentByComponentType_Map = new Map<number | string, {
-    [status: string]: _ComponentDescription<any, any, any>,
+    [status: string]: _ComponentDescription<any, any, any, any>,
 }>();
 
 function _getReactFunctionComponent(
-    componentType: EventSignal.NewOptions<any, any, any>["componentType"],
+    componentType: EventSignal.NewOptions<any, any, any, any>["componentType"],
     status?: string,
-): _ComponentDescription<any, any, any> | null {
+): _ComponentDescription<any, any, any, any> | null {
     const type = typeof componentType;
 
     if (componentType === null || type === 'undefined') {
@@ -2751,7 +2763,7 @@ function _getReactFunctionComponent(
 }
 
 function _setReactFunctionComponent(
-    componentType: EventSignal.NewOptions<any, any, any>["componentType"],
+    componentType: EventSignal.NewOptions<any, any, any, any>["componentType"],
     reactFC: EventSignal.ReactFC<any, any, any, any> | null | undefined,
     status: string | undefined,
     preDefinedProps?: Object,
@@ -2777,7 +2789,7 @@ function _setReactFunctionComponent(
         }
     }
     else {
-        const componentDescriptionForStatus: _ComponentDescription<any, any, any> = {
+        const componentDescriptionForStatus: _ComponentDescription<any, any, any, any> = {
             0: reactFC,
             1: preDefinedProps,
             __proto__: null,
@@ -2924,7 +2936,7 @@ function _eventTargetAgnosticAddListener<T>(
 /**
  * @private
  * @throws {TypeError} 'Invalid type of "emitter". Should be EventEmitter or EventTarget'
- * @throws {TypeError} 'Failed to execute 'addEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
+ * @throws {TypeError} 'Failed to execute 'removeEventListener' on 'EventTarget': Cannot convert a Symbol value to a string'
  */
 function _eventTargetAgnosticRemoveListener<T>(
     emitter: EventEmitter | EventTarget,
