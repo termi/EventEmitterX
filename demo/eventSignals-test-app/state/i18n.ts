@@ -2,7 +2,7 @@
 
 // noinspection ES6UnusedImports
 import {} from 'cftools/ts_types/index';
-import type { MouseEventHandler } from "react";
+import type { MouseEventHandler, ChangeEventHandler } from "react";
 
 import { EventSignal, isEventSignal } from '~/modules/EventEmitterEx/EventSignal';
 import {
@@ -50,6 +50,17 @@ export const currentLocale$ = new EventSignal(currentLocale, (prevValue, newLoca
                 }
             }
         }) as MouseEventHandler,
+        onChangeLocaleSelect: ((event) => {
+            const { currentTarget } = event;
+
+            if (currentTarget) {
+                const locale = (currentTarget as HTMLSelectElement).value;
+
+                if (locale) {
+                    currentLocale$.set(locale);
+                }
+            }
+        }) as ChangeEventHandler,
     },
 });
 

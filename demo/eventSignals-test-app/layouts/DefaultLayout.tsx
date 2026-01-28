@@ -6,12 +6,18 @@ import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
 import NavBar from "../modules/NavBar";
 import { LocaleSelector } from "../modules/LocaleSelector";
+import { LocaleSelectorModern } from "../modules/LocaleSelectorModern";
 
 import { currentLocale$ } from "../state/i18n";
+import { hasCustomizableSelectSupport } from "../lib/supports";
 
 import css from "./DefaultLayout.module.css";
 
-export default function DefaultLayout({ children, pageTitle, pageTitle$ }: {
+if (hasCustomizableSelectSupport()) {
+    currentLocale$.setReactFC(LocaleSelectorModern, { accessKey: 'i' });
+}
+
+const DefaultLayout = React.memo(function DefaultLayout({ children, pageTitle, pageTitle$ }: {
     children?: React.ReactNode,
     pageTitle?: string,
     pageTitle$?: EventSignal<string>,
@@ -21,9 +27,7 @@ export default function DefaultLayout({ children, pageTitle, pageTitle$ }: {
             <div className={css.headerTop}>
                 <h1 className={css.pageTitle}>{pageTitle$ || pageTitle || ''}</h1>
                 <div className={css.headerActions}>
-                    <div className={css.pageHeaderRight}>
-                        <currentLocale$.component sFC={LocaleSelector}/>
-                    </div>
+                    <currentLocale$.component sDefaultFC={LocaleSelector} />
                 </div>
             </div>
             <div className={css.headerBottom}>
@@ -32,4 +36,6 @@ export default function DefaultLayout({ children, pageTitle, pageTitle$ }: {
         </header>
         {children || null}
     </main>;
-}
+})
+
+export default DefaultLayout;
