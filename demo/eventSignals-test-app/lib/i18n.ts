@@ -14,7 +14,6 @@ const regionBaseCodePoint = "A".codePointAt(0);
  */
 const unicodeFlagBaseCodePoint = "🇦".codePointAt(0);
 
-const sourceLanguagesForText: Record<string, string> = Object.create(null);
 let _fetchGoogleTranslateApi_currentRequest: Promise<any> | undefined = void 0;
 const capitals = _capitals as {
     capitalsList: string[],
@@ -29,7 +28,7 @@ Object.freeze(Object.setPrototypeOf(capitals.indexByISOv2, null));
 Object.freeze(Object.setPrototypeOf(capitals, null));
 
 export async function fetchGoogleTranslateApi(text: string, {
-    sourceLanguage = sourceLanguagesForText[text] ?? defaultLocale,
+    sourceLanguage = defaultLocale,
     targetLanguage = 'en-US',
     delay,
     queueRequests,
@@ -146,10 +145,6 @@ export async function fetchGoogleTranslateApi(text: string, {
         targetLanguage,
         timestamp: Date.now(),
     };
-}
-
-export function setSourceLanguageForText(text: string, sourceLanguage: string) {
-    sourceLanguagesForText[text] = sourceLanguage;
 }
 
 const localStorageLocalizationsByLocaleMap = Object.assign(new Map<string, Partial<Record<string, string>>>(), {
@@ -438,13 +433,19 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         flag = String.fromCodePoint(unicodeFlagCodePoint0) + String.fromCodePoint(unicodeFlagCodePoint1);
     }
 
+    const defaultNumberingSystem = _getLocaleDefaultNumberingSystem(localeCode);
+    const numberFormatOptions = new Intl.NumberFormat(localeCode).resolvedOptions();
+
+    numberFormatOptions.numberingSystem = defaultNumberingSystem;
+
     const result: getLocaleInfo.Result = {
         locale: localeCode,
         flag,
         language,
         region,
-        defaultNumericSystem: _getLocaleDefaultNumericSystem(localeCode),
+        defaultNumberingSystem,
         textDirection,
+        numberFormatOptions,
         __proto__: null,
     };
 
@@ -471,14 +472,15 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         }
 
         _result.capital = capital;
+        /**
+         * В файле eventSignals-test-app/static/data/capitals.json название столицы сохранено на английском языке,
+         *  а по-умолчанию у нас для переводов используется русский.
+         */
+        _result.capitalOriginateLocale = 'en-US';
         _result.defaultTimezone = defaultTimezone || 'UTC';
-
-        // В файле eventSignals-test-app/static/data/capitals.json название столицы сохранено на английском языке,
-        //  а по-умолчанию у нас для переводов используется русский.
-        // todo: Сделать как-то более элегантно
-        setSourceLanguageForText(capital, 'en-US');
     }
 
+    Object.freeze(Object.setPrototypeOf(numberFormatOptions, null));
     Object.freeze(Object.setPrototypeOf(result, null));
 
     _getLocaleInfo_cache.set(cacheKey, result as getLocaleInfo.ExtendedResult);
@@ -492,13 +494,15 @@ export namespace getLocaleInfo {
         flag: string,
         language: string,
         region: string,
-        defaultNumericSystem: string,
+        defaultNumberingSystem: string,
         textDirection: 'ltr' | 'rtl',
+        numberFormatOptions: ConstructorParameters<typeof Intl["NumberFormat"]>[1],
         __proto__: null,
     };
 
     export type ExtendedResult = Result & {
         capital: string,
+        capitalOriginateLocale?: string,
         defaultTimezone: string,
     };
 }
@@ -527,7 +531,7 @@ export function getLanguageName(languageCode: string, displayLocale: string) {
 /**
  * Warning: This was AI generated! Do not blinded trust this!
  */
-const numericSystemByLocale = {
+const numberingSystemByLocale = {
     // Арабский и родственные
     'ar': 'arab', 'ar-*': 'arab',           // Arabic
     'fa': 'arabext', 'fa-*': 'arabext',     // Persian (Eastern Arabic)
@@ -669,7 +673,7 @@ const numericSystemByLocale = {
  *
  * Warning: This was AI generated! Do not blinded trust this!
  */
-const numericSystemByLocale_scriptOverrides = {
+const numberingSystemByLocale_scriptOverrides = {
     'zh-Hant': 'hanidec',   // Traditional Chinese
     'zh-Hans': 'hanidec',   // Simplified Chinese
     'zh-TW': 'hanidec',
@@ -690,7 +694,7 @@ const numericSystemByLocale_scriptOverrides = {
  *
  * Warning: This was AI generated! Do not blinded trust this!
  */
-const numericSystemByLocale_regionOverrides = {
+const numberingSystemByLocale_regionOverrides = {
     // Персидские/арабские цифры в определенных регионах
     'AF': 'arabext',    // Afghanistan
     'IR': 'arabext',    // Iran
@@ -731,24 +735,24 @@ const numericSystemByLocale_regionOverrides = {
     'IN-ML': 'beng',    // Meghalaya (mostly, though English dominant)
 };
 
-Object.freeze(Object.setPrototypeOf(numericSystemByLocale, null));
-Object.freeze(Object.setPrototypeOf(numericSystemByLocale_scriptOverrides, null));
-Object.freeze(Object.setPrototypeOf(numericSystemByLocale_regionOverrides, null));
+Object.freeze(Object.setPrototypeOf(numberingSystemByLocale, null));
+Object.freeze(Object.setPrototypeOf(numberingSystemByLocale_scriptOverrides, null));
+Object.freeze(Object.setPrototypeOf(numberingSystemByLocale_regionOverrides, null));
 
 const arabicRegions = new Set([ 'SA', 'AE', 'QA', 'KW', 'BH', 'OM', 'YE', 'IQ', 'SY', 'JO', 'LB', 'PS', 'SD', 'MA', 'DZ', 'TN', 'LY', 'MR', 'DJ', 'SO' ]);
 const cyrillicRegions = new Set([ 'RU', 'BY', 'UA', 'KZ', 'KG', 'MD', 'RS', 'ME', 'BA', 'MK', 'BG' ]);
 
-function _getLocaleDefaultNumericSystem(locale: string) {
+function _getLocaleDefaultNumberingSystem(locale: string) {
     if (!locale || typeof locale !== 'string') {
         return 'latn';
     }
 
     // 1. Проверяем точное совпадение в scriptOverrides
     {
-        const forceNumericSystem = numericSystemByLocale_scriptOverrides[locale];
+        const forceNumberingSystem = numberingSystemByLocale_scriptOverrides[locale];
 
-        if (forceNumericSystem) {
-            return forceNumericSystem;
+        if (forceNumberingSystem) {
+            return forceNumberingSystem;
         }
     }
 
@@ -773,14 +777,14 @@ function _getLocaleDefaultNumericSystem(locale: string) {
 
         // Проверяем региональное переопределение для языка-региона
         const langRegion = `${lang}-${region}`;
-        const ns_by_langRegion = numericSystemByLocale_regionOverrides[langRegion];
+        const ns_by_langRegion = numberingSystemByLocale_regionOverrides[langRegion];
 
         if (ns_by_langRegion) {
             return ns_by_langRegion;
         }
 
         // Проверяем общее региональное переопределение
-        const ns_by_region = numericSystemByLocale_regionOverrides[region];
+        const ns_by_region = numberingSystemByLocale_regionOverrides[region];
 
         if (ns_by_region) {
             return ns_by_region;
@@ -789,7 +793,7 @@ function _getLocaleDefaultNumericSystem(locale: string) {
         // Проверяем подрегион (например, CN-65 для Синьцзяна)
         if (parts.length >= 3) {
             const subRegion = `${region}-${parts[2]}`;
-            const ns_by_subRegion = numericSystemByLocale_regionOverrides[subRegion];
+            const ns_by_subRegion = numberingSystemByLocale_regionOverrides[subRegion];
 
             if (ns_by_subRegion) {
                 return ns_by_subRegion;
@@ -798,7 +802,7 @@ function _getLocaleDefaultNumericSystem(locale: string) {
     }
 
     // 4. Ищем точное совпадение локали
-    const default_ns_by_locale = numericSystemByLocale[locale];
+    const default_ns_by_locale = numberingSystemByLocale[locale];
 
     if (default_ns_by_locale) {
         return default_ns_by_locale;
@@ -807,14 +811,14 @@ function _getLocaleDefaultNumericSystem(locale: string) {
     // 5. Ищем по языку с wildcard
     const lang = locale.split('-')[0];
     const wildcardKey = `${lang}-*`;
-    const default_ns_by_langWildcardKey = numericSystemByLocale[wildcardKey];
+    const default_ns_by_langWildcardKey = numberingSystemByLocale[wildcardKey];
 
     if (default_ns_by_langWildcardKey) {
         return default_ns_by_langWildcardKey;
     }
 
     // 6. Ищем только по языку
-    const default_ns_by_lang = numericSystemByLocale[lang];
+    const default_ns_by_lang = numberingSystemByLocale[lang];
 
     if (default_ns_by_lang) {
         return default_ns_by_lang;
@@ -826,7 +830,7 @@ function _getLocaleDefaultNumericSystem(locale: string) {
     if (scriptMatch) {
         const script = scriptMatch[1];
         const scriptKey = `${lang}-${script}`;
-        const default_ns_by_scriptKey = numericSystemByLocale[scriptKey];
+        const default_ns_by_scriptKey = numberingSystemByLocale[scriptKey];
 
         if (default_ns_by_scriptKey) {
             return default_ns_by_scriptKey;
