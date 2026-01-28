@@ -1,4 +1,4 @@
-/* eslint-disable callforce/typescript__no_declaration_in_dts */
+/* eslint-disable callforce/typescript__no_declaration_in_dts,@typescript-eslint/no-explicit-any */
 //
 
 declare namespace _EventSignal_ReactPropTypes {
@@ -7,7 +7,7 @@ declare namespace _EventSignal_ReactPropTypes {
     export interface Validator<T> {
         (props: { [key: string]: any }, propName: string, componentName: string, location: string, propFullName: string): Error | null;
         [nominalTypeHack]?: {
-            type: T;
+            type: T,
         } | undefined;
     }
 }
@@ -17,9 +17,9 @@ type Validator<T> = _EventSignal_ReactPropTypes.Validator<T>;
 export namespace EventSignal_ReactCopy {
     type JSXElementConstructor<P> =
         | ((props: P) => ReactElement<any, any> | null);
-    type Key = string | number;
+    type Key = number | string;
 
-    interface ReactElement<P = any, T extends string | JSXElementConstructor<any> = string | JSXElementConstructor<any>> {
+    interface ReactElement<P = any, T extends JSXElementConstructor<any> | string = JSXElementConstructor<any> | string> {
         type: T;
         props: P;
         key: Key | null;
