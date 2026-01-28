@@ -27,6 +27,7 @@ export function LocaleSelector({ eventSignal }: { eventSignal: typeof currentLoc
                 currentLocale={currentLocale}
                 otherLocale={systemLocale}
                 isCurrent={true}
+                accessKey="i"
             />
             <div className={css.languageDropdown}>
                 {allowedLocales.map(localeInfo => {
@@ -48,7 +49,7 @@ export function LocaleSelector({ eventSignal }: { eventSignal: typeof currentLoc
     </div>);
 }
 
-function LanguageCard({ locale, onClick, flag, currentLocale, otherLocale, isSelected, isCurrent }: {
+function LanguageCard({ locale, onClick, flag, currentLocale, otherLocale, isSelected, isCurrent, accessKey }: {
     locale: string,
     onClick?: typeof currentLocale$.data.onClickLocaleElement,
     flag: string,
@@ -56,6 +57,7 @@ function LanguageCard({ locale, onClick, flag, currentLocale, otherLocale, isSel
     otherLocale: string,
     isSelected?: boolean,
     isCurrent?: boolean,
+    accessKey?: string,
 }) {
     return (<button
         role="menuitem"
@@ -67,6 +69,7 @@ function LanguageCard({ locale, onClick, flag, currentLocale, otherLocale, isSel
         } ${
             isSelected ? css.languageOptionSelected : ''
         }`}
+        accessKey={accessKey}
     >
         <div className={css.languageFlag}>{flag}</div>
         <div className={css.languageInfo}>

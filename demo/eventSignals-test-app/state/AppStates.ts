@@ -15,7 +15,7 @@ const counter1$ = new EventSignal(0, {
     },
 });
 const computed1$ = new EventSignal('', (_prev, sourceValue, eventSignal) => {
-    if (eventSignal.getStateFlags() === EventSignal.StateFlags.wasSourceSetting) {
+    if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
         counter1$.set(sourceValue);
     }
 

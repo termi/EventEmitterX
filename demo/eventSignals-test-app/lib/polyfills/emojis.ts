@@ -3,7 +3,7 @@
 // @see [The dumb reason why flag emojis aren't working on your site in Chrome on Windows](https://geyer.dev/blog/windows-flag-emojis/)
 import { polyfillCountryFlagEmojis } from "country-flag-emoji-polyfill";
 
-import twemojiCountryFlags_filepath from '../static/fonts/TwemojiCountryFlags.woff2';
+import twemojiCountryFlags_filepath from '../../static/fonts/TwemojiCountryFlags.woff2';
 
 type FlagEmojisSupportedInfo = {
     timestamp: number,

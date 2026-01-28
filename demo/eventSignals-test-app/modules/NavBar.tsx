@@ -3,7 +3,6 @@
 import type { MouseEvent } from 'react';
 
 import * as React from 'react';
-import { memo } from 'react';
 
 import type { NavigationRouter } from "../state/routing";
 import { currentNavigatorPage$ } from "../state/routing";
@@ -20,14 +19,14 @@ function handleClick(event: MouseEvent<HTMLElement>) {
     }
 }
 
-const NavBar = memo(function NavBar() {
+const NavBar = React.memo(function NavBar() {
     console.log(NavBar.name, 'render');
 
     const currentPageRouter = currentNavigatorPage$.use();
     const { routersList } = currentNavigatorPage$.data;
 
     return (<div className={css.navContainer} role="navigation" aria-label="Main" aria-haspopup="true">
-        <ul className={css.navMenu}>
+        <menu className={css.navMenu}>
             {routersList.map(router => {
                 if (router.menuHidden) {
                     return null;
@@ -35,7 +34,7 @@ const NavBar = memo(function NavBar() {
 
                 return <MenuItem key={router.key} router={router} currentPageRouter={currentPageRouter} />;
             })}
-        </ul>
+        </menu>
     </div>);
 });
 

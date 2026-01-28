@@ -4,6 +4,12 @@
 
 import { apply, isSupported, injectStyles } from '@oddbird/popover-polyfill/fn';
 
+/**
+ * * [MDN Popover API examples](https://mdn.github.io/dom-examples/popover-api/)
+ * * [npm / Popover Attribute Polyfill](https://www.npmjs.com/package/@oddbird/popover-polyfill)
+ * * [codepen.io / Learn CSS P2 Popover - interaction](https://codepen.io/web-dot-dev/pen/OPyZpRP)
+ * * [web.dev / popover-and-dialog](https://web.dev/learn/css/popover-and-dialog?hl=ru)
+ */
 if (!isSupported()) {
     // see https://github.com/oddbird/popover-polyfill/commit/5fd42a46ec4f8852290382191748bc1abadd4211
     const cssSupportsLevel = CSS.supports('selector(:where(dialog[popover][open]))')
