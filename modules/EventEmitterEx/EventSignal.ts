@@ -78,7 +78,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     private _computationsCount = 0;
     /** (React) component version. Only usable with {@link registerReactComponentForComponentType} and {@link _subscribeOnNextAnimationFrame} */
     private _cv = 0 | 0;
-    private _computationPromise: Promise<T> | null | undefined;
+    /** computationDeferredList */
+    private _cDeferredList: ({ resolve: ((newValue: T) => void), reject: ((error: unknown) => void), promise: Promise<T> })[] | undefined;
     private _recalcPromise: Promise<void> | null | undefined;
     // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
     // private _setPromise: Promise<void> | null | undefined;
@@ -124,7 +125,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     private _sourceValue: S | undefined;
     // todo: add `statusData?: any;`?
     public readonly status?: string;
-    public readonly lastError?: Error | string | undefined;
+    public readonly lastError?: Error | string | unknown | undefined;
     // todo: Заменить на _sourceMapAndFilterFn
     private readonly _sourceMapFn?: EventSignal.NewOptionsWithSource<T, S, D, R>["sourceMap"];
     // todo: Заменить на _sourceMapAndFilterFn
@@ -497,16 +498,19 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         // EventSignal._setComponentOnDestroy(this);
 
         if (has_finaleValue || has_finaleSourceValue) {
-            this._setSourceValue((has_finaleValue ? _finaleValue : _finaleSourceValue) as unknown as S, true);
+            if (this._setSourceValue((has_finaleValue ? _finaleValue : _finaleSourceValue) as unknown as S, true)) {
+                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                // this._updateReason = Symbol.dispose;
 
-            const maybePromise = this._calculateValue(has_finaleValue);
+                const maybePromise = this._calculateValue(has_finaleValue);
 
-            // eslint-disable-next-line promise/prefer-await-to-then
-            if (typeof (maybePromise as Promise<T>)?.then === 'function') {
-                // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
-                (maybePromise as Promise<T>)?.then(null, (error) => {
-                    console.error('EventSignal#destructor: async _calculateValue: error:', error);
-                });
+                // eslint-disable-next-line promise/prefer-await-to-then
+                if (typeof (maybePromise as Promise<T>)?.then === 'function') {
+                    // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
+                    (maybePromise as Promise<T>)?.then(null, (error) => {
+                        console.error('EventSignal#destructor: async _calculateValue: error:', error);
+                    });
+                }
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
@@ -573,6 +577,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
         // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.isDestroyed
         this._rejectPromiseIfDestroyed();
+
+        if (this._cDeferredList) {
+            this._cDeferredList.length = 0;
+            this._cDeferredList = void 0;
+        }
 
         if (_resolve) {
             this._resolve = void 0;
@@ -742,12 +751,22 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
     }
 
-    private _setErrorState(error: Error | string) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-        // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
-        this.lastError = error;
+    private _setErrorState(error: Error | string | unknown | null) {
+        if (error == null) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
+            this.lastError = void 0;
 
-        this._setStatus('error');
+            // reset status to default
+            this._setStatus();
+        }
+        else {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
+            this.lastError = error;
+
+            this._setStatus('error');
+        }
     }
 
     private _calculateValue(ignoreComputation?: boolean): Promise<T> | T | undefined {
@@ -758,9 +777,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         this._stateFlags &= ~EventSignal.StateFlags.wasThrottleTrigger;
 
         if ((this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0 && !ignoreComputation) {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
-            this.lastError = void 0;
+            if (this.status || this.lastError) {
+                // reset status (mostly 'error')
+                this._setErrorState(null);
+            }
 
             const prevValue = this._value;
 
@@ -781,11 +801,18 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             }
 
             if (currentSignal === this) {
-                throw new Error(`Depends on own value`);
+                throw new EventSignalError(`Depends on own value`, {
+                    eventSignal: this,
+                });
             }
 
-            if ((this._stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) !== 0) {
-                throw new Error(`Now in computing state (cycle deps?)`);
+            if ((this._stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) !== 0
+                && (this._stateFlags & EventSignal.StateFlags.nowInCalculatingNewValueAsync) === 0
+            ) {
+                // If now in SYNC computation/calculation phase
+                throw new EventSignalError(`Now in computing state (cycle deps?)`, {
+                    eventSignal: this,
+                });
             }
 
             const _computation = this._computation as NonNullable<EventSignal<T, S, D, R>["_computation"]>;
@@ -801,6 +828,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
             // this._nowInComputing = true;
             this._stateFlags |= EventSignal.StateFlags.nowInCalculatingNewValue;
+
+            let nowInCalculatingNewValueAsync = false;
 
             try {
                 this._computationsCount++;
@@ -823,24 +852,35 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 //  2. В нормальном случае, подпишемся только на те, которые вызывались синхронно в первой части асинхронной функции
                 //  3. В худшем случае, МЫ ПОДПИШЕМСЯ НА СЛУЧАЙНЫЙ EventSignal который в этот момент исполнялся
                 if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
+                    nowInCalculatingNewValueAsync = true;
+
+                    this._stateFlags |= (EventSignal.StateFlags.nowInCalculatingNewValueAsync | EventSignal.StateFlags.wasLastAsyncComputation);
                     this._setStatus('pending');
+
+                    const _cDeferredList = this._cDeferredList ??= [];
+                    // todo: ЭТО ДРАФТ, он может быть ПЕРЕДЕЛАН
+                    // eslint-disable-next-line prefer-destructuring
+                    const pendingValue = (newValue as unknown as Promise<T> & { pendingValue: string })["pendingValue"];
+
+                    if (pendingValue !== void 0) {
+                        this._value = pendingValue as unknown as T;
+                    }
+
+                    const computationDeferred = Promise.withResolvers<T>();
 
                     // Async computation DRAFT support
                     // todo: Это очень простая реализация async computation. Тут не учитывается много моментов:
-                    //  1. Если у нас есть заведённый Promise с текущей async computation и нужно сделать новый.
-                    //  2. Если у нас есть несколько идущих одновременно async computation, то завершаться они могут быть
-                    //     в разной последовательности, не в том же порядке, в каком вызывались, поэтому, нужно испрользовать
-                    //     только newValue ОТ САМОГО ПОСЛЕДНЕГО вызова async computation в качестве `this._value`.
                     //  3. Как ПРАВИЛЬНО обрабатывать .catch?
                     //  4. Асинхронный .set() ?
                     //  5. ...
                     // eslint-disable-next-line promise/prefer-await-to-then
-                    const computationPromise = (newValue as unknown as { then(onFulfilled: (a: T) => T): Promise<unknown> }).then((newValue) => {
-                        if (this._computationPromise !== computationPromise) {
-                            return newValue;
+                    (newValue as unknown as { then(onFulfilled: (a: T) => void): Promise<unknown> }).then((newValue) => {
+                        if (_cDeferredList.at(-1) !== computationDeferred) {
+                            return;
                         }
 
-                        this._computationPromise = null;
+                        this._stateFlags &= ~(EventSignal.StateFlags.nowInCalculatingNewValue | EventSignal.StateFlags.nowInCalculatingNewValueAsync);
+                        // todo: Кажется, тут лишнее это. Ниже всё равно будет выставлен 'default' статус
                         this._setStatus('default');
 
                         let isNeedToUpdate = newValue !== void 0;
@@ -868,32 +908,59 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                             this._resolveIfNeeded(newValue);
                             this._setStatus(void 0, false);
 
+                            // Если у нас есть несколько идущих одновременно async computation их Promise будут закрыты
+                            //  со значением только от самого последнего async computation.
+                            for (const { resolve } of _cDeferredList) {
+                                resolve(newValue);
+                            }
+
+                            _cDeferredList.length = 0;
+
                             subscribersEventsEmitter.emit(this._signalSymbol, newValue);
                         }
                         else {
+                            // todo: Проверить, зачем мы тут тригерим подписчиков subscribersEventsEmitter, если фактически
+                            //  нового значения не было.
                             this._setStatus();
-                        }
 
-                        return newValue;
+                            const prevValue = this._value;
+
+                            // Если у нас есть несколько идущих одновременно async computation их Promise будут закрыты
+                            //  со значением только от самого последнего async computation.
+                            for (const { resolve } of _cDeferredList) {
+                                resolve(prevValue);
+                            }
+
+                            _cDeferredList.length = 0;
+                        }
                         // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
                     }).catch(error => {
-                        if (this._computationPromise !== computationPromise) {
+                        if (_cDeferredList.at(-1) !== computationDeferred) {
                             console.error('EventSignal: async computation: error:', error);
 
-                            return this._value;
+                            return;
                         }
 
-                        this._computationPromise = null;
+                        this._stateFlags &= ~(EventSignal.StateFlags.nowInCalculatingNewValue | EventSignal.StateFlags.nowInCalculatingNewValueAsync);
                         this._setErrorState(error);
 
                         console.error('EventSignal: async computation: error:', error);
 
-                        return this._value;
-                    }) as Promise<T>;
+                        const prevValue = this._value;
 
-                    this._computationPromise = computationPromise;
+                        // Если у нас есть несколько идущих одновременно async computation их Promise будут закрыты
+                        //  со значением только от самого последнего async computation.
+                        // В данном случае, при обработке ошибок, используем самое последнее успешное значение.
+                        for (const { resolve } of _cDeferredList) {
+                            resolve(prevValue);
+                        }
 
-                    return computationPromise;
+                        _cDeferredList.length = 0;
+                    });
+
+                    _cDeferredList.push(computationDeferred);
+
+                    return computationDeferred.promise;
                 }
 
                 let isNeedToUpdate = newValue !== void 0;
@@ -922,11 +989,33 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
                     subscribersEventsEmitter.emit(this._signalSymbol, newValue);
                 }
+
+                if ((this._stateFlags & EventSignal.StateFlags.wasLastAsyncComputation) !== 0) {
+                    this._stateFlags &= ~EventSignal.StateFlags.wasLastAsyncComputation;
+
+                    if (this._cDeferredList) {
+                        const currentValue = this._value;
+
+                        for (const { resolve } of this._cDeferredList) {
+                            resolve(currentValue);
+                        }
+                    }
+                }
+            }
+            catch (error) {
+                if (error && error instanceof EventSignalError) {
+                    throw error;
+                }
+
+                this._setErrorState(error);
             }
             finally {
                 currentSignal = prev_currentSignal;
-                // this._nowInComputing = false;
-                this._stateFlags &= ~EventSignal.StateFlags.nowInCalculatingNewValue;
+
+                if (!nowInCalculatingNewValueAsync) {
+                    // this._nowInComputing = false;
+                    this._stateFlags &= ~EventSignal.StateFlags.nowInCalculatingNewValue;
+                }
             }
         }
         else {
@@ -1050,16 +1139,64 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             }
         }
 
-        return this._value;
+        if ((stateFlags & EventSignal.StateFlags.nowInCalculatingNewValueAsync) !== 0
+            && this._cDeferredList
+            && this._cDeferredList.length > 0
+        ) {
+            const lastDeferred = this._cDeferredList.at(-1);
+
+            if (lastDeferred) {
+                return lastDeferred.promise as unknown as R;
+            }
+        }
+
+        if ((stateFlags & EventSignal.StateFlags.wasLastAsyncComputation) !== 0) {
+            return Promise.resolve(this._value) as unknown as R;
+        }
+
+        return this._value as unknown as R;
     };
 
     getSafe = () => {
         try {
-            return this.get();
+            const newValue = this.get();
+
+            if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
+                // eslint-disable-next-line promise/prefer-await-to-then
+                const newPromise = (newValue as unknown as Promise<T>).then(value => value, () => {
+                    // ignore error, return last value
+                    // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
+                    return this._value;
+                });
+
+                if (newValue["pendingValue"] !== void 0) {
+                    newPromise["pendingValue"] = newValue["pendingValue"];
+                }
+
+                return newPromise;
+            }
         }
         catch {
             // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
             return this._value;
+        }
+    };
+
+    getSyncSafe = () => {
+        try {
+            const newValue = this.get();
+
+            if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
+                // Возвращаем последнее значение. После резолва промиса, произойдёт обновление сигнала и пере-получение значения.
+                // В this._value также может быть значение "pendingValue".
+                return this._value as Awaited<T>;
+            }
+
+            return newValue as Awaited<T>;
+        }
+        catch {
+            // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
+            return this._value as Awaited<T>;
         }
     };
 
@@ -1170,7 +1307,13 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             }
             else if (typeof _sourceValue === 'object') {
                 if ((this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0) {
-                    this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                    if ((this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0) {
+                        // Если есть сomputation, то в нём будет вычисленно новое значение isNeedToUpdate
+                        this._stateFlags &= ~EventSignal.StateFlags.nextValueShouldBeForceSettled;
+                    }
+                    else {
+                        /** Do not unset for {@link this._calculateValue} */
+                    }
                 }
                 else if ((this._stateFlags & EventSignal.StateFlags.valuesAsObjectShouldBeForceSettled) !== 0) {
                     // nothing to do
@@ -1190,7 +1333,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
             const stateFlags = this._stateFlags;
 
-            if ((stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) === 0) {
+            if ((stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) === 0
+                || (stateFlags & EventSignal.StateFlags.nowInCalculatingNewValueAsync) !== 0
+            ) {
                 // this._isNeedToCompute = true;
                 this._stateFlags |= EventSignal.StateFlags.isNeedToCalculateNewValue;
 
@@ -1317,15 +1462,32 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             this._promise = void 0;
         }
         */
+        const { description } = this._signalSymbol;
+        const lazyError = {
+            _error: null as Error | null,
+            get error() {
+                if (this._error) {
+                    return this._error;
+                }
+
+                return this._error = new Error(`EventSignal object is destroyed${description ? ` (${description})` : ''}`);
+            },
+        };
 
         if (this._reject) {
-            const { description } = this._signalSymbol;
-
-            this._reject(new Error(`EventSignal object is destroyed${description ? ` (${description})` : ''}`));
+            this._reject(lazyError.error);
 
             this._resolve = void 0;
             this._reject = void 0;
             this._promise = void 0;
+        }
+
+        if (this._cDeferredList && this._cDeferredList.length > 0) {
+            const { error } = lazyError;
+
+            for (const { reject } of this._cDeferredList) {
+                reject(error);
+            }
         }
     }
 
@@ -1338,6 +1500,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             currentPromise = this._promise;
         }
         else {
+            // todo: Перейти на this._cDeferredList ?
             const { resolve, reject, promise } = Promise.withResolvers<T>();
 
             this._resolve = resolve;
@@ -2104,11 +2267,13 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
              * A BETA version of EventSignal's ViewContext
              */
             const contextValue = _EventSignalsContext?._currentValue;
-            // Вызовем get/getSafe:
+            // Вызовем get/getSyncSafe:
             //  1. Чтобы все подписки внутри computation сработали
             //  2. Чтобы выставился правильный status
+            //  3. Если eventSignal это async computable signal, то вернётся последнее значение (или "pendingValue").
+            //     Это нужно для того, чтобы не тригеррить React Suspense-логику (она реагирует на Promise в значении).
             // (можно сделать для этого отдельный метод, который будет вызывать computation только если оно ещё ни разу не вызывалось).
-            const signalValue = eventSignal.getSafe();
+            const signalValue = eventSignal.getSyncSafe();
             const { componentType } = eventSignal;
             const reactFCDescriptor = sFC === void 0 && Boolean(_React_createElement)
                 ? (contextValue ? getReactFunctionComponentFromMagicContext(contextValue, componentType, eventSignal.status) as (_ComponentDescription<any, any, any, any> | null) : void 0)
@@ -2499,8 +2664,13 @@ export namespace EventSignal {
         hasDepsFromProps = 1 << 11,
         hasThrottle = 1 << 12,
 
+        /**
+         * Is last (most relevant) computation returns Promise?
+         */
+        wasLastAsyncComputation = 1 << 14,
         nowInSettings = 1 << 15,
         nowInCalculatingNewValue = 1 << 16,
+        nowInCalculatingNewValueAsync = 1 << 17,
 
         nextValueShouldBeForceSettled = 1 << 20,
         valuesAsObjectShouldBeForceSettled = 1 << 21,
@@ -2512,6 +2682,16 @@ export namespace EventSignal {
 const tagEventSignal = 'EventSignal';
 
 EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
+
+class EventSignalError extends Error {
+    eventSignal: EventSignal<any, any, any, any> | undefined;
+
+    constructor(message: string, options: ConstructorParameters<typeof Error>[1] & { cause?: unknown, eventSignal: EventSignal<any, any, any, any> }) {
+        super(message, options);
+
+        this.eventSignal = options.eventSignal;
+    }
+}
 
 const _emptySubscription: EventSignal.Subscription = {
     unsubscribe: _noop,
