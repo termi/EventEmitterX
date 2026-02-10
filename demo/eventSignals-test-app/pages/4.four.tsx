@@ -42,15 +42,16 @@ export default function PageFour() {
     </>);
 }
 
-function WidgetButtonDisableSignal({ eventSignal, onClick, children }: {
-    eventSignal: typeof addWidgetsDisable$ | typeof clearWidgetsDisable$,
+function WidgetButtonDisableSignal({ current$, current$Value, onClick, children }: {
+    current$: typeof addWidgetsDisable$ | typeof clearWidgetsDisable$,
+    current$Value: typeof addWidgetsDisable$.value | typeof clearWidgetsDisable$.value,
     onClick?: () => void,
     children: React.ReactNode,
 }) {
     // const theme = React.useContext(ThemeContext);
 
-    return (<button onClick={onClick ?? eventSignal.data.onClick} disabled={eventSignal.get()}>
-        {eventSignal.data.title}
+    return (<button onClick={onClick ?? current$.data.onClick} disabled={current$Value}>
+        {current$.data.title}
         {children}
     </button>);
 }
@@ -63,7 +64,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 }
 </style>`);
 
-function UserSimpleCart({ eventSignal }: { eventSignal: JsonPlaceholderUser1$ }) {
+function UserSimpleCart({ current$ }: { current$: JsonPlaceholderUser1$ }) {
     const userId = eventSignal.get();
     const { userDTO } = eventSignal.data;
     const onWidgetDelete = useContext($widgetsList)?.onWidgetDelete;

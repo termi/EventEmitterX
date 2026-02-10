@@ -2,12 +2,10 @@
 
 import * as React from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
-
 import css from './AnimatedText.module.css';
 
-export default function AnimatedText({ eventSignal }: { eventSignal: EventSignal<Promise<string> | string> }) {
-    const text = eventSignal.getSync();
+export default function AnimatedText({ current$Value }: { current$Value: unknown }) {
+    const text = String(current$Value);
     const letters = text.split('');
     const textLength = text.length;
 

@@ -13,54 +13,54 @@ import { i18nString$$ } from "../state/i18n";
 import css from './JsonPlaceholderUser.module.css';
 
 export default function JsonPlaceholderUser({
-    eventSignal,
+    current$,
     current$Value,
     version,
     textColor,
     backgroundColor,
     forceRenderType,
 }: {
-    // todo: rename to 'current$'?
-    eventSignal: PlaceholderUser$,
-    current$Value: ReturnType<typeof eventSignal.getSync>,
+    current$: PlaceholderUser$,
+    current$Value: ReturnType<typeof current$.getSync>,
     // todo: rename to 'current$Version'?
     version: number,
     textColor?: string,
     backgroundColor?: string,
     forceRenderType?: 'card' | 'table',
 }) {
-    const { userDTO, type = 'card' } = eventSignal.data;
+    const { userDTO, type = 'card' } = current$.data;
     const style = {
         color: textColor,
         "--backgroundColor": backgroundColor ? `${backgroundColor}` : void 0,
     } as React.CSSProperties;
     const isUserCardRender = (forceRenderType ?? type) === 'card';
     const $content = isUserCardRender
-        ? UserCard(userDTO, eventSignal)
-        : ObjectToTable(userDTO, eventSignal)
+        ? UserCard(userDTO, current$)
+        : ObjectToTable(userDTO, current$)
     ;
 
     return (<div
         className={css.JsonPlaceholderUser}
         data-user-id={current$Value}
-        data-componenttype={eventSignal.componentType}
+        data-componenttype={current$.componentType}
         data-version={version}
         style={style}
     >
         {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
         {/* @ts-expect-error fixme: [TYPINGS / typings] Исправить тут типизацию */}
-        <eventSignal.component.ViewContext value={{
-            [eventSignal.componentType as unknown as string]: isUserCardRender
+        <current$.component.ViewContext value={{
+            [current$.componentType as unknown as string]: isUserCardRender
                 ? [ JsonPlaceholderUser, { forceRenderType: 'table' } ]
                 : [ JsonPlaceholderUser, { forceRenderType: 'card' } ]
             ,
         }}>
             {$content}
-        </eventSignal.component.ViewContext>
+        </current$.component.ViewContext>
     </div>);
 }
 
 function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"], user$: PlaceholderUser$) {
+    const [ popupShow, setPopupShow ] = useState(false);
     const {
         id,
         name,
@@ -86,7 +86,6 @@ function UserCard(userDTO: PlaceholderUser$["data"]["userDTO"], user$: Placehold
         value: string,
         __proto__: null,
     }[];
-    const [ popupShow, setPopupShow ] = useState(false);
 
     return (<div className={css.miniCardContainer} data-user-id={id}>
         <div className={css.miniCard}>

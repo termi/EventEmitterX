@@ -4,17 +4,21 @@ import * as React from "react";
 
 import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
 
-export default function ErrorView({ eventSignal, children }: { eventSignal: EventSignal<any, any, any>, children?: React.ReactNode }) {
-    const { lastError } = eventSignal;
+export default function ErrorView({ current$, children }: { current$: EventSignal<any, any, any>, children?: React.ReactNode }) {
+    const { lastError } = current$;
 
     if (!lastError) {
         return null;
     }
 
-    return ErrorViewSimple({ error: lastError, children });
+    return ErrorViewSimple({ error: lastError as (Error | number | string), children });
 }
 
-export function ErrorViewSimple({ error, children }: { error?: Error | number | string, children?: React.ReactNode, resetErrorBoundary: (...args: any[]) => void }) {
+export function ErrorViewSimple({ error, children }: {
+    error?: Error | number | string,
+    children?: React.ReactNode,
+    resetErrorBoundary?: (...args: any[]) => void,
+}) {
     if (!error) {
         return null;
     }
