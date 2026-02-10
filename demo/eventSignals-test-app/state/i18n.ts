@@ -266,6 +266,11 @@ function _i18n_computation<T>(prevValue: string, sourceValue: { template: Templa
 
         // eslint-disable-next-line promise/prefer-await-to-then
         const promise = (result as unknown as Promise<string>).then(result => {
+            // todo: Детектировать ситуацию циклических запросов, когда изменение этого сигнала ведёт к пересчитыванию
+            //  сигнала в котором перевод запрашивался, это ведёт к тому, что мы опять запустим логику запроса перевода
+            //  и если его не будет в кеше `translations.get(currentLocale)` (translationsMap) то исполнение кода опять
+            //  вернётся к созданию temporaryEventSignal и переходу опять на эту строку, что опять запустил цикл по новому.
+            //  В итоге, этот цикл будет бесконечно выполняться.
             temporaryEventSignal?.set(true);
             temporaryEventSignal?.destructor();
 
@@ -310,7 +315,7 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
     const translationsMap = translations.getOrInsertComputed(currentLocale, translations.createValue);
     // const isNeedToLoadTranslation = currentLocale !== defaultLocale;
 
-    const allowAsync = eventSignal === true || (!!eventSignal && isEventSignal(eventSignal));
+    const allowAsync = eventSignal === true || isEventSignal(eventSignal, true);
     const allowTemporarySignal = allowAsync && eventSignal !== true;
     const translation = translationsMap.get(sourceValue);
     let promise: Promise<string> | undefined;
@@ -391,6 +396,26 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
 
         promise = _promiseCacheMap.getOrInsertComputed(sourceValue, () => {
             return new Promise<string>(resolve => {
+                const onErrorFetchTranslation = (translatedText: string | undefined) => {
+                    // todo: Сейчас ошибка скрывается, но на самом деле она должна показываться: сигнал должен переходить
+                    //  в состояние error и должен отрендериваться компонент который отвечает за error-рендеринг переводимого текста.
+                    // note: ОБЯЗАТЕЛЬНО нужно сохранить хоть какое-то значение в translationsMap, иначе будут
+                    //  бесконечные циклические запросы перевода. Пример:
+                    // ```
+                    // const computed1$ = new EventSignal('', (_prev, sourceValue, eventSignal) => {
+                    //     // Используем функцию `i18n`, внутри которой создаётся временный сигнал
+                    //     // Когда fetch завершается с ошибкой временный сигнал изменяет значение на true,
+                    //     //  данный computation срабатывает ещё раз, проверяет перевод в кеше, не обнаруживает его,
+                    //     //  делает запрос на перевод и временный сигнал и так по кругу, до бесконечности.
+                    //     return i18n`Значение = ${counter1$.get()}`;
+                    // }
+                    // ```
+                    translatedText ||= textForTranslation;
+
+                    translationsMap.set(sourceValue, translatedText);
+                    resolve(translatedText);
+                };
+
                 fetchGoogleTranslateApi(textForTranslation, {
                     sourceLanguage: sourceValueLocale,
                     targetLanguage: currentLocale,
@@ -411,11 +436,13 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
 
                         const { translatedText } = result;
 
-                        resolve(translatedText);
-
                         if (result.ok) {
+                            resolve(translatedText);
                             translationsMap.set(sourceValue, translatedText);
                             saveLocalizationToLocalStorage(sourceValue, translatedText, currentLocale);
+                        }
+                        else {
+                            onErrorFetchTranslation(translatedText);
                         }
 
                         _promiseCacheMap.delete(sourceValue);
@@ -425,7 +452,7 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
 
                         _promiseCacheMap.delete(sourceValue);
 
-                        resolve(textForTranslation);
+                        onErrorFetchTranslation('');
                     })
                 ;
             });
@@ -446,6 +473,11 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
                 const temporaryEventSignal = new EventSignal(false, { description: 'i18n.-temporary-' });
 
                 void promise.then(() => { // eslint-disable-line promise/prefer-await-to-then
+                    // todo: Детектировать ситуацию циклических запросов, когда изменение этого сигнала ведёт к пересчитыванию
+                    //  сигнала в котором перевод запрашивался, это ведёт к тому, что мы опять запустим логику запроса перевода
+                    //  и если его не будет в кеше `translations.get(currentLocale)` (translationsMap) то исполнение кода опять
+                    //  вернётся к созданию temporaryEventSignal и переходу опять на эту строку, что опять запустил цикл по новому.
+                    //  В итоге, этот цикл будет бесконечно выполняться.
                     temporaryEventSignal.set(true);
                     temporaryEventSignal.destructor();
                 }, () => {

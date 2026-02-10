@@ -70,9 +70,14 @@ export async function fetchGoogleTranslateApi(text: string, {
             const promise = _fetchGoogleTranslateApi_currentRequest;
 
             // eslint-disable-next-line promise/prefer-await-to-then
-            _fetchGoogleTranslateApi_currentRequest = promise.then(() => queuePromise);
+            _fetchGoogleTranslateApi_currentRequest = promise.then(() => queuePromise, () => queuePromise);
 
-            await promise;
+            try {
+                await promise;
+            }
+            catch {
+                // ignore error
+            }
         }
         else {
             _fetchGoogleTranslateApi_currentRequest = queuePromise;
@@ -94,14 +99,23 @@ export async function fetchGoogleTranslateApi(text: string, {
         });
     }
 
+    // eslint-disable-next-line promise/prefer-await-to-then
+    promise.finally(() => {
+        // В любом случае (resolve или reject) убираем текущую блокировку очереди.
+        // todo: Если произошел reject по причине недоступности API, то некоторое время (5-10 секунд) не нужно больше пробовать совершать запрос к этому домену.
+        if (_fetchGoogleTranslateApi_currentRequest === queuePromise) {
+            _fetchGoogleTranslateApi_currentRequest = void 0;
+        }
+
+        queuePromiseResolve();
+    });
+
+    // todo: Тут может быть ошибка типа "TypeError: Failed to fetch". Воспроизводиться в браузере Edge.
+    //  Более подробная ошибка из DevTools/Network: `net::ERR_SOCKS_CONNECTION_FAILED`
+    //  Сейчас, если это промис падает с ошибкой, то сигнал для этого переводимого текста будет навсегда в состоянии pending
+    //  (и будет всегда рендериться через AnimatedText).
     // Выполняем запрос
     const response = await promise;
-
-    if (_fetchGoogleTranslateApi_currentRequest === queuePromise) {
-        _fetchGoogleTranslateApi_currentRequest = void 0;
-    }
-
-    queuePromiseResolve();
 
     // Проверяем статус ответа
     if (!response.ok) {
