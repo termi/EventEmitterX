@@ -282,6 +282,8 @@
     font-size: 0.9rem;
     border-top: 1px solid #eee;
 
+    --city-dayLightSign: '';
+
     .legend {
       display: flex;
       justify-content: center;
@@ -295,6 +297,12 @@
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    .legend-item--current-timezone {
+      &::before {
+        content: var(--city-dayLightSign) " ";
+      }
     }
 
     .legend-icon {

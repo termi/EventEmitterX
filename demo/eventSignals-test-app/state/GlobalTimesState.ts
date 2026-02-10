@@ -12,8 +12,14 @@ const componentTypeGlobalTimesList = Symbol('GlobalTimes/List');
 const componentTypeGlobalTimesCity = Symbol('GlobalTimes/City');
 
 export const mostPopularCities$ = new EventSignal(
-    [] as mostPopularCities$.CityDescriptionEventSignal[],
-    function(_prev) {
+    [] as mostPopularCities$.CityDescription$[],
+    function(prevMostPopularCitiesList) {
+        // Обязательно нужно уничтожить предыдущие сигналы, иначе они будут висеть в памяти процесса бесконечно (будет утечка памяти).
+        // todo: Разработать механизм автоматической очистки и/или Weak-подписок.
+        for (const cityDescription$ of prevMostPopularCitiesList) {
+            cityDescription$.destructor();
+        }
+
         const mostPopularCitiesList = getMostPopularCities(currentLocale$.get());
 
         return mostPopularCitiesList.map(cityDescription => {
@@ -29,7 +35,7 @@ export const mostPopularCities$ = new EventSignal(
 );
 
 export namespace mostPopularCities$ {
-    export type CityDescriptionEventSignal = ReturnType<typeof _makeCityTime$$>;
+    export type CityDescription$ = ReturnType<typeof _makeCityTime$$>;
 }
 
 /**
@@ -79,7 +85,9 @@ const _dnCache = Object.assign(new Map<string, ReturnType<typeof _dnCacheOnNew>>
         return this.getOrInsertComputed(key, _dnCacheOnNew) as ReturnType<typeof _dnCacheOnNew>;
     },
 });
-const _DisplayNames_options = Object.freeze(Object.setPrototypeOf({ type: 'region' }, null)) as Intl.DisplayNamesOptions;
+const _DisplayNames_options: Intl.DisplayNamesOptions = Object.freeze(Object.setPrototypeOf({
+    type: 'region',
+} satisfies Intl.DisplayNamesOptions, null));
 
 function _makeCityTime$$(cityDescription: RawCityDescription) {
     const id = hashSum([
