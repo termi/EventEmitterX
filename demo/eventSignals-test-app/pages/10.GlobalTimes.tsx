@@ -139,7 +139,7 @@ export default function PageGlobalTimes({ viewType, filterById }: {
                     </div>
 
                     <div className={css.headerClock}>
-                        <AnalogClock eventSignal={nowDate$} onManualTime={nowDate$.set} onResetClick={nowDate$.data.reset}/>
+                        <AnalogClock current$={nowDate$} onManualTime={nowDate$.set} onResetClick={nowDate$.data.reset}/>
                     </div>
                 </header>
 
@@ -196,18 +196,18 @@ EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesTable, {
 
 /** @see [Each item component]{@link GlobalTimesCity} */
 function GlobalTimesList({
-    eventSignal,
+    current$Value,
     filterById,
 }: {
-    eventSignal: typeof mostPopularCities$,
+    current$Value: typeof mostPopularCities$.value,
     filterById?: string,
 }) {
     /** note: for `'table'` value there is another component to render: {@link GlobalTimesTable} */
     const viewType = useContext(ViewType$Context)?.use();
     const classNameMode = viewType === 'grid' ? css.citiesGrid : '';
     const cities = filterById
-        ? eventSignal.get().filter(item => item.get().id === filterById)
-        : eventSignal.get()
+        ? current$Value.filter(item => item.get().id === filterById)
+        : current$Value
     ;
 
     return (<div className={`${css.citiesContainer} ${classNameMode}`}>
@@ -236,9 +236,11 @@ function _setPopup(event: MouseEvent<HTMLDivElement>) {
 }
 
 function GlobalTimesCity({
-    eventSignal,
+    current$,
+    current$Value,
 }: {
-    eventSignal: mostPopularCities$.CityDescriptionEventSignal,
+    current$: mostPopularCities$.CityDescription$,
+    current$Value: mostPopularCities$.CityDescription$["value"],
 }) {
     const {
         // enable,
@@ -255,14 +257,14 @@ function GlobalTimesCity({
         timeZone,
         timeZoneName,
         isCurrentOffset,
-    } = eventSignal.get();
+    } = current$Value;
+    const { data } = current$;
     /**
      * * Translated value from default language: `Лондон`
      * * Translated value from custom language: `||es-US||:Pyongyang`
      */
     const translatedCityName = nameLocale ? `||${nameLocale}||:${name}` : name;
     const isCurrentLocale = locale === currentLocale$.get();
-    const { data } = eventSignal;
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const isThisPipOpen = pipPopupWindow$.use().dataId === id;
     const viewType = useContext(ViewType$Context)?.use();
@@ -315,15 +317,15 @@ function GlobalTimesCity({
 
 /** @see [Each item component]{@link GlobalTimesTableRow} */
 function GlobalTimesTable({
-    eventSignal,
+    current$Value,
     filterById,
 }: {
-    eventSignal: typeof mostPopularCities$,
+    current$Value: typeof mostPopularCities$.value,
     filterById?: string,
 }) {
     const cities = filterById
-        ? eventSignal.get().filter(item => item.get().id === filterById)
-        : eventSignal.get()
+        ? current$Value.filter(item => item.get().id === filterById)
+        : current$Value
     ;
 
     return (<table className={`${css.citiesContainer} ${css.citiesTable}`}>
@@ -345,7 +347,11 @@ function GlobalTimesTable({
     </table>);
 }
 
-function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.CityDescriptionEventSignal }) {
+function GlobalTimesTableRow({
+    current$Value,
+}: {
+    current$Value: mostPopularCities$.CityDescription$["value"],
+}) {
     const {
         id,
         name,
@@ -358,7 +364,7 @@ function GlobalTimesTableRow({ eventSignal }: { eventSignal: mostPopularCities$.
         dayLightSign,
         timeZone,
         timeZoneName,
-    } = eventSignal.get();
+    } = current$Value;
     /**
      * * Translated value from default language: `Лондон`
      * * Translated value from custom language: `||es-US||:Pyongyang`

@@ -10,23 +10,23 @@ const AnalogClockM = React.memo(AnalogClock);
 
 export default AnalogClockM;
 
-function AnalogClock({ eventSignal, onManualTime, onResetClick }: {
-    eventSignal: EventSignal<Date, Date | number | null, unknown>,
+function AnalogClock({ current$, onManualTime, onResetClick }: {
+    current$: EventSignal<Date, Date | number | null, unknown>,
     onManualTime?: AnalogClockCanvas["_onManualTime"],
     onResetClick?: React.MouseEventHandler<any>,
 }) {
-    const canvasRef = useRef<HTMLCanvasElement>();
+    const $canvasRef = useRef<HTMLCanvasElement>();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    const canvasController = useMemo(AnalogClockCanvas.factory, []);
+    const canvasController = useMemo(AnalogClockCanvas.factory, [ current$, onManualTime ]);
     const onReset = useCallback<React.MouseEventHandler>((event) => {
         canvasController.resetManualDate();
         onResetClick?.(event);
     }, [ canvasController, onResetClick ]);
 
     useLayoutEffect(() => {
-        const subscription = eventSignal.addListener(canvasController.updateCurrentDate);
+        const subscription = current$.addListener(canvasController.updateCurrentDate);
 
-        canvasController.start(canvasRef.current, eventSignal.get(), {
+        canvasController.start($canvasRef.current, current$.get(), {
             onManualTime,
         });
 
@@ -34,10 +34,10 @@ function AnalogClock({ eventSignal, onManualTime, onResetClick }: {
             subscription.unsubscribe();
             canvasController[Symbol.dispose]();
         };
-    }, [ canvasController, eventSignal, onManualTime ]);
+    }, [ canvasController, current$, onManualTime ]);
 
     return <canvas
-        ref={canvasRef}
+        ref={$canvasRef}
         style={{ width: '100%', height: '100%' }}
         onDoubleClick={onReset}
     ></canvas>;

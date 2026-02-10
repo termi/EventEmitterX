@@ -11,12 +11,12 @@ const {
     userFullNameComponentType,
 } = mainState;
 
-export default function UserCard({ eventSignal }: { eventSignal: typeof userFullNameObject$ }) {
+export default function UserCard({ current$Value }: { current$Value: typeof userFullNameObject$.value }) {
     const {
         firstName,
         secondName,
         icon,
-    } = eventSignal.get();
+    } = current$Value;
 
     console.log('render UserCard', icon);
 

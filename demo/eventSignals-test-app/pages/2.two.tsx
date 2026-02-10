@@ -44,9 +44,9 @@ export default function PageTwo() {
     </>);
 }
 
-function SignalInputComponent({ eventSignal }: { eventSignal: typeof userFirstName$ | typeof userSecondName$ }) {
-    return (<label key={eventSignal.key} className={eventSignal.data.cssClasses} style={eventSignal.data.style}>
-        <span>{eventSignal.data.title}</span>
-        <input value={eventSignal.get()} onChange={eventSignal.data.onChanges} style={{ width: '100%' }}/>
+function SignalInputComponent({ current$ }: { current$: typeof userFirstName$ | typeof userSecondName$ }) {
+    return (<label key={current$.key} className={current$.data.cssClasses} style={current$.data.style}>
+        <span>{current$.data.title}</span>
+        <input value={current$.get()} onChange={current$.data.onChanges} style={{ width: '100%' }}/>
     </label>);
 }

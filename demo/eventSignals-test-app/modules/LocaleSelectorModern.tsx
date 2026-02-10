@@ -10,16 +10,21 @@ import { getLanguageName } from "../lib/i18n";
 
 import css from './LocaleSelectorModern.module.css';
 
-export function LocaleSelectorModern({ eventSignal, accessKey }: { eventSignal: typeof currentLocale$, accessKey?: string }) {
-    const currentLocale = eventSignal.get();
-    const { data } = eventSignal;
+export function LocaleSelectorModern({ current$, current$Value, accessKey }: {
+    current$: typeof currentLocale$,
+    current$Value: typeof currentLocale$.value,
+    accessKey?: string,
+}) {
+    const currentLocale = current$Value;
+    const { data } = current$;
     const {
         systemLocale,
         allowedLocales,
+        onChangeLocaleSelect,
     } = data;
 
     return (<div className={css.languageSelectorModern} data-current-locale={currentLocale}>
-        <select name="currentLocale" accessKey={accessKey} value={currentLocale} onChange={eventSignal.data.onChangeLocaleSelect}>
+        <select name="currentLocale" accessKey={accessKey} value={currentLocale} onChange={onChangeLocaleSelect}>
             <button>
                 <selectedcontent></selectedcontent>
             </button>

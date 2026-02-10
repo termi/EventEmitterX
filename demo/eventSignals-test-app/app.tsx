@@ -128,8 +128,8 @@ const pipPopupContainer = createRoot(document.querySelector('#pipPopupContainer'
     },
 });
 
-pipPopupContainer.render(<pipPopupWindow$.component sFC={function({ eventSignal }: { eventSignal: typeof pipPopupWindow$ }) {
-    const { component: Component, componentProps, window } = eventSignal.getLast();
+pipPopupContainer.render(<pipPopupWindow$.component sFC={function({ current$Value }: { current$Value: typeof pipPopupWindow$.value }) {
+    const { component: Component, componentProps, window } = current$Value;
 
     if (!Component || !window?.document?.body) {
         return null;

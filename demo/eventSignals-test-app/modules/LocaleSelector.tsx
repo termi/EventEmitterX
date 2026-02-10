@@ -8,9 +8,12 @@ import { getLanguageName } from "../lib/i18n";
 
 import css from './LocaleSelector.module.css';
 
-export function LocaleSelector({ eventSignal }: { eventSignal: typeof currentLocale$ }) {
-    const currentLocale = eventSignal.get();
-    const { data } = eventSignal;
+export function LocaleSelector({ current$, current$Value }: {
+    current$: typeof currentLocale$,
+    current$Value: typeof currentLocale$.value,
+}) {
+    const currentLocale = current$Value;
+    const { data } = current$;
     const {
         systemLocale,
         allowedLocales,
@@ -37,7 +40,7 @@ export function LocaleSelector({ eventSignal }: { eventSignal: typeof currentLoc
                     return <LanguageCard
                         key={locale}
                         locale={locale}
-                        onClick={eventSignal.data.onClickLocaleElement}
+                        onClick={current$.data.onClickLocaleElement}
                         flag={flag}
                         currentLocale={locale}
                         otherLocale={isSelected ? systemLocale : currentLocale}

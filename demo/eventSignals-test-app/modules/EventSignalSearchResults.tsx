@@ -39,11 +39,11 @@ globalThis.__requestDataSignal$ = requestDataSignal$;
 
 EventSignal.registerReactComponentForComponentType(requestDataSignal$.componentType, EventSignalSearchResults);
 
-function EventSignalSearchResults({ eventSignal }: { eventSignal: typeof requestDataSignal$ }) {
-    const { status } = eventSignal;
-    const query = eventSignal.getSourceValue() || '';
-    const albums = eventSignal.getLast();
-    const content = status === 'error' ? <ErrorView eventSignal={eventSignal}><button onClick={eventSignal.data.retry}>retry</button></ErrorView>
+function EventSignalSearchResults({ current$, current$Value }: { current$: typeof requestDataSignal$, current$Value: typeof requestDataSignal$.value }) {
+    const { status } = current$;
+    const query = current$.getSourceValue() || '';
+    const albums = current$Value;
+    const content = status === 'error' ? <ErrorView current$={current$}><button onClick={current$.data.retry}>retry</button></ErrorView>
         : status === 'pending' ? <AsyncSpinner hint={query} />
         : query === '' ? null
         : albums.length === 0 ? <p>No matches for <i>&quot;{query}&quot;</i></p>
@@ -58,8 +58,8 @@ function EventSignalSearchResults({ eventSignal }: { eventSignal: typeof request
         <div>
             <h4>EventSignal (renders count: {++EventSignalSearchResults.rendersCounter})</h4>
             <label>
-                <span>{eventSignal.data.title}</span>
-                <input value={query} onChange={eventSignal.data.onChanges} disabled={eventSignal.data.disabled} />
+                <span>{current$.data.title}</span>
+                <input value={query} onChange={current$.data.onChanges} disabled={current$.data.disabled} />
             </label>
         </div>
         <div>

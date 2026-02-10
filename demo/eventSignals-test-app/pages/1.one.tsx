@@ -27,7 +27,7 @@ export default function PageOne() {
 
                     <mainState.computed1$.component sFC={Counter} classes={counterClasses}/>
 
-                    <Counter eventSignal={mainState.computed2$} classes={counterClasses}/>
+                    <Counter current$={mainState.computed2$} classes={counterClasses}/>
 
                     {mainState.computed2$}
                 </div>
