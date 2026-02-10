@@ -78,10 +78,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal((
         window.document.body.append(container);
 
         // Копируем стили из основного окна в PIP
-        const styles = document.querySelectorAll('style, link[rel="stylesheet"]');
-
-        // eslint-disable-next-line unicorn/no-array-for-each
-        styles.forEach(style => {
+        document.querySelectorAll('style, link[rel="stylesheet"]').forEach(style => {// eslint-disable-line unicorn/no-array-for-each
             window.document.head.append(style.cloneNode(true));
         });
 
@@ -105,7 +102,7 @@ export const pipPopupWindow$ = Object.assign(new EventSignal((
         });
 
         // Обработчик закрытия через Escape
-        window.document.addEventListener('keydown', onKeyDown);
+        window.document.addEventListener('keydown', onKeyDown, { once: true });
 
         return {
             get window() {

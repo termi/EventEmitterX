@@ -12,15 +12,6 @@ import TicTacToeGameMutablePro from "../modules/TicTacToe/TicTacToeGameMutablePr
 
 import css from './5.TicTacToe.module.css';
 
-const obj = {
-    test: 'test',
-    toString() {
-        if (globalThis.AA)debugger;
-
-        return this.test;
-    },
-};
-
 export default function TicTacToe() {
     const [ currentTab, setCurrentTab ] = useState(0);
     const onTabMenuClick = useCallback<React.MouseEventHandler<HTMLElement>>((event) => {
@@ -35,7 +26,7 @@ export default function TicTacToe() {
     return (<div className={css.TicTacToe}>
         <div className={css.tabsContainer}>
             <div className={css.tabsHeader} onClick={onTabMenuClick}>
-                <button className={`${css.tabButton} ${currentTab === 0 ? css.active : ''}`} data-tab-index="0" data-test={obj}>
+                <button className={`${css.tabButton} ${currentTab === 0 ? css.active : ''}`} data-tab-index="0">
                     {i18nString$$('Простой Иммутабельный')}
                 </button>
                 <button className={`${css.tabButton} ${currentTab === 1 ? css.active : ''}`} data-tab-index="1">

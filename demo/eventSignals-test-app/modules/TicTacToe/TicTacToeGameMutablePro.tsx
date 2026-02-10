@@ -156,15 +156,25 @@ function Settings() {
     const [ winnerRowSize, setWinnerRowSize ] = useState(ticTacToeSettings.winnerLineSize);
     const onFormChange = useCallback<React.FormEventHandler<HTMLFormElement>>((event) => {
         const { elements } = event.currentTarget;
+        const $winnerRowSizeNumberInput = elements["winnerRowSize"] as HTMLInputElement;
         const new_matrixSize = Number(elements["matrixSize"]?.value ?? void 0);
-        let new_winnerRowSize = Number(elements["winnerRowSize"]?.value ?? void 0);
+        let new_winnerRowSize = Number($winnerRowSizeNumberInput?.value ?? void 0);
 
         if (Number.isInteger(new_matrixSize)) {
             setMatrixSize(new_matrixSize);
 
             if (new_winnerRowSize > new_matrixSize) {
                 new_winnerRowSize = new_matrixSize;
-                elements["winnerRowSize"].value = new_matrixSize;
+
+                if ($winnerRowSizeNumberInput) {
+                    $winnerRowSizeNumberInput.value = String(new_matrixSize);
+                    $winnerRowSizeNumberInput.max = String(new_matrixSize);
+                }
+            }
+            else {
+                if ($winnerRowSizeNumberInput) {
+                    $winnerRowSizeNumberInput.max = String(new_matrixSize);
+                }
             }
         }
         if (Number.isInteger(new_winnerRowSize)) {
