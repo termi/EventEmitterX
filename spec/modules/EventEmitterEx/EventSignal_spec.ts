@@ -10,11 +10,12 @@ import {
     on as nodeOn,
     once as nodeOnce,
 } from "node:events";
-import { assertIsDefined, assertIsString } from 'termi@type_guards';
-import { assertIsNumber } from 'termi@type_guards';
 
 require('termi@polyfills');
 
+import { sleep } from '../../../utils/promise';
+import { assertIsDefined, assertIsString } from 'termi@type_guards';
+import { assertIsNumber } from 'termi@type_guards';
 import {
     EventSignal,
     __test__get_signalEventsEmitter,
@@ -24,6 +25,7 @@ import {
 // import { isAbortError } from "../../../common/AbortController";
 import { EventEmitterX, once, on } from "../../../modules/events";
 import { ProgressControllerX } from 'termi@ProgressControllerX';
+
 import {
     getEventListeners,
 } from '../../../spec_utils/EventTarget_helpers';
@@ -44,6 +46,7 @@ const __test__timersTriggerEventsEmitter = __test__get_timersTriggerEventsEmitte
 
 const SECONDS = 1000;
 const MINUTES = 60 * SECONDS;
+const HOURS = 60 * MINUTES;
 const SECONDS_15 = SECONDS * 15;
 const SECONDS_30 = SECONDS * 30;
 
@@ -938,6 +941,484 @@ describe('EventSignal', () => {
             currentUser$.set(2);
 
             expect(await currentUser$.get()).toBe(user2);
+        });
+
+        it('async computation3', async function() {
+            const usersStore = new UsersStore(new EventEmitterX(), defaultUsers);
+            const currentUser$ = new EventSignal(null as unknown as UserOrNull, (prevValue, userId, eventSignal) => {
+                if (eventSignal.computationsCount < 3) {
+                    if (prevValue !== null) {
+                        throw new Error('On first computation in this case, prev value should be null');
+                    }
+                }
+                else {
+                    assertIsDefined(prevValue);
+                }
+
+                // note: `usersStore.getUser` is async function
+                return usersStore.getUser(userId);
+            }, {
+                initialSourceValue: 0,
+            });
+            const user1 = usersStore.getUserSync(1);
+            const user2 = usersStore.getUserSync(2);
+
+            expect(user1).toBeDefined();
+            expect(user2).toBeDefined();
+
+            const promise = currentUser$.get();
+
+            expect(await promise).toBeNull();
+
+            currentUser$.set(1);
+
+            expect(await currentUser$.get()).toBe(user1);
+
+            currentUser$.set(2);
+
+            expect(await currentUser$.get()).toBe(user2);
+        });
+
+        it('async computation with "pendingValue"', async function() {
+            const async$ = new EventSignal('', (_v, num) => {
+                const promise = new Promise<string>(resolve => {
+                    setTimeout(() => {
+                        resolve(`test ${num + 100}`);
+                    });
+                }) as Promise<string> & { pendingValue: string };
+
+                // todo: ЭТО ДРАФТ, он может быть ПЕРЕДЕЛАН.
+                //  Может быть заменить на eventSignal.setPendingValue (и eventSignal.getPendingValue)?
+                //  Или просто в редактируемое свойство eventSignal.pendingValue?
+                //  И добавить eventSignal.pendingHint (string)?
+                promise["pendingValue"] = `test ${num}`;
+
+                return promise;
+            }, {
+                initialSourceValue: 0,
+                data: {
+                    test: 123,
+                },
+            });
+
+            expect(async$.data).toBeDefined();
+            expect(async$.getLast()).toBe(``);
+
+            const promise = async$.get();
+
+            expect((promise as unknown) instanceof Promise<string>).toBeTruthy();
+
+            const pendingValue = async$.getSync();
+
+            expect(pendingValue).toBe(`test 0`);
+            expect(async$.getLast()).toBe(`test 0`);
+            expect(async$.getSync()).toBe(`test 0`);
+            expect(await promise).toBe(`test 100`);
+            expect(async$.getLast()).toBe(`test 100`);
+            expect(async$.getSync()).toBe(`test 100`);
+
+            async$.set(2);
+
+            expect(async$.getLast()).toBe(`test 100`);
+            expect(async$.getSync()).toBe(`test 2`);
+            expect(await async$.get()).toBe(`test 102`);
+            expect(async$.getLast()).toBe(`test 102`);
+            expect(async$.getSync()).toBe(`test 102`);
+        });
+
+        it('should run new async computation if current computation is not finished and all pending promises should resolve with last value', async function() {
+            const clock = useFakeTimers();
+
+            const usersStore = new UsersStore(new EventEmitterX(), defaultUsers);
+
+            const currentUser$ = new EventSignal(null as unknown as UserOrNull, async (_prev, userId, eventSignal) => {
+                expect((_prev as unknown as Promise<any>)?.then).toBeUndefined();
+
+                eventSignal.data.ac.abort();
+                eventSignal.data.ac = new AbortController();
+
+                return userId ? usersStore.getUser(userId, {
+                    delay: HOURS,
+                    signal: eventSignal.data.ac.signal,
+                }) : null;
+            }, {
+                initialSourceValue: 0,
+                data: {
+                    ac: new AbortController(),
+                },
+            });
+
+            const nullValue = await currentUser$.get();
+
+            expect(nullValue).toBeNull();
+            expect(currentUser$.getSourceValue()).toBe(0);
+
+            currentUser$.set(1);
+
+            const promise1_2 = currentUser$.get();
+            const promise1_3 = currentUser$.get();
+
+            await advanceTimersByTimeAsync(HOURS);
+
+            const currentUser1 = await promise1_2;
+
+            assertIsDefined(currentUser1);
+            expect(currentUser1.id).toBe(1);
+            expect(await promise1_3).toBe(currentUser1);
+            expect(await currentUser$.get()).toBe(currentUser1);
+
+            currentUser$.set(2);
+
+            const promise2 = currentUser$.get();
+
+            await realSleep();
+
+            currentUser$.set(3);
+
+            const promise3_1 = currentUser$.get();
+            const promise3_2 = currentUser$.toPromise();
+
+            await advanceTimersByTimeAsync(HOURS);
+
+            const currentUser3 = await currentUser$.get();
+
+            expect(currentUser$.getSourceValue()).toBe(3);
+            assertIsDefined(currentUser3);
+            expect(currentUser3.id).toBe(3);
+            expect(await promise2).toBe(currentUser3);
+            expect(await promise3_1).toBe(currentUser3);
+            expect(await promise3_2).toBe(currentUser3);
+
+            clock.restore();
+        });
+
+        // todo: Async error handling
+        // describe('error handling', () => {
+        //
+        // });
+    });
+
+    describe('types', () => {
+        it('sync', async function() {
+            const number$ = new EventSignal(0);
+            const numberWithData_null$ = new EventSignal(0, {
+                data: null,
+            });
+            const numberWithData_string$ = new EventSignal(0, {
+                data: 'test',
+            });
+            const numberWithData_object$ = new EventSignal(0, {
+                data: {
+                    test: 1,
+                },
+            });
+            // eslint-disable-next-line jest/no-commented-out-tests
+            /* fixme: [TYPINGS / typings]
+                * see [Bug with type argument inference if it has default value = undefined and actual value is object with non-arrow function #62995](https://github.com/microsoft/TypeScript/issues/62995)
+                * see [Improve inference in the presence of context-sensitive expressions #47599](https://github.com/microsoft/TypeScript/issues/47599)
+            const numberWithData_object2$ = new EventSignal(0, {
+                data: {
+                    test() {
+                        return 123;
+                    },
+                },
+            });
+            */
+            const numberWithData_object3$ = new EventSignal(0, {
+                data: {
+                    test: () => {
+                        return 123;
+                    },
+                },
+            });
+            const string$ = new EventSignal('');
+            const stringWithFinaleValue$ = new EventSignal('', {
+                finaleValue: 'finale',
+            });
+            const computed1$ = new EventSignal(0, (prev, source, eventSignal) => {
+                void prev;
+                void source;
+                void eventSignal;
+
+                return number$.get() + 1000;
+            }, {
+                deps: [ string$ ],
+            });
+            const computedWithData2$ = new EventSignal(0, (prev, source, eventSignal) => {
+                void prev;
+                void source;
+                void eventSignal;
+
+                const value = number$.get();
+
+                if (_isEvenNumber(value)) {
+                    return value + string$.get().length;
+                }
+
+                return number$.get() + 1000;
+            }, {
+                deps: [ string$ ],
+                data: { test: 1 },
+            });
+            const computedWithData3$ = new EventSignal(0, (prev, _, eventSignal) => {
+                void eventSignal;
+
+                return prev + 1;
+            }, {
+                data: { a: 1, testMethod },
+            });
+            const computedWithData3$Data = computedWithData3$.data;
+            const computedWithData4$ = new EventSignal(0, (prev, _, eventSignal) => {
+                void eventSignal;
+
+                return prev + 1;
+            }, {
+                data: {
+                    a: 1,
+                    testMethod(this: { a: number }) {
+                        return this.a;
+                    },
+                },
+            });
+            /*
+            // fixme: Так почему-то нельзя: не выводить this автоматически и/или ломается типизация
+            const computedWithData5$ = new EventSignal(0, (prev, _, eventSignal) => {
+                void eventSignal;
+
+                return prev + 1;
+            }, {
+                data: {
+                    a: 1,
+                    testMethod() {
+                        return this.a;
+                    },
+                },
+            });
+            */
+            const data = {
+                a: 1,
+                testMethod(this: { a: number }) {
+                    return this.a;
+                },
+            };
+            const computedWithData6$ = new EventSignal(0, (prev, _, eventSignal) => {
+                void eventSignal;
+
+                return prev + 1;
+            }, {
+                data,
+            });
+
+            function testMethod(this: { a: number }) {
+                return this.a;
+            }
+
+            void [
+                number$,
+                numberWithData_null$,
+                numberWithData_string$,
+                numberWithData_object$,
+                //fixme: numberWithData_object2$,
+                numberWithData_object3$,
+
+                string$,
+                stringWithFinaleValue$,
+
+                computed1$,
+                computedWithData2$,
+                computedWithData3$,
+                computedWithData3$Data,
+                computedWithData4$,
+                computedWithData6$,
+                computedWithData6$.data,
+            ];
+
+            expect(typeof number$.get()).toBe('number');
+
+            stringWithFinaleValue$.destructor();
+
+            expect(stringWithFinaleValue$.get()).toBe('finale');
+            expect(computedWithData3$Data.testMethod()).toBe(1);
+            expect(computedWithData4$.data.testMethod()).toBe(1);
+            expect(computedWithData6$.data.testMethod()).toBe(1);
+        });
+
+        it('async computed', async function() {
+            const number$ = new EventSignal(0);
+            const string$ = new EventSignal('');
+            // fixme: [TYPINGS / typings] remove ` as unknown as Promise<number>`
+            const asyncComputed1$ = new EventSignal(0 as unknown as Promise<number>, async (prev, source, eventSignal) => {
+                void prev;
+                void source;
+                void eventSignal;
+
+                return number$.get() + 1000;
+            }, {
+                deps: [ string$ ],
+            });
+            const asyncComputed1$Value = asyncComputed1$.get();
+            const asyncComputedWithData1$ = new EventSignal(0 as unknown as Promise<number>, async (prev, source, eventSignal) => {
+                void prev;
+                void source;
+                void eventSignal;
+
+                const value = number$.get();
+
+                if (_isEvenNumber(value)) {
+                    return value + string$.get().length;
+                }
+
+                return number$.get() + 1000;
+            }, {
+                deps: [ string$ ],
+                data: { test: 1 },
+            });
+            const asyncComputedWithData1$Value = asyncComputedWithData1$.get();
+            const usersStore = new UsersStore(new EventEmitterX(), defaultUsers);
+            const asyncComputed2$ = new EventSignal(null as unknown as UserOrNull, async (_, userId) => {
+                return await usersStore.getUser(userId);
+            }, {
+                initialSourceValue: 0,
+                componentType: 1,
+                description: '',
+                // todo: Убрать отсюда ` as Awaited<UserOrNull>`
+                finaleValue: null as Awaited<UserOrNull>,
+                finaleSourceValue: 0,
+            });
+            const asyncComputedWithData3$ = new EventSignal(null as unknown as UserOrNull, async (_, userId) => {
+                return await usersStore.getUser(userId);
+            }, {
+                initialSourceValue: 0,
+                componentType: 1,
+                description: '',
+                // todo: Убрать отсюда ` as Awaited<UserOrNull>`
+                finaleValue: null as Awaited<UserOrNull>,
+                finaleSourceValue: 0,
+                data: { test: 'test' },
+            });
+            // eslint-disable-next-line jest/no-commented-out-tests
+            /*
+            // fixme: [TYPINGS / typings] Что-то не так с типизацией `data`.
+            //  Возможно, из-за того, что TypeScript не даёт лиш частично заполнить список Generic и подставляет в D значение undefined, если хоть один generic задан явно.
+            const asyncComputedWithData4$ = new EventSignal<UserOrNull, number>(null as unknown as UserOrNull, async (_, userId) => {
+                return await usersStore.getUser(userId);
+            }, {
+                initialSourceValue: 0,
+                componentType: 1,
+                description: '',
+                // todo: Убрать отсюда ` as Awaited<UserOrNull>`
+                finaleValue: null as Awaited<UserOrNull>,
+                finaleSourceValue: 123,
+                data: null,
+            });
+            */
+            const asyncComputed5$ = new EventSignal('', (_v, num) => {
+                void _v;
+                //   ^?
+                void num;
+                //   ^?
+
+                const promise = new Promise<string>(resolve => {
+                    queueMicrotask(() => {
+                        resolve(`test ${num + 1}`);
+                    });
+                }) as Promise<string> & { pendingValue: string };
+
+                promise["pendingValue"] = `test ${num}`;
+
+                return promise as Promise<string>;
+            }, {
+                initialSourceValue: 0,
+            });
+            const asyncComputed5$Value = asyncComputed5$.get();
+            /*
+            // fixme: Добавление eventSignal в computation ломает типизацию
+            const asyncComputed6$ = new EventSignal('', (_v, num, eventSignal) => {
+                void _v;
+                //   ^?
+                void num;
+                //   ^?
+                void eventSignal;
+                //   ^?
+
+                const promise = new Promise<string>(resolve => {
+                    queueMicrotask(() => {
+                        resolve(`test ${num + 1}`);
+                    });
+                }) as Promise<string> & { pendingValue: string };
+
+                promise["pendingValue"] = `test ${num}`;
+
+                return promise as Promise<string>;
+            }, {
+                initialSourceValue: 0,
+            });
+            const asyncComputed6$Value = asyncComputed6$.get();
+            */
+            const asyncComputed7$ = new EventSignal('', async (_v, num) => {
+                const promise = new Promise<string>(resolve => {
+                    queueMicrotask(() => {
+                        resolve(`test ${num + 1}`);
+                    });
+                }) as Promise<string> & { pendingValue: string };
+
+                promise["pendingValue"] = `test ${num}`;
+
+                return promise as Promise<string>;
+            }, {
+                initialSourceValue: 0,
+            });
+            const asyncComputed7$Value = asyncComputed5$.get();
+            // fixme: [TYPINGS / typings]: Если убрать ` as unknown as Promise<string>` то ломается типизация
+            const asyncComputed8$ = new EventSignal('' as unknown as Promise<string>, async (_v, num, eventSignal) => {
+                void eventSignal;
+
+                const promise = new Promise<string>(resolve => {
+                    queueMicrotask(() => {
+                        resolve(`test ${num + 1}`);
+                    });
+                }) as Promise<string> & { pendingValue: string };
+
+                promise["pendingValue"] = `test ${num}`;
+
+                return promise as Promise<string>;
+            }, {
+                initialSourceValue: 0,
+                data: {
+                    test: 123,
+                },
+            });
+            const asyncComputed8$Value = asyncComputed5$.get();
+
+            void [
+                asyncComputed1$,
+                asyncComputed1$Value,
+                asyncComputedWithData1$,
+                asyncComputedWithData1$.data,
+                asyncComputedWithData1$Value,
+                asyncComputed2$,
+                asyncComputedWithData3$,
+                asyncComputedWithData3$.data,
+                // fixme: asyncComputedWithData4$,
+                asyncComputed5$,
+                asyncComputed5$Value,
+                // fixme: asyncComputed6$,
+                // fixme: asyncComputed6$Value,
+                asyncComputed7$,
+                asyncComputed7$Value,
+                asyncComputed8$,
+                asyncComputed8$Value,
+            ];
+
+            expect(typeof asyncComputed1$Value).toBe('object');
+            expect(typeof asyncComputed1$Value.then).toBe('function');
+            expect(typeof await asyncComputed1$Value).toBe('number');
+            expect(typeof asyncComputed5$Value).toBe('object');
+            expect(typeof asyncComputed5$Value.then).toBe('function');
+            expect(typeof await asyncComputed5$Value).toBe('string');
+            expect(typeof asyncComputed7$Value).toBe('object');
+            expect(typeof asyncComputed7$Value.then).toBe('function');
+            expect(typeof await asyncComputed7$Value).toBe('string');
         });
     });
 
@@ -3095,7 +3576,7 @@ class UsersStore {
     userNameSignalSignals: Record<number, EventSignal<string, number, { userId: number, computationCounter: number }>> = Object.create(null);
     usersSignals: Record<number, EventSignal<User | null, number, { userId: number }>> = Object.create(null);
 
-    constructor(public emitter: EventEmitterX, users?: User[]) {
+    constructor(public emitter = new EventEmitterX(), users?: User[]) {
         emitter.addListener('user-add', (user: User) => {
             const { id: userId } = user;
 
@@ -3146,7 +3627,16 @@ class UsersStore {
         this.lastAsyncGetUser = void 0;
     }
 
-    async getUser(userId: number | undefined) {
+    async getUser(userId: number | undefined, options?: {
+        delay?: number,
+        signal?: AbortSignal,
+    }) {
+        if (options?.delay) {
+            await sleep(options.delay, {
+                signal: options.signal,
+            });
+        }
+
         this.lastAsyncGetUser = userId;
 
         return userId ? this.users.find(user => user.id === userId) ?? null : null;
@@ -3206,8 +3696,7 @@ class UsersStore {
     getUserSignal(userIdParameter: number) {
         let userId = userIdParameter;
 
-        // @ts-expect-error todo: Разобраться с типизацией
-        return this.usersSignals[userId] ??= new EventSignal<User | null, number, { userId: number }>(this.getUserSync(userId), (currentUser: User | null, sourceUserId: number | undefined, eventSignal): User | null | undefined => {
+        return this.usersSignals[userId] ??= new EventSignal<User | null, number, { userId: number }>(this.getUserSync(userId), (currentUser, sourceUserId, eventSignal): User | null | undefined => {
             const stateFlags = eventSignal.getStateFlags();
             const isNewSourceValue = (stateFlags & EventSignal.StateFlags.wasSourceSetting) !== 0
                 && sourceUserId != null
