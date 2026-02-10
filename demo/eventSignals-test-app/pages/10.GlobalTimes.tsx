@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/prefer-dom-node-dataset */
 'use strict';
 
 import type { MouseEvent } from "react";
@@ -23,13 +24,11 @@ import css from './10.GlobalTimes.module.css';
 
 type ViewType$ = ReturnType<typeof makeViewType$$>;
 
-const ViewType$Context = createContext(null as ViewType$ | null);
 const makeViewType$$ = () => {
     const global = (globalThis as unknown as {
         __test__viewType$set: ViewType$[],
     });
-    let destructor: (() => void) | undefined;
-    const viewType$ = Object.assign(new EventSignal('list' as 'grid' | 'list' | 'table', {
+    const viewType$ = new EventSignal('list' as 'grid' | 'list' | 'table', {
         description: 'viewType$',
         data: {
             onFormSubmit: ((event) => {
@@ -39,6 +38,17 @@ const makeViewType$$ = () => {
                 const target = event.target as HTMLInputElement;
 
                 if (target.name === viewType$.data.radioName && target.value != null) {
+                    // todo: Передавать в set(v, 'onFormChange') вторым параметром значение reason, а когда форма будет вынесена из PageGlobalTimes
+                    //  в отдельном компоненте, в этом новом компоненте можно будет вызывать use с параметром { ignoreUpdateReason: 'onFormChange' }
+                    //  чтобы не ререндерить форму если в ней изменилось значение инпута.
+                    //  ```
+                    //  viewType$.set(target.value as 'grid' | 'list' | 'table', 'onFormChange');
+                    //  ...
+                    //  function ViewTypeForm() {
+                    //    const viewType = viewType$.use({ ignoreUpdateReason: 'onFormChange' });
+                    //    ...
+                    //  }
+                    //  ```
                     viewType$.set(target.value as 'grid' | 'list' | 'table');
                 }
             }) as React.FormEventHandler<HTMLFormElement>,
@@ -65,10 +75,6 @@ const makeViewType$$ = () => {
                 global.__test__viewType$set.splice(index, 1);
             }
         },
-    }), {
-        effectWithDestructor: () => {
-            return destructor ??= viewType$.destructor.bind(viewType$);
-        },
     });
 
     // Use this global value to emulate viewType$ changes from some other component/place.
@@ -83,7 +89,7 @@ const useViewType$$ = (viewType?: ReturnType<ViewType$["get"]>) => {
     const viewType$ = useMemo(makeViewType$$, []);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(viewType$.effectWithDestructor, [ viewType$ ]);
+    useEffect(viewType$.getDispose, [ viewType$ ]);
 
     // Только если мы только что создали viewType$ и нужно указать ему первоначальное значение
     if (viewType && viewType$.version === 0) {
@@ -92,6 +98,8 @@ const useViewType$$ = (viewType?: ReturnType<ViewType$["get"]>) => {
 
     return viewType$;
 };
+// Should be default ViewType$ EventSignal to prevent conditional use of `EventSignal.use` (conditional hooks)
+const ViewType$Context = createContext(makeViewType$$());
 
 export default function PageGlobalTimes({ viewType, filterById }: {
     viewType?: ReturnType<ViewType$["get"]>,
@@ -107,7 +115,7 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     console.log(PageGlobalTimes.name, 'render');
 
     return (<>
-        <div className={css.PageGlobalTimes}>
+        <div className={css.PageGlobalTimes} data-renders-counter={++PageGlobalTimes.rendersCounter}>
             <section className={css.container}>
                 <header className={css.header}>
                     <div className={css.headerMainContent}>
@@ -164,11 +172,39 @@ export default function PageGlobalTimes({ viewType, filterById }: {
     </>);
 }
 
-function PageGlobalTimesLegend() {
-    const currentLocale = currentLocale$.use();
+PageGlobalTimes.rendersCounter = 0;
 
-    return <div className={css.legend}>
-        <div className={css.legendItem}>
+function PageGlobalTimesLegend() {
+    console.log('PageGlobalTimesLegend render');
+
+    const currentLocale = currentLocale$.use();
+    const currentLocaleCityInfo$ = mostPopularCities$.use(cityDescription$List => {
+        return cityDescription$List.find(cityDescription$ => cityDescription$.get().locale === currentLocale);
+    });
+    const $ref = useRef<HTMLDivElement | null>(null);
+
+    const cityDescription = currentLocaleCityInfo$.useListener((cityDescription) => {
+        const $current = $ref.current;
+
+        if ($current) {
+            // note: If 'Столица' is not firstElementChild: $current.queueSelector('data-capital-title')?.title = cityDescription.name;
+            if ($current.firstElementChild) {
+                // set 'title' for 'Столица' div container element
+                ($current.firstElementChild as HTMLElement).title = cityDescription.name;
+            }
+
+            $current.setAttribute('data-city-name', cityDescription.name);
+            $current.setAttribute('data-city-version', currentLocaleCityInfo$.getSnapshotVersion());
+            $current.style.setProperty("--city-dayLightSign", `"${cityDescription.dayLightSign}"`);
+        }
+    });
+
+    return <div
+        ref={$ref}
+        className={css.legend}
+        data-renders-counter={++PageGlobalTimesLegend.rendersCounter}
+    >
+        <div className={css.legendItem} title={cityDescription.name}>
             <span className={css.legendIcon}>🏛️</span>
             <span>{i18n$$`Столица`}</span>
         </div>
@@ -180,11 +216,21 @@ function PageGlobalTimesLegend() {
             <span className={css.legendIcon}>⏰</span>
             <span>{i18n$$`Ваша таймзона: ${getCurrentTimeZoneOffsetName()}`}</span>
         </div>
+        <div className={`${css.legendItem} ${css.legendItemCurrentTimezone}`}>
+            <span>{i18n$$`Таймзона в выбранной локале: ${getCurrentTimeZoneOffsetName(cityDescription.timeZone)}`}</span>
+        </div>
     </div>;
 }
 
 /* todo:
-EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesList);
+EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesList, {
+    default: true,
+    mod: 'list',
+    applyView: [
+        // [ componentType, reactFC, preDefinedProps? ]
+        [ mostPopularCities$.data.elementsComponentType, GlobalTimesCity ],
+    ],
+});
 EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesTable, {
     mod: 'table',
     applyView: [
@@ -194,6 +240,8 @@ EventSignal.registerView(mostPopularCities$.componentType, GlobalTimesTable, {
 });
 */
 
+PageGlobalTimesLegend.rendersCounter = 0;
+
 /** @see [Each item component]{@link GlobalTimesCity} */
 function GlobalTimesList({
     current$Value,
@@ -202,15 +250,23 @@ function GlobalTimesList({
     current$Value: typeof mostPopularCities$.value,
     filterById?: string,
 }) {
-    /** note: for `'table'` value there is another component to render: {@link GlobalTimesTable} */
-    const viewType = useContext(ViewType$Context)?.use();
-    const classNameMode = viewType === 'grid' ? css.citiesGrid : '';
+    const $containerRef = useRef<HTMLDivElement>(null);
+
+    useContext(ViewType$Context).useListener(viewType => {
+        const $container = $containerRef.current;
+
+        if ($container) {
+            /** note: for `'table'` value there is another component to render: {@link GlobalTimesTable} */
+            $container.classList.toggle(css.citiesGrid, viewType === 'grid');
+        }
+    });
+
     const cities = filterById
         ? current$Value.filter(item => item.get().id === filterById)
         : current$Value
     ;
 
-    return (<div className={`${css.citiesContainer} ${classNameMode}`}>
+    return (<div ref={$containerRef} className={css.citiesContainer}>
         {cities}
     </div>);
 }
@@ -264,18 +320,39 @@ function GlobalTimesCity({
      * * Translated value from custom language: `||es-US||:Pyongyang`
      */
     const translatedCityName = nameLocale ? `||${nameLocale}||:${name}` : name;
+    // note: No need to subscribe to currentLocale$ changes due current$ instance (mostPopularCities$.CityDescription$ EventSignal) already has it in dependence list.
     const isCurrentLocale = locale === currentLocale$.get();
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const isThisPipOpen = pipPopupWindow$.use().dataId === id;
-    const viewType = useContext(ViewType$Context)?.use();
+    const $containerRef = useRef<HTMLDivElement>(null);
+    const $canvasRef = useRef<HTMLCanvasElement>(null);
+    const $pipIconRef = useRef<HTMLImageElement>(null);
+    const viewType = useContext(ViewType$Context).useListener(viewType => {
+        const $container = $containerRef.current;
+
+        if ($container) {
+            // note: This attribute value is only for DEBUG. This attribute value is not used in any logic.
+            $container.setAttribute('data-viewtype', viewType);
+        }
+    });
 
     useLayoutEffect(() => {
-        return data.initCanvasAnimation(canvasRef.current);
+        return data.initCanvasAnimation($canvasRef.current);
     }, [ data ]);
 
+    pipPopupWindow$.useListener(pipPopupWindowDescription => {
+        const isThisPipOpen = pipPopupWindowDescription.dataId === id;
+        const $pipIcon = $pipIconRef.current;
+
+        if ($pipIcon) {
+            $pipIcon.classList.toggle(css.pipIconClose, isThisPipOpen);
+            $pipIcon.setAttribute('data-click-mode', isThisPipOpen ? 'close' : 'open');
+        }
+    });
+
     return (<div
+        ref={$containerRef}
         data-id={id}
         data-viewtype={viewType}
+        data-renders-counter={++GlobalTimesCity.rendersCounter}
         className={`${css.cityCard} ${
             isCapital ? css.cityCardCapital : ''} ${
             isCurrentLocale ? css.cityCardCurrentLocale : ''} ${
@@ -283,7 +360,7 @@ function GlobalTimesCity({
         style={{ "--city-flag-content": `"${flag}"` } as React.CSSProperties}
     >
         <div className={css.canvasContainer}>
-            <canvas ref={canvasRef}></canvas>
+            <canvas ref={$canvasRef}></canvas>
         </div>
         <div className={css.cityInfo}>
             <div className={css.cityName}>
@@ -307,13 +384,15 @@ function GlobalTimesCity({
                 <span>{dayLightSign}️</span>
             </div>
         </div>
-        <img className={`${css.pipIcon} ${isThisPipOpen ? css.pipIconClose : ''}`}
-            data-id={id} data-click-mode={isThisPipOpen ? 'close' : 'open'}
+        <img ref={$pipIconRef} className={css.pipIcon}
+            data-id={id} data-click-mode=""
             onClick={_setPopup}
             src="/pip.svg" alt="pip" height="24px"
         />
     </div>);
 }
+
+GlobalTimesCity.rendersCounter = 0;
 
 /** @see [Each item component]{@link GlobalTimesTableRow} */
 function GlobalTimesTable({
