@@ -52,6 +52,12 @@ let currentSignal: EventSignal<any, any, any> | null = null;
 
 // Вспомогательный тип для определения возвращаемого типа
 type ReturnTypeOrPromise<T> = T extends Promise<infer U> ? Promise<U> : T;
+type TryResult<T> = {
+    ok: boolean,
+    error: unknown | null,
+    /** Current value or last value if `error` is defined */
+    result: T,
+};
 
 export class EventSignal<T, S=T, D=undefined, R=T> {
     public readonly id = ++idIncrement;
@@ -1284,6 +1290,47 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
         return newValue as Awaited<T>;
     };
+
+    tryGet(): R extends Promise<any> ? Promise<TryResult<T>> : TryResult<T> {
+        try {
+            const newValue = this.get();
+
+            if (!!newValue && typeof newValue === 'object' && typeof newValue["then"] === 'function') {
+                const newPromise = (newValue as unknown as Promise<T>).then(value => {// eslint-disable-line promise/prefer-await-to-then
+                    if (this.lastError) {
+                        return { ok: false, error: this.lastError, result: value };
+                    }
+
+                    return { ok: true, error: null, result: value };
+                }, (error: unknown) => {// eslint-disable-line promise/prefer-await-to-callbacks
+                    return { ok: false, error, result: this._value };
+                });
+
+                if (newValue["pendingValue"] !== void 0) {
+                    newPromise["pendingValue"] = newValue["pendingValue"];
+                }
+
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                return newPromise;
+            }
+
+            if (this.lastError) {
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                return { ok: false, error: this.lastError, result: newValue };
+            }
+
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            return { ok: true, error: null, result: newValue };
+        }
+        catch (error) {
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-expect-error
+            return { ok: false, error, result: this._value };
+        }
+    }
 
     getSourceValue = () => {
         return this._sourceValue;
@@ -3124,9 +3171,17 @@ const _emptySubscription: EventSignal.Subscription = {
 
 Object.freeze(_emptySubscription);
 
-export function isEventSignal<T extends EventSignal<unknown, unknown, unknown, unknown>>(maybeEventSignal: T | unknown): maybeEventSignal is T {
-    return !!maybeEventSignal
-        && ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
+export function isEventSignal<T extends EventSignal<unknown, unknown, unknown, unknown>>(maybeEventSignal: T | unknown, inThisRealm?: boolean): maybeEventSignal is T {
+    if (!maybeEventSignal) {
+        return false;
+    }
+
+    if (inThisRealm) {
+        return maybeEventSignal instanceof EventSignal;
+    }
+
+    return ((maybeEventSignal as EventSignal<any>).isEventSignal as unknown) === true
+        && (maybeEventSignal as EventSignal<any>)[Symbol.toStringTag] === tagEventSignal
     ;
 }
 

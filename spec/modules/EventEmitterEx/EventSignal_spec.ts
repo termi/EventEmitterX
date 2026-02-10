@@ -18,6 +18,7 @@ import { assertIsDefined, assertIsString } from 'termi@type_guards';
 import { assertIsNumber } from 'termi@type_guards';
 import {
     EventSignal,
+    isEventSignal,
     __test__get_signalEventsEmitter,
     __test__get_subscribersEventsEmitter,
     __test__get_timersTriggerEventsEmitter,
@@ -883,6 +884,54 @@ describe('EventSignal', () => {
             // @ts-ignore fixme: [TYPINGS / typings] Fix types for this case
             expect(computed1$.data.title).toBeDefined();
         });
+
+        describe('getters', () => {
+            // todo: get, getSafe, getSyncSafe, getLast, getSync
+
+            it('tryGet', async function() {
+                const isThrowError$ = new EventSignal(false);
+                let counter = 0;
+                const computedPotentialError$ = new EventSignal(counter, function() {
+                    if (isThrowError$.get()) {
+                        throw new Error('test error');
+                    }
+
+                    return ++counter;
+                });
+
+                {
+                    const { ok, error, result } = computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(true);
+                    expect(error).toBeNull();
+                    expect(result).toBe(1);
+                }
+
+                isThrowError$.set(true);
+
+                {
+                    const { ok, error, result } = computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(false);
+                    expect(String(error)).toBe('Error: test error');
+                    expect(result).toBe(1);
+                    expect(computedPotentialError$.lastError).toBe(error);
+                    expect(computedPotentialError$.status).toBe('error');
+                }
+
+                isThrowError$.set(false);
+
+                {
+                    const { ok, error, result } = computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(true);
+                    expect(error).toBeNull();
+                    expect(result).toBe(2);
+                    expect(computedPotentialError$.lastError).toBeUndefined();
+                    expect(computedPotentialError$.status).toBe('default');
+                }
+            });
+        });
     });
 
     // todo: Async computation is experimental!
@@ -1140,6 +1189,54 @@ describe('EventSignal', () => {
             expect(await promise3_2).toBe(currentUser3);
 
             clock.restore();
+        });
+
+        describe('getters', () => {
+            // todo: get, getSafe, getSyncSafe, getLast, getSync
+
+            it('tryGet', async function() {
+                const isThrowError$ = new EventSignal(false);
+                let counter = 0;
+                const computedPotentialError$ = new EventSignal(counter, async function() {
+                    if (isThrowError$.get()) {
+                        throw new Error('test error');
+                    }
+
+                    return ++counter;
+                });
+
+                {
+                    const { ok, error, result } = await computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(true);
+                    expect(error).toBeNull();
+                    expect(result).toBe(1);
+                }
+
+                isThrowError$.set(true);
+
+                {
+                    const { ok, error, result } = await computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(false);
+                    expect(String(error)).toBe('Error: test error');
+                    expect(result).toBe(1);
+                    expect(computedPotentialError$.lastError).toBe(error);
+                    expect(computedPotentialError$.status).toBe('error');
+                }
+
+                isThrowError$.set(false);
+
+                {
+                    const { ok, error, result } = await computedPotentialError$.tryGet();
+
+                    expect(ok).toBe(true);
+                    expect(error).toBeNull();
+                    expect(result).toBe(2);
+                    expect(computedPotentialError$.lastError).toBeUndefined();
+                    expect(computedPotentialError$.status).toBe('default');
+                }
+            });
         });
 
         // todo: Async error handling
@@ -3827,6 +3924,21 @@ describe('EventSignal', () => {
 
                 expect(owner.renders).toBe(1);
                 expect($el.getAttribute('data-test')).toBe('2');
+            });
+        });
+    });
+
+    describe('helpers', function() {
+        describe('isEventSignal', function() {
+            it('positive', function() {
+                expect(isEventSignal(new EventSignal(0))).toBe(true);
+            });
+
+            it('negative', function() {
+                expect(isEventSignal(null)).toBe(false);
+                expect(isEventSignal(void 0)).toBe(false);
+                expect(isEventSignal(123)).toBe(false);
+                expect(isEventSignal({})).toBe(false);
             });
         });
     });
