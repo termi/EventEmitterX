@@ -40,7 +40,7 @@ const subscribersEventsEmitter = new EventEmitterX({
     listenerOncePerEventType: true,
 });
 
-const isDev = isRunningInWebDevMode();
+const isReactDev = isRunningInWebDevMode();
 const _is = Object.is;
 let idIncrement = 0;
 // note: can be implemented via stack
@@ -161,17 +161,30 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
      *
      * React component function (React.FC) despite of type `string` here.
      */
-    declare readonly type: ({ eventSignal }: { eventSignal: EventSignal<T, S, D, R>, __proto__?: null }, context?: Object) => { type: any, props: any, key: string };
+    declare readonly type: ({ eventSignal, current$ }: {
+        current$: EventSignal<T, S, D, R>,
+        /** @deprecated use {@link current$} */
+        eventSignal?: EventSignal<T, S, D, R>,
+        __proto__?: null,
+    }, context?: Object) => { type: any, props: any, key: string };
     // Reserved for React
     // declare readonly type: (props: {
     //     eventSignal: EventSignal<T, S, D, R>,
     // }) => any;
     // Reserved for React
-    declare readonly props: { eventSignal: EventSignal<any> };
+    declare readonly props: {
+        current$: EventSignal<any>,
+        /** @deprecated use {@link current$} */
+        eventSignal?: EventSignal<any>,
+    };
     // Reserved for React
     declare readonly keyProps: { key: EventSignal<any>["key"] };
     // Reserved for React
-    declare readonly defaultProps: { eventSignal: EventSignal<any> };
+    declare readonly defaultProps: {
+        current$: EventSignal<any>,
+        /** @deprecated use {@link current$} */
+        eventSignal?: EventSignal<any>,
+    };
     // Reserved for React
     declare readonly ref: null;
     // Reserved for React
@@ -2020,10 +2033,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     // noinspection JSUnusedGlobalSymbols
-    component = Object.assign((props: Record<string, any> & {
+    component = Object.defineProperties(Object.assign((props: Record<string, any> & {
         children?: unknown,
         sFC?: EventSignal.ReactFC<T, S, D, R> | false,
+        sDefaultFC?: EventSignal.ReactFC<T, S, D, R> | false,
         // sComponents?: Map<ComponentType, EventSignal.ReactFC<any, any, any, any>>)
+        sIgnoreRecursive?: boolean,
     }, context?: Object) => {
         const { type } = this;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -2033,25 +2048,35 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         return _type({
             __proto__: null,
             eventSignal: this,
+            current$: this,
             ...props,
         }, context);
     }, {
+        ViewContext: null as unknown as EventSignal_ReactCopy.Context<Record<number | string | symbol, (
+            ((...props: any[]) => any)
+            | [ <T extends unknown[]>(...props: T) => any, Partial<T> ]
+        )>>["Provider"],
+    }), {
         /**
          * A BETA version of EventSignal's ViewContext
          */
-        get ViewContext() {
-            const ViewContext = EventSignal._ContextProvider;
+        ViewContext: {
+            get() {
+                const ViewContext = EventSignal._ContextProvider;
 
-            if (ViewContext) {
-                Object.defineProperty(this, 'ViewContext', {
-                    value: ViewContext,
-                    enumerable: true,
-                    configurable: true,
-                    writable: false,
-                });
-            }
+                if (ViewContext) {
+                    Object.defineProperty(this, 'ViewContext', {
+                        value: ViewContext,
+                        enumerable: true,
+                        configurable: true,
+                        writable: false,
+                    });
+                }
 
-            return ViewContext as EventSignal_ReactCopy.Context<Record<number | string | symbol, (...props: any[]) => any>>["Provider"];
+                return ViewContext as EventSignal_ReactCopy.Context<Record<number | string | symbol, (...props: any[]) => any>>["Provider"];
+            },
+            configurable: true,
+            enumerable: true,
         },
     });
 
@@ -2090,7 +2115,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     /**
      * A BETA version of EventSignal's ViewContext
      */
-    declare private static _ContextProvider: { (props: Object): null, children: any, value: any, readonly $$typeof: symbol; };
+    declare private static _ContextProvider: { (props: Object): null, children: any, value: any, readonly $$typeof: symbol } | undefined;
     //todo: Сейчас не работает
     // declare private static _setComponentOnDestroy;
 
@@ -2132,13 +2157,13 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             compare?: Function,
         ) => Object) | undefined;
         let _useSyncExternalStore: UseSyncExternalStore | undefined;
-        let _EventSignalsContext: Object & { Provider: Object, _currentValue: Object | undefined };
+        let _EventSignalsContext: undefined | Object & { Provider: Object, _currentValue: Object | undefined };
         let _useContext: (key: Object) => (Object | null) = () => null;
 
         this.initReact = function(ReactParam: unknown) {
             const __React = ReactParam as {
                 useSyncExternalStore: UseSyncExternalStore,
-                createContext: () => typeof _EventSignalsContext,
+                createContext: () => NonNullable<typeof _EventSignalsContext>,
                 useContext: typeof _useContext,
                 createElement?: typeof _React_createElement,
                 memo?: typeof _React_createElement,
@@ -2147,12 +2172,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             // eslint-disable-next-line @typescript-eslint/no-magic-numbers
             const isReactGte19 = Number.parseInt(__React.version || '') >= 19;
 
-            if (isDev || isTest) {
+            if (isReactDev || isTest) {
                 this._React = _React = __React as unknown as typeof _React;
             }
 
-            if ('useSyncExternalStore' in __React) {
                 this.prototype._useSyncExternalStore = _useSyncExternalStore = __React.useSyncExternalStore;
+            reactInit: if ('useSyncExternalStore' in __React) {
 
                 if (__React.createElement) {
                     _React_createElement = __React.createElement;
@@ -2171,11 +2196,18 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     });
                 }
 
-                /**
-                 * A BETA version of EventSignal's ViewContext
-                 */
-                _EventSignalsContext = createEventSignalMagicContext(__React.createContext, 'EventSignalsContext');
                 _useContext = __React.useContext;
+
+                if (_EventSignalsContext) {
+                    break reactInit;
+                }
+
+                if (__React.createContext) {
+                    /**
+                     * A BETA version of EventSignal's ViewContext
+                     */
+                    _EventSignalsContext = createEventSignalMagicContext(__React.createContext, 'EventSignalsContext');
+                }
 
                 if (isReactGte19) {
                     // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
@@ -2219,18 +2251,18 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         / **
          * A wrapper component that renders a EventSignal's value directly as a Text node or JSX.
          * /
-        const EventSignalDestroyedComponent = function EventSignalDestroyedComponent({ signal }: { eventSignal: EventSignal<any> }) {
-            const componentType = signal._componentType;
-            const reactFC = signal._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType) : void 0);
+        const EventSignalDestroyedComponent = function EventSignalDestroyedComponent({ current$ }: { current$: EventSignal<any> }) {
+            const componentType = current$._componentType;
+            const reactFC = current$._reactFC ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType) : void 0);
             const has_reactFC = reactFC != null && (reactFC as unknown) !== false;
 
             if (has_reactFC) {
-                return reactFC({ signal });
+                return reactFC({ current$ });
             }
         };
 
         this._setComponentOnDestroy = function(eventSignal: EventSignal<any, any, any>) {
-            void Object.defineProperty(signal, 'type', {
+            void Object.defineProperty(eventSignal, 'type', {
                 configurable: true,
                 value: EventSignalDestroyedComponent,
             });
@@ -2257,11 +2289,15 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             eventSignal,
             children,
             sFC,
+            sDefaultFC,
+            sIgnoreRecursive,
             ...otherProps
         }: {
             eventSignal: EventSignal<any>,
             children?: Object,
             sFC?: EventSignal.ReactFC<any, any, any, any> | false,
+            sDefaultFC?: EventSignal.ReactFC<any, any, any, any> | false,
+            sIgnoreRecursive?: boolean,
         }) {
             /**
              * A BETA version of EventSignal's ViewContext
@@ -2281,17 +2317,17 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, eventSignal.status) : void 0)
                 : void 0
             ;
-            const reactFC = sFC !== void 0 ? sFC : reactFCDescriptor?.[0];
-            const has_reactFC = reactFC != null && reactFC !== false;
-            const preDefinedProps = has_reactFC ? reactFCDescriptor?.[1] as Record<any, any> : void 0;
+            let reactFCDescriptor_0: NonNullable<(typeof reactFCDescriptor)>[0] | null | undefined;
+            const reactFC = sFC !== void 0 ? sFC : ((reactFCDescriptor_0 = reactFCDescriptor?.[0]) ?? sDefaultFC);
+            const preDefinedProps = reactFCDescriptor_0 ? (reactFCDescriptor as NonNullable<(typeof reactFCDescriptor)>)[1] as Record<any, any> : void 0;
             let snapshotVersion: string | undefined = void 0;
 
             if (_useSyncExternalStore) {
                 // https://react.dev/reference/react/useSyncExternalStore
                 snapshotVersion = _useSyncExternalStore(eventSignal.subscribeOnNextRender, eventSignal.getSnapshotVersion);
 
-                renderReactComponent: if (has_reactFC) {
-                    if (isDev) {
+                renderReactComponent: if (reactFC != null && reactFC !== false) {
+                    if (isReactDev && !sIgnoreRecursive) {
                         /**
                          * Детектируем рекурсивный вызов EventSignalComponent(), чтобы избежать ситуации, когда внутри
                          *  зарегистрированного React-компонента в JSX возвращается сам EventSignal и мы опять вызываем EventSignalComponent(),
@@ -2324,10 +2360,14 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     const element = _React_createElement!(memorizedReactFC, { // eslint-disable-line @typescript-eslint/no-non-null-assertion
                         __proto__: null,
                         key,
+                        // @deprecated use current$
                         eventSignal,
+                        current$: eventSignal,
+                        current$Value: signalValue,
+                        // todo: rename to 'current$Version'?
                         version,
+                        // todo: rename to 'current$SnapshotVersion'?
                         snapshotVersion,
-                        componentType,
                         ...preDefinedProps,
                         ...otherProps,
                     }, children || null);
@@ -2361,7 +2401,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         Object.defineProperty(EventSignalComponent, 'name', {
-            value: 'EventSignalComponent',
+            value: '$Component',
             enumerable: false,
             configurable: true,
             writable: false,
@@ -2394,7 +2434,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 configurable: true,
                 enumerable: false,
                 get(this: EventSignal<any>) {
-                    const props: EventSignal<any, any, any>["props"] = Object.freeze(Object.setPrototypeOf({ eventSignal: this }, null));
+                    const props: EventSignal<any, any, any>["props"] = Object.freeze(Object.setPrototypeOf({ eventSignal: this, current$: this }, null));
 
                     return _defineNonEnumValue(this, 'props', props);
                 },
@@ -2439,11 +2479,16 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         R=T,
         CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$?: EventSignal<T, S, D, R>,
+            current$Value?: EventSignal<T, S, D, R>["value"],
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
@@ -2461,11 +2506,16 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         R=T,
         CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$?: EventSignal<T, S, D, R>,
+            current$Value?: EventSignal<T, S, D, R>["value"],
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
@@ -2482,11 +2532,16 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         R=T,
         CT extends Object | number | string | symbol | undefined=EventSignal.NewOptions<T, S, D, R>["componentType"],
         PROPS extends {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$?: EventSignal<T, S, D, R>,
+            current$Value?: EventSignal<T, S, D, R>["value"],
             version?: number,
             componentType?: CT,
         } = {
-            eventSignal: EventSignal<T, S, D, R>,
+            // deprecated use current$
+            eventSignal?: EventSignal<T, S, D, R>,
+            current$: EventSignal<T, S, D, R>,
             version?: number,
             componentType?: CT,
             [key: string]: unknown,
@@ -2576,7 +2631,10 @@ export namespace EventSignal {
     export type TriggerDescription = TriggerDescriptionClock | TriggerDescriptionEmitter | TriggerDescriptionEventSignal;
 
     export type ReactFC<T, S, D, R, PROPS={}> = (props: {
-        eventSignal: EventSignal<T, S, D, R>,
+        /** @deprecated use {@link current$} */
+        eventSignal?: EventSignal<T, S, D, R>,
+        current$: EventSignal<T, S, D, R>,
+        current$Value: Awaited<T>,
         version?: number,
         children?: any,
         [key: string]: any,
@@ -3348,11 +3406,11 @@ function _weakRefFabric<O extends object = object>(target: O): WeakRef<O> {
 }
 
 // todo: Не экспортировать signalEventsEmitter, а сделать отдельные методы, которые будут давать информацию о его состоянии.
-export const __test__get_signalEventsEmitter = isTest ? () => signalEventsEmitter : void 0 as unknown as (() => typeof signalEventsEmitter);
-export const __test__get_subscribersEventsEmitter = isTest ? () => subscribersEventsEmitter : void 0 as unknown as (() => typeof subscribersEventsEmitter);
-export const __test__get_timersTriggerEventsEmitter = isTest ? () => timersTriggerEventsEmitter : void 0 as unknown as (() => typeof timersTriggerEventsEmitter);
+export const __test__get_signalEventsEmitter = (isTest || isReactDev) ? () => signalEventsEmitter : void 0 as unknown as (() => typeof signalEventsEmitter);
+export const __test__get_subscribersEventsEmitter = (isTest || isReactDev) ? () => subscribersEventsEmitter : void 0 as unknown as (() => typeof subscribersEventsEmitter);
+export const __test__get_timersTriggerEventsEmitter = (isTest || isReactDev) ? () => timersTriggerEventsEmitter : void 0 as unknown as (() => typeof timersTriggerEventsEmitter);
 
-if (isIDEDebugger) {
+if (isIDEDebugger || isReactDev) {
     const _global = (globalThis as unknown as {
         __test__get_signalEventsEmitter: typeof __test__get_signalEventsEmitter,
         __test__get_subscribersEventsEmitter: typeof __test__get_subscribersEventsEmitter,

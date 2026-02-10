@@ -16,9 +16,7 @@ export function createEventSignalMagicContext(createContext: () => ReactContextL
     // eslint-disable-next-line unicorn/consistent-function-scoping
     const _FakeKlass = function() {};
 
-    if (displayName) {
-        magicContext.displayName = magicContext.Provider.displayName = 'EventSignalsContext';
-    }
+    magicContext.displayName = magicContext.Provider.displayName = displayName ?? 'EventSignalsContext';
 
     Object.defineProperty(magicContext, '_currentValue', {
         get() {
@@ -33,11 +31,12 @@ export function createEventSignalMagicContext(createContext: () => ReactContextL
                     newValue = Object.fromEntries(newValue);
                 }
 
-                Object.setPrototypeOf(newValue, null);
-
                 // noinspection CommaExpressionJS
                 if (currentValue && !(currentValue instanceof (_FakeKlass.prototype = newValue, _FakeKlass))) {
                     Object.setPrototypeOf(newValue, currentValue);
+                }
+                else {
+                    Object.setPrototypeOf(newValue, null);
                 }
             }
 
@@ -45,18 +44,6 @@ export function createEventSignalMagicContext(createContext: () => ReactContextL
             this.__currentValue = newValue;
         },
     });
-
-    if (Object.getPrototypeOf(magicContext) === Object.prototype) {
-        Object.setPrototypeOf(magicContext, null);
-    }
-
-    if (Object.getPrototypeOf(magicContext.Provider) === Object.prototype) {
-        Object.setPrototypeOf(magicContext.Provider, null);
-    }
-
-    // if (Object.getPrototypeOf(magicContext.Consumer) === Object.prototype) {
-    //     Object.setPrototypeOf(magicContext.Consumer, null);
-    // }
 
     return magicContext as ReactMagicContext;
 }
@@ -72,17 +59,44 @@ export function getReactFunctionComponentFromMagicContext(
         return null;
     }
 
+    let reactFC: ((...props: any[]) => any) | null = null;
+    let predefinedProps: Object | undefined;
+
     // @ts-expect-error `TS2538: Type Object cannot be used as an index type.
     //  TS2538: Type undefined cannot be used as an index type.`
     const reactFCs = magicContextValue[componentType] || null;
 
-    const reactFC = reactFCs
-        ? ((status != null ? reactFCs[status] : null) || reactFCs["default"] || reactFCs)
-        : null
-    ;
+    if (reactFCs) {
+        if (typeof reactFCs === 'object') {
+            if (status === 'error-boundary') {
+                return reactFCs?.['error-boundary'] || null;
+            }
 
-    if (reactFC) {
-        return { 0: reactFC, __proto__: null };
+            if (status === 'error-only') {
+                return reactFCs?.['error'] || null;
+            }
+
+            reactFC = reactFCs
+                ? ((status != null ? reactFCs[status] : null) || reactFCs["default"] || reactFCs)
+                : null
+            ;
+        }
+        else if (!status || status === 'default') {
+            reactFC = reactFCs;
+        }
+
+        if (Array.isArray(reactFC)) {
+            predefinedProps = reactFC[1];
+            reactFC = reactFC[0];
+        }
+
+        if (reactFC) {
+            if (predefinedProps) {
+                return { 0: reactFC, 1: predefinedProps, __proto__: null };
+            }
+
+            return { 0: reactFC, __proto__: null };
+        }
     }
 
     return null;
