@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-/* eslint-disable no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment, promise/no-nesting,jest/prefer-expect-resolves */
+/* eslint-disable no-unused-vars, @typescript-eslint/no-unused-vars, @typescript-eslint/ban-ts-comment, promise/no-nesting,jest/prefer-expect-resolves, unicorn/prefer-dom-node-dataset */
 /* globals describe, xdescribe, it, xit, expect */
 'use strict';
 
@@ -37,6 +37,7 @@ import {
     advanceTimersByTime,
     advanceTimersByTimeAsync,
 } from "../../../spec_utils/fakeTimers";
+import { fakeReact, FakeMiniHTMLElement } from "../../../spec_utils/simple-react-hooks";
 
 const { createSignal } = EventSignal;
 
@@ -63,8 +64,10 @@ describe('EventSignal', () => {
             const signal2$ = new EventSignal(100, {
                 description: 'signal2',
             });
-            const computedSignal1$ = new EventSignal(0, (prev) => {
+            const computedSignal1$ = new EventSignal(0, (prev, source, eventSignal) => {
                 void prev;
+                void source;
+                void eventSignal;
 
                 const value = signal1$.get();
 
@@ -80,6 +83,8 @@ describe('EventSignal', () => {
             });
 
             const value = signal1$.get();
+
+            signal1$.mutate(1);
 
             signal1$.set(value + 1);
 
@@ -111,7 +116,7 @@ describe('EventSignal', () => {
                 const objB = signal2$.get();
                 const args = [ objA.a, objB.b ];
 
-                return prev.replace(/#{(\d+)}/g, function(_, curr) {
+                return prev.replace(/#{(\d+)}/g, function(_, curr: string) {
                     return `#{${args.shift() || curr || 0}}`;
                 });
             }, {
@@ -832,6 +837,51 @@ describe('EventSignal', () => {
             expect(object$.get().numericValue).toBe(1);
             expect(object$.version).toBe(1);
             expect(object$.computationsCount).toBe(2);
+        });
+
+        it('computation value #2', function() {
+            const counter$ = new EventSignal(0, {
+                description: 'counter1$',
+                data: {
+                    title: `Счетчик`,
+                },
+            });
+            // eslint-disable-next-line @typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore fixme: [TYPINGS / typings] Fix types for this case
+            const computed1$ = new EventSignal('', (_prev, sourceValue, eventSignal) => {
+                if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
+                    counter$.set(sourceValue);
+                }
+
+                return `Значение = ${counter$.get()}`;
+            }, {
+                initialSourceValue: counter$.get(),
+                data: {
+                    title: `test`,
+                    _: {
+                        increment(arg = 1) {
+                            counter$.set(v => v + arg);
+                        },
+                        decrement(arg = 1) {
+                            counter$.set(v => v - arg);
+                        },
+                    },
+                },
+            });
+
+            expect(computed1$.get()).toBe(`Значение = 0`);
+
+            computed1$.set(777);
+
+            expect(counter$.get()).toBe(0);
+            expect(computed1$.get()).toBe(`Значение = 777`);
+            expect(counter$.get()).toBe(777);
+            expect(counter$.data).toBeDefined();
+            expect(counter$.data.title).toBeDefined();
+            expect(computed1$.data).toBeDefined();
+            // eslint-disable-next-line @typescript-eslint/prefer-ts-expect-error
+            // @ts-ignore fixme: [TYPINGS / typings] Fix types for this case
+            expect(computed1$.data.title).toBeDefined();
         });
     });
 
@@ -3373,7 +3423,7 @@ describe('EventSignal', () => {
         });
 
         describe('with trigger', function() {
-            xit('force update signal value every X milliseconds 3 - async with subscriptions', async function() {
+            it('force update signal value every X milliseconds 3 - async with subscriptions', async function() {
                 /**
                  * @example Use custom date
                  * nowDate$.set(new Date('2025-12-10T00:19:48.581Z').getTime());
@@ -3394,6 +3444,8 @@ describe('EventSignal', () => {
                     trigger: {
                         type: 'clock',
                         ms: 1000,
+                        // Нужно, чтобы не подключаться к существующему setInterval, который может быть заведён с другими настройками fake-timers.
+                        timerGroupId: Symbol(),
                     },
                     throttle: {
                         type: 'clock',
@@ -3416,9 +3468,6 @@ describe('EventSignal', () => {
                 await advanceTimersByTimeAsync(SECONDS);
 
                 // Has subscription, already computed
-                // fixme: [tag: SUBSCRIPTIONS_ON_NEW_VALUE] Тут как-то НЕНАДЁЖНО работает получение нового значения
-                //  в подписчике через addListener - тут ПЛАВАЮЩИЙ баг, когда nowDate$.computationsCount то 0, то 1.
-                //  Воспроизводиться когда запускаются ВСЕ тесты в этом файле, в том числе в DEBUG-режиме.
                 expect(nowDate$.computationsCount).toBe(1);
                 expect(counter).toBe(1);
                 expect(nowDate$.get().getTime()).toBe(startDate.getTime() + SECONDS);
@@ -3442,6 +3491,7 @@ describe('EventSignal', () => {
                 expect(counter).toBe(3);
 
                 const prevValue = nowDate$.get().getTime();
+
                 // Устанавливаем новое время.
                 // Нужно учитывать, что новое значение пересчитается в после следующей микротаски, т.к. есть подписчики
                 //  навешанные через addListener на этот сигнал.
@@ -3549,6 +3599,237 @@ describe('EventSignal', () => {
     //         };
     //     });
     // });
+
+    describe('Synthetic testing of React (using own fakeReact)', function() {
+        const { requestAnimationFrame } = globalThis;
+        const currentReact = EventSignal._React;
+
+        beforeAll(() => {
+            // @ts-expect-error
+            globalThis.requestAnimationFrame = queueMicrotask;
+
+            EventSignal.initReact(fakeReact);
+        });
+
+        afterAll(() => {
+            globalThis.requestAnimationFrame = requestAnimationFrame;
+
+            if (currentReact) {
+                EventSignal.initReact(currentReact);
+            }
+            else {
+                EventSignal.initReact(void 0);
+            }
+        });
+
+        describe('#use', function() {
+            it('with reducer - 1', async () => {
+                const store$ = new EventSignal({
+                    value: 0,
+                    get isOdd() {
+                        return (store$.get().value & 1) === 1;
+                    },
+                });
+
+                const {
+                    owner,
+                    result,
+                } = fakeReact.fakeRender(function() {
+                    const isOdd = store$.use(v => v.isOdd);
+
+                    return [ String(isOdd) ];
+                });
+
+                expect(owner.renders).toBe(1);
+                expect(owner.lastRender).toEqual([ "false" ]);
+                expect(result).toEqual(owner.lastRender);
+
+                store$.mutate({
+                    // isOdd should be false
+                    value: store$.get().value + 2,
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner.renders).toBe(1);
+                expect(owner.lastRender).toEqual([ "false" ]);
+
+                store$.mutate({
+                    // isOdd should be true
+                    value: store$.get().value + 1,
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner.renders).toBe(2);
+                expect(owner.lastRender).toEqual([ "true" ]);
+            });
+
+            it('with reducer - 2', async () => {
+                type Size = {
+                    height: number,
+                    width: number,
+                };
+
+                const store$ = new EventSignal({
+                    type: 'monitor',
+                    size: {
+                        height: 640,
+                        width: 480,
+                    } as Size,
+                    isActive: true,
+                });
+                const sizeIsEqual = (size1: Size, size2: Size) => {
+                    return size1.height === size2.height
+                        && size1.width === size2.width
+                    ;
+                };
+
+                const {
+                    owner: owner1,
+                    result: result1,
+                } = fakeReact.fakeRender(function() {
+                    // Subscribe only in new values in 'size'
+                    const size = store$.use(v => {
+                        return v.size;
+                    }, sizeIsEqual);
+
+                    return [ 'size is: ', size.height, 'x', size.width, ' px' ];
+                });
+                const {
+                    owner: owner2,
+                    result: result2,
+                } = fakeReact.fakeRender(function() {
+                    // Subscribe on ALL changes
+                    const monitor = store$.use();
+
+                    return [ 'monitor is: ', monitor.isActive ? 'active' : 'not active' ];
+                });
+
+                expect(owner1.renders).toBe(1);
+                expect(owner1.lastRender.join('')).toBe('size is: 640x480 px');
+                expect(result1).toEqual(owner1.lastRender);
+                expect(owner2.renders).toBe(1);
+                expect(owner2.lastRender.join('')).toBe('monitor is: active');
+                expect(result2).toEqual(owner2.lastRender);
+
+                store$.mutate({
+                    isActive: false,
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner1.renders).toBe(1);
+                expect(owner1.lastRender.join('')).toBe('size is: 640x480 px');
+                expect(owner2.renders).toBe(2);
+                expect(owner2.lastRender.join('')).toBe('monitor is: not active');
+
+                const monitorSize = store$.get().size;
+
+                monitorSize.height = 800;
+                monitorSize.width = 600;
+
+                // note: Direct mutation in monitorSize will be ignored
+                store$.mutate({});
+
+                await fakeReact.awaitRender();
+
+                expect(owner1.renders).toBe(1);
+                expect(owner1.lastRender.join('')).toBe('size is: 640x480 px');
+                expect(owner2.renders).toBe(2);
+                expect(owner2.lastRender.join('')).toBe('monitor is: not active');
+
+                const monitorSize2 = store$.get().size;
+
+                monitorSize2.height = 1280;
+                monitorSize2.width = 720;
+
+                /** note: Mutation in monitorSize will be ignored due prevValue and newValue in {@link sizeIsEqual} are the same because of {@link monitorSize2} mutation. */
+                store$.mutate({
+                    isActive: true,
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner1.renders).toBe(1);
+                expect(owner1.lastRender.join('')).toBe('size is: 640x480 px');
+                expect(owner2.renders).toBe(3);
+                expect(owner2.lastRender.join('')).toBe('monitor is: active');
+
+                // note:
+                //  * owner1: size will be read due it is new object
+                //  * owner2: will be re-rendered due it has no reducer
+                store$.mutate({
+                    size: {
+                        height: 1920,
+                        width: 1080,
+                    },
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner1.renders).toBe(2);
+                expect(owner1.lastRender.join('')).toBe('size is: 1920x1080 px');
+                expect(owner2.renders).toBe(4);
+                expect(owner2.lastRender.join('')).toBe('monitor is: active');
+
+                /**
+                 * note:
+                 *  * owner1: size will be read due it is new object not re-rendered due {@link sizeIsEqual}
+                 *  * owner2: will be re-rendered due it has no reducer
+                 */
+                store$.mutate({
+                    size: {
+                        height: 1920,
+                        width: 1080,
+                    },
+                });
+
+                await fakeReact.awaitRender();
+
+                expect(owner1.renders).toBe(2);
+                expect(owner1.lastRender.join('')).toBe('size is: 1920x1080 px');
+                expect(owner2.renders).toBe(5);
+                expect(owner2.lastRender.join('')).toBe('monitor is: active');
+            });
+        });
+
+        describe('#useListener', function() {
+            it('should should not cause rerender', async () => {
+                const counter$ = new EventSignal(0);
+
+                const {
+                    owner,
+                    result,
+                } = fakeReact.fakeRender(function() {
+                    const $ref = fakeReact.useRef<HTMLElement>();
+                    const counter = counter$.useListener((newValue) => {
+                        // eslint-disable-next-line unicorn/prefer-dom-node-dataset
+                        $ref.current!.setAttribute('data-test', String(newValue));
+                    });
+
+                    return [ String(counter), { ref: $ref } ];
+                });
+
+                expect(owner.renders).toBe(1);
+                expect(result).toEqual(owner.lastRender);
+
+                const $el = result[1];
+
+                FakeMiniHTMLElement.assertIsFakeMiniHTMLElement($el);
+
+                expect(owner.renders).toBe(1);
+                expect($el.getAttribute('data-test')).toBe('0');
+
+                counter$.set(2);
+
+                await fakeReact.awaitRender();
+
+                expect(owner.renders).toBe(1);
+                expect($el.getAttribute('data-test')).toBe('2');
+            });
+        });
+    });
 });
 
 type User = {
