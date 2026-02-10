@@ -17,12 +17,13 @@ export default function UserCard({ current$Value }: { current$Value: typeof user
         secondName,
         icon,
     } = current$Value;
+    const userFirstName = userFirstName$.use();
 
     console.log('render UserCard', icon);
 
     return (<div className="user-card" data-type="UserCard" style={{ border: '1px solid gray' }}>
         <p>This is UserCard registered for EventSignal componentType={userFullNameComponentType}</p>
-        <p title={userFirstName$.get()}>{userFirstName$.data.title}
+        <p title={userFirstName}>{userFirstName$.data.title}
             <span> ({userFirstName$.version})</span>:{'\u00A0'}
             <span>{firstName}</span>
             {'\u00A0'}{icon}

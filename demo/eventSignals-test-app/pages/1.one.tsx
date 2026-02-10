@@ -30,6 +30,8 @@ export default function PageOne() {
                     <Counter current$={mainState.computed2$} classes={counterClasses}/>
 
                     {mainState.computed2$}
+                    {' | '}
+                    {mainState.computed1$}
                 </div>
 
                 <div className={css.summarySection}>

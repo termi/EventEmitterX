@@ -241,9 +241,10 @@ export function getCurrentTimeZoneOffset() {
     return new Date().getTimezoneOffset();
 }
 
-export function getCurrentTimeZoneOffsetName() {
+export function getCurrentTimeZoneOffsetName(timeZone?: string) {
     const timeZoneFormatter = new Intl.DateTimeFormat(getCurrentLocale(), {
         timeZoneName: 'longOffset',
+        timeZone,
     });
     const timeZoneParts = timeZoneFormatter.formatToParts(new Date());
 

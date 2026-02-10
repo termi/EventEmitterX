@@ -295,19 +295,6 @@ class AnalogClockCanvas {
         context.stroke();
     };
 
-    private _onDocumentKeydown = (event: KeyboardEvent) => {
-        if (event.key === 'Shift') {
-            this._states |= AnalogClockCanvas.States.shiftPressed;
-            // this.updateStatus();
-        }
-    };
-    private _onDocumentKeyup = (event: KeyboardEvent) => {
-        if (event.key === 'Shift') {
-            this._states &= ~AnalogClockCanvas.States.shiftPressed;
-            // this.updateStatus();
-        }
-    };
-
     // Обработчики событий мыши
     private _onCanvasMousedown = (event: PointerEvent) => {
         this._states |= (AnalogClockCanvas.States.isMouseDown | AnalogClockCanvas.States.isManualMode);
@@ -336,19 +323,12 @@ class AnalogClockCanvas {
             return;
         }
 
-        // Отслеживание нажатия Shift
-        document.addEventListener('keydown', this._onDocumentKeydown, { passive: true });
-        document.addEventListener('keyup', this._onDocumentKeyup, { passive: true });
         canvas.addEventListener('mousedown', this._onCanvasMousedown, { passive: true });
         canvas.addEventListener('mouseup', this._onCanvasMouseup, { passive: true });
         canvas.addEventListener('mousemove', this._onCanvasMousemove, { passive: true });
     }
 
     private _unsubscribeEvens() {
-        // Отслеживание нажатия Shift
-        document.removeEventListener('keydown', this._onDocumentKeydown);
-        document.removeEventListener('keyup', this._onDocumentKeyup);
-
         const { _canvas: canvas } = this;
 
         if (canvas) {
@@ -372,7 +352,7 @@ class AnalogClockCanvas {
             return;
         }
 
-        const shiftPressed = (this._states & AnalogClockCanvas.States.shiftPressed) !== 0;
+        const shiftPressed = event.shiftKey;
         const rect = canvas.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
@@ -467,7 +447,6 @@ class AnalogClockCanvas {
 namespace AnalogClockCanvas {
     export const enum States {
         isMouseDown = 1 << 1,
-        shiftPressed = 1 << 2,
         isManualMode = 1 << 3,
     }
 }
