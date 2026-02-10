@@ -274,7 +274,23 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             this.lastError = void 0;
 
             Object.defineProperty(_computation, 'name', {
-                value: `computation#${this.id}`,
+                value: `computation#${symbolDescription}`,
+                enumerable: false,
+                configurable: true,
+                writable: false,
+            });
+        }
+
+        Object.defineProperty(_oneOfDepUpdated, 'name', {
+            value: `_oneOfDepUpdated#${this.id}`,
+            enumerable: false,
+            configurable: true,
+            writable: false,
+        });
+
+        if (isIDEDebugger || isReactDev) {
+            Object.defineProperty(_oneOfDepUpdated, 'current$', {
+                value: this,
                 enumerable: false,
                 configurable: true,
                 writable: false,
@@ -285,6 +301,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D, R>)?.initialSourceValue ?? void 0;
 
         this.set = this.set.bind(this);
+        // note: I don't see any cases where `use` would be called without `EventSignal` object in form of `current$.use()`.
+        // this.use = this.use.bind(this);
 
         // noinspection JSUnusedAssignment
         initialValue = void 0 as Awaited<T>;
@@ -361,6 +379,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     );
 
                     if (!isNeedToUpdate) {
+                        //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                        // this._updateReason = 'sourceEmitter';
                         this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
                     }
                 }, {
@@ -393,6 +413,22 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     }
                 };
 
+                Object.defineProperty(_onTrigger, 'name', {
+                    value: `_onTrigger#${this.id}`,
+                    enumerable: false,
+                    configurable: true,
+                    writable: false,
+                });
+
+                if (isIDEDebugger || isReactDev) {
+                    Object.defineProperty(_onTrigger, 'current$', {
+                        value: this,
+                        enumerable: false,
+                        configurable: true,
+                        writable: false,
+                    });
+                }
+
                 const triggerCleanUp = this._subscribeToTrigger(trigger, _onTrigger);
 
                 if (triggerCleanUp) {
@@ -407,11 +443,24 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
                     if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
                         this._oneOfDepUpdated(true);
-
-                        // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
-                        signalEventsEmitter.emit(this._signalSymbol);
                     }
                 };
+
+                Object.defineProperty(_onThrottleTrigger, 'name', {
+                    value: `_onThrottleTrigger#${this.id}`,
+                    enumerable: false,
+                    configurable: true,
+                    writable: false,
+                });
+
+                if (isIDEDebugger || isReactDev) {
+                    Object.defineProperty(_onThrottleTrigger, 'current$', {
+                        value: this,
+                        enumerable: false,
+                        configurable: true,
+                        writable: false,
+                    });
+                }
 
                 const throttleCleanUp = this._subscribeToTrigger(throttle, _onThrottleTrigger, () => {
                     this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
@@ -635,6 +684,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
     [Symbol.dispose] = () => {
         this.destructor();
+    };
+
+    getDispose = () => {
+        return this[Symbol.dispose];
     };
 
     get destroyed() {
@@ -1118,6 +1171,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         return this._value;
     }
 
+    /** A getter version of {@link getSync} */
+    get value() {
+        return this.getSync();
+    }
+
     get = () => {
         const stateFlags = this._stateFlags;
 
@@ -1239,6 +1297,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         this._stateFlags |= EventSignal.StateFlags.nextValueShouldBeForceSettled;
     }
 
+    // todo: Добавить второй параметр `updateReason?: number | string | symbol` для
+    //  1. Истории изменений (в том числе для дебага)
+    //  2. Для возможности игнорировать установки нового значения с определёнными значениями reason (пока предполагается
+    //     только для React-хуков EventSignal.use({ ignoreUpdateReason: 'reason-name' }) и EventSignal.useListener((v) => { log(v); }, { ignoreUpdateReason: 'reason-name' })
     /** setter */
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
@@ -1277,13 +1339,77 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(currentValue as T, currentSourceValue, this.data);
 
             if (this._setSourceValue(_newSourceValue, true)) {
+                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                // this._updateReason = updateReason ?? 'set';
+                // this._stateFlags |= EventSignal.StateFlags.wasSetSourceSetting;
                 this._recalculateIfNeeded();
             }
         }
         // todo: Рассмотреть возможность возвращать true если что-то изменилось
         else if (this._setSourceValue(newSourceValue, true)) {
+            //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+            // this._updateReason = updateReason ?? 'set';
+            // this._stateFlags |= EventSignal.StateFlags.wasSetSourceSetting;
             this._recalculateIfNeeded();
         }
+    }
+
+    // todo: mutate(mutation: (value) => boolean)) - Внутри коллбека mutation происходит мутация value, а возвращаемое значение говорит о том, изменилось ли значение или нет.
+    mutate<PROPS=Partial<Awaited<S>>>(props: PROPS) {
+        if (props == null || (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+            return false;
+        }
+
+        if (typeof props !== 'object') {
+            if (this._setSourceValue(props as S, true)) {
+                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                // this._updateReason = updateReason ?? 'mutate';
+                // this._stateFlags |= EventSignal.StateFlags.wasMutateSourceSetting;
+                this._recalculateIfNeeded();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        let hasChanges = (this._stateFlags & EventSignal.StateFlags.nextValueShouldBeForceSettled) !== 0;
+        const { _sourceValue } = this;
+        const currentValue = _sourceValue !== void 0 ? _sourceValue : this._value;
+
+        if (!currentValue) {
+            if (this._setSourceValue(props as S, true)) {
+                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                // this._updateReason = updateReason ?? 'mutate';
+                // this._stateFlags |= EventSignal.StateFlags.wasMutateSourceSetting;
+                this._recalculateIfNeeded();
+
+                return true;
+            }
+
+            return false;
+        }
+
+        for (const key of Object.keys(props)) {
+            const propValue = props[key];
+
+            hasChanges ||= (currentValue[key] !== propValue);
+            currentValue[key] = propValue;
+        }
+
+        if (hasChanges) {
+            this.markNextValueAsForced();
+            // only for `signalEventsEmitter.emit(this._signalSymbol);`
+            this._setSourceValue(currentValue as S, false);
+
+            //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+            // this._updateReason = updateReason ?? 'mutate';
+            // this._stateFlags |= EventSignal.StateFlags.wasMutateSourceSetting;
+
+            this._recalculateIfNeeded();
+        }
+
+        return hasChanges;
     }
 
     // todo: https://wicg.github.io/observable/#typedefdef-observerunion
@@ -1875,23 +2001,158 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     /**
+     * * Get the current value.
+     * * Subscribe on this Signal changes. Will trigger React re-render on new value.
+     *
      * Use it in React as implementation of `useSignal` custom hook.
      */
-    use = () => {
+    use(): Awaited<T>;
+    /**
+     * todo: options.ignoreUpdateReason
+     *
+     * * Get the current value and modified it with {@link reducer}.
+     * * Subscribe on this Signal changes. Will trigger React re-render only if {@link reducer} returns new value.
+     *
+     * Use it in React as implementation of `useSignal` custom hook.
+     */
+    use<REDUCE_VALUE>(reducer: (value: Awaited<T>) => REDUCE_VALUE, areReducedValueEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): REDUCE_VALUE;
+    /**
+     * todo: options.ignoreUpdateReason
+     */
+    use<REDUCE_VALUE>(reducer?: (value: Awaited<T>) => REDUCE_VALUE, areReducedValueEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): Awaited<T> | REDUCE_VALUE {
         const { _useSyncExternalStore } = this;
 
         if (_useSyncExternalStore) {
-            // Для асинхронных сигналов, мы не можем вернуть в React Promise (может только если использовать совместно с React.use).
-            // Поэтому используем getSync, который вызовет подсчет нового значения, но если это асинхронная операция,
-            //  то будет возвращено последнее значение. А после того, как promise завершиться, сработает событие обновления.
-            _useSyncExternalStore(this.subscribeOnNextAnimationFrame, this.getSync);
+            if (isReactDev) {
+                this._useDebugValue?.({
+                    id: this.id,
+                    description: this._signalSymbol.description,
+                    value: this._value,
+                    source: '#use()',
+                });
+            }
+
+            // todo: Если текущий сигнал это computableSignal, и него есть настройка throttle/debounce,
+            //  то нужно заводить useEffect который отменит получение значения (т.е. отменит действие throttle/debounce).
+            //  Т.е., если компонент в котором использовался хук EventSignal.use уже unmount, то и вычислять новое значение не нужно.
+            //  Но НЕЛЬЗЯ это делать опционально - потому что для одного и того же компонента, могут использоваться разные
+            //  сигналы - c throttle и без, соответственно есть вероятность conditional hook.
+            /**
+             * Trigger value calculation (if needed).
+             * If computation is async it will trigger next render (via {@link this.subscribeOnNextAnimationFrame}).
+             */
+            this.getSyncSafe();
+
+            if (reducer) {
+                if (areReducedValueEqual) {
+                    const { 0: reducedValue, 1: setReducedValue } = this._useState(() => reducer(this.getLast()));
+                    const scopeRef = this._useRef({ reducer, areReducedValueEqual, reducedValue });
+
+                    scopeRef.current.reducer = reducer;
+                    scopeRef.current.areReducedValueEqual = areReducedValueEqual;
+
+                    this._useEffect(() => {
+                        return this.subscribeOnNextAnimationFrame(() => {
+                            const newValue = scopeRef.current.reducer(this.getLast());
+
+                            if (!scopeRef.current.areReducedValueEqual(scopeRef.current.reducedValue, newValue)) {
+                                scopeRef.current.reducedValue = newValue;
+                                setReducedValue(newValue);
+                            }
+                        });
+                    }, [ this ]);
+
+                    return reducedValue;
+                }
+
+                let reducerResultCache: unknown;
+
+                // todo: Нужно добавить в EventSignal.use возможность передать список зависимостей deps
+                // note: Если не передавать список зависимостей (deps) то "reducer" будет вызываться каждый раз 2 раза:
+                //  1. На срабатывании onStoreChanges
+                //  2. На срабатывании хука useSyncExternalStore
+                //  3. Будет ещё 3й и даже 4й раз, если не кешировать значение (reducerResultCache)
+                // note: Если список зависимостей отсутствует и в дефолтный не добавить сам "reducer", то значение будет
+                //  считаться с неактуальным окружением (scope) функции "reducer", что со 100% гарантией приведёт к плавающим багам.
+                const getSnapshot = this._useCallback(() => {
+                    if (!reducerResultCache) {
+                        queueMicrotask(() => {
+                            reducerResultCache = undefined;
+                        });
+                    }
+
+                    // Mutable value (same object ref as prev value) returned by reducer is not supported (for now?).
+                    return reducerResultCache ??= reducer(this.getLast());
+                }, [ this, reducer ]);
+
+                return _useSyncExternalStore(this.subscribeOnNextAnimationFrame, getSnapshot);
+                // return _useSyncExternalStore(this.subscribeOnNextAnimationFrame, () => {
+                //     if (!reducerResultCache) {
+                //         queueMicrotask(() => {
+                //             reducerResultCache = undefined;
+                //         });
+                //     }
+                //
+                //     // Mutable value (same object ref as prev value) returned by reducer is not supported (for now?).
+                //     return reducerResultCache ??= reducer(this.getLast());
+                // });
+            }
+
+            // Mutable value (same object ref as prev value) is supported by version increment and `return this.getLast()`.
+            _useSyncExternalStore(this.subscribeOnNextAnimationFrame, this.getVersion);
         }
         else {
             console.warn('warning: "useSyncExternalStore" for EventSignal is not set. Please use `if (!EventSignal.reactIsInited) EventSignal.initReact(React)`.');
+
+            if (reducer) {
+                // Mutable value (same object ref as prev value) returned by reducer is not supported (for now?).
+                return reducer(this.getLast());
+            }
         }
 
         return this.getLast();
-    };
+    }
+
+    /**
+     * * Get the current value.
+     * * Call {@link listener} once inside `useLayoutEffect`.
+     * * Subscribe {@link listener} on this Signal changes. Will not trigger React re-render.
+     *
+     * Use it in React as implementation of `useSignalListener` custom hook.
+     *
+     * todo:
+     *  1. Add options.suspend - do not call listener in useLayoutEffect and do not subscribe to changes
+     *  2. Add options.noSub - do not subscribe to changes
+     *  3. Add options.ignoreUpdateReason
+     */
+    useListener(listener: (newValue: T) => void, deps?: any[]/*, { suspend, noSub }: { suspend?: boolean, noSub?: boolean }*/) {
+        if (!(typeof (listener as unknown) === 'function') || (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+            return this.getLast();
+        }
+
+        const { _useLayoutEffect } = this;
+
+        if (_useLayoutEffect) {
+            const actualDeps = Array.isArray(deps) ? [ ...deps, this ] : [ this ];
+
+            _useLayoutEffect(() => {
+                // if (suspend) return noop;
+                // if (ignoreUpdateReason === this.lastUpdateReason) return noop;
+
+                listener(this.getLast());
+
+                // if (noSub) return noop;
+
+                // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
+                return this._addListener(listener, void 0, 1 << 3).unsubscribe;
+            }, actualDeps);
+        }
+        else {
+            console.warn('warning: "useEffect" for EventSignal is not set. Please use `if (!EventSignal.reactIsInited) EventSignal.initReact(React)`.');
+        }
+
+        return this.getLast();
+    }
 
     /**
      * todo: add overload: subscribe = (subscriptionObserver: {
@@ -1919,7 +2180,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     subscribeOnNextAnimationFrame = this._subscribeOnNextAnimationFrame.bind(this, false);
     subscribeOnNextRender = this._subscribeOnNextAnimationFrame.bind(this, true);
 
-    private _subscribeOnNextAnimationFrame(subscribeToComponentTypeUpdate: boolean, func: () => void, /*subscribeOptions?: { signal: AbortSignal })*/) {
+    private _subscribeOnNextAnimationFrame(subscribeToComponentTypeUpdate: boolean, func: () => void/*, subscribeOptions?: {
+        signal?: AbortSignal,
+        reducer?: (value: Awaited<T>, prevValue: any) => any,
+    }*/) {
         if (typeof requestAnimationFrame !== 'function') {
             throw new TypeError('"requestAnimationFrame" is not supported in this JS Agent.');
         }
@@ -1928,15 +2192,22 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             return _noop;
         }
 
+        /*
+        const reducer = subscribeOptions?.reducer;
+        */
         const _listenerWithAnimFrameDebounce = _awaitNextAnimationFrame.bind(null, func);
         // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
         const { unsubscribe } = this._addListener(_listenerWithAnimFrameDebounce, void 0, 1 << 3);
-        let _listenerComponentTypeUpdate: (() => void) | undefined;
+        let _listenerComponentTypeUpdate: ((status?: string) => void) | undefined;
 
         if (subscribeToComponentTypeUpdate) {
-            _listenerComponentTypeUpdate = () => {
+            _listenerComponentTypeUpdate = (status?: string) => {
                 this._cv++;
-                _listenerWithAnimFrameDebounce();
+
+                if (status == null ? (this.status == null || this.status === 'default') : this.status === status) {
+                    // Do not emit callback if instance in a status different from the one for which the change was received
+                    _listenerWithAnimFrameDebounce();
+                }
             };
 
             if (this.componentType) {
@@ -2108,6 +2379,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     declare private _useSyncExternalStore: UseSyncExternalStore | undefined;
+    declare private _useRef: any | undefined;
+    declare private _useState: any | undefined;
+    declare private _useEffect: any | undefined;
+    declare private _useLayoutEffect: any | undefined;
+    declare private _useCallback: any | undefined;
+    declare private _useDebugValue: ((value: any) => void) | undefined;
     static reactIsInited = false;
     declare static initReact;
     /** For debug only */
@@ -2125,8 +2402,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     // }
 
     static {
+        const _EventSignal_prototype = this.prototype;
+
         // make `EventSignal extends null`
-        Object.setPrototypeOf(this.prototype, null);
+        Object.setPrototypeOf(_EventSignal_prototype, null);
 
         // var REACT_PROVIDER_TYPE = Symbol.for("react.provider");
 
@@ -2145,6 +2424,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 },
             },
         } | undefined;
+        let _ErrorBoundary: ((
+            type: Function | string | symbol,
+            props?: Object | null,
+            ...children: (Object | null)[]
+        ) => Object) | undefined;
         let _ReactFragment: symbol;
         // let _ReactProfiler: symbol;
         let _React_createElement: ((
@@ -2157,12 +2441,43 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             compare?: Function,
         ) => Object) | undefined;
         let _useSyncExternalStore: UseSyncExternalStore | undefined;
+        let _useDebugValue: ((value: any) => void) | undefined;
         let _EventSignalsContext: undefined | Object & { Provider: Object, _currentValue: Object | undefined };
         let _useContext: (key: Object) => (Object | null) = () => null;
 
-        this.initReact = function(ReactParam: unknown) {
+        this.initReact = function(ReactParam: unknown, ErrorBoundary?: ((
+            type: Function | string | symbol,
+            props?: Object | null,
+            ...children: (Object | null)[]
+        ) => Object) | undefined) {
+            if (!ReactParam) {
+                this._React = void 0;
+                _EventSignal_prototype._useSyncExternalStore = _useSyncExternalStore = void 0;
+                _EventSignal_prototype._useRef = void 0;
+                _EventSignal_prototype._useState = void 0;
+                _EventSignal_prototype._useEffect = void 0;
+                _EventSignal_prototype._useLayoutEffect = void 0;
+                _EventSignal_prototype._useCallback = void 0;
+                _EventSignal_prototype._useDebugValue = void 0;
+                Object.defineProperty(_EventSignal_prototype, 'type', { value: void 0, configurable: true, writable: true });
+
+                _React_createElement = void 0;
+                _React_memo = void 0;
+                _useContext = () => null;
+                _EventSignalsContext = void 0;
+                this._ContextProvider = void 0;
+
+                return;
+            }
+
             const __React = ReactParam as {
+                useRef: <T>(initValue?: T) => { current: T },
+                useState: (init?: () => any) => [ value: any, setValue: (value: any) => void ],
+                useEffect: (effect: () => any, deps?: any[]) => void,
+                useLayoutEffect: (effect: () => any, deps?: any[]) => void,
+                useCallback: (callback: () => any, deps?: any[]) => void,
                 useSyncExternalStore: UseSyncExternalStore,
+                useDebugValue: (value: any) => void,
                 createContext: () => NonNullable<typeof _EventSignalsContext>,
                 useContext: typeof _useContext,
                 createElement?: typeof _React_createElement,
@@ -2176,8 +2491,17 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 this._React = _React = __React as unknown as typeof _React;
             }
 
-                this.prototype._useSyncExternalStore = _useSyncExternalStore = __React.useSyncExternalStore;
             reactInit: if ('useSyncExternalStore' in __React) {
+                _EventSignal_prototype._useSyncExternalStore = _useSyncExternalStore = __React.useSyncExternalStore;
+                _EventSignal_prototype._useRef = __React.useRef;
+                _EventSignal_prototype._useState = __React.useState;
+                _EventSignal_prototype._useEffect = __React.useEffect;
+                _EventSignal_prototype._useLayoutEffect = __React.useLayoutEffect || __React.useEffect;
+                _EventSignal_prototype._useCallback = __React.useCallback;
+
+                if (isReactDev) {
+                    _EventSignal_prototype._useDebugValue = _useDebugValue = __React.useDebugValue;
+                }
 
                 if (__React.createElement) {
                     _React_createElement = __React.createElement;
@@ -2185,7 +2509,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 if (__React.memo) {
                     _React_memo = __React.memo;
 
-                    Object.defineProperties(this.prototype, {
+                    // EventSignal.prototype.type = EventSignalComponent;
+                    // this.prototype.type = EventSignalComponent;
+                    Object.defineProperties(_EventSignal_prototype, {
                         type: {
                             configurable: true,
                             value: _React_memo(EventSignalComponent),
@@ -2221,11 +2547,14 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 }
             }
 
+            _ErrorBoundary = ErrorBoundary;
             _ReactFragment = Symbol.for('react.fragment');
             // _ReactProfiler = Symbol.for("react.profiler");
 
             if (isReactGte19) {
-                Object.defineProperties(this.prototype, {
+                // EventSignal.prototype.$$typeof = Symbol();
+                // this.prototype.$$typeof = Symbol();
+                Object.defineProperties(_EventSignal_prototype, {
                     $$typeof: {
                         configurable: true,
                         value: Symbol.for("react.transitional.element"),
@@ -2326,6 +2655,15 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 // https://react.dev/reference/react/useSyncExternalStore
                 snapshotVersion = _useSyncExternalStore(eventSignal.subscribeOnNextRender, eventSignal.getSnapshotVersion);
 
+                if (isReactDev && _useDebugValue) {
+                    _useDebugValue({
+                        id: eventSignal.id,
+                        description: eventSignal._signalSymbol.description,
+                        value: eventSignal._value,
+                        source: '$Component',
+                    });
+                }
+
                 renderReactComponent: if (reactFC != null && reactFC !== false) {
                     if (isReactDev && !sIgnoreRecursive) {
                         /**
@@ -2372,6 +2710,26 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                         ...otherProps,
                     }, children || null);
 
+                    if (_ErrorBoundary) {
+                        const reactFCDescriptor = (contextValue ? getReactFunctionComponentFromMagicContext(contextValue, componentType, 'error-boundary') as (_ComponentDescription<any, any, any, any> | null) : void 0)
+                            ?? (componentType !== void 0 ? _getReactFunctionComponent(componentType, 'error-boundary') : void 0)
+                        ;
+
+                        if (reactFCDescriptor) {
+                            return _React_createElement!(_ErrorBoundary, { // eslint-disable-line @typescript-eslint/no-non-null-assertion
+                                __proto__: null,
+                                key,
+                                FallbackComponent: reactFCDescriptor[0],
+                                // // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                                // fallback: _React_createElement!(reactFCDescriptor[0], {
+                                //     __proto__: null,
+                                //     key,
+                                //     eventSignal,
+                                // }),
+                            }, element);
+                        }
+                    }
+
                     return element;
                 }
             }
@@ -2412,7 +2770,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
         // Decorate Signals so React renders them as <EventSignalComponent> components. - https://github.com/preactjs/signals/blob/10e13d3a67e796873c2d4ddc6d04cd8d8705194b/packages/react/runtime/src/index.ts#L354
         // See "_useSignalsImplementation" in preactjs/signals https://github.com/preactjs/signals/blob/10e13d3a67e796873c2d4ddc6d04cd8d8705194b/packages/react/runtime/src/index.ts#L323
-        Object.defineProperties(this.prototype, {
+        Object.defineProperties(_EventSignal_prototype, {
             $$typeof: {
                 configurable: true,
                 enumerable: false,
@@ -2565,7 +2923,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
         if (componentType && (prev_reactFC !== reactFC || !_shallowEqualObjects(reactFCDescriptor?.[1], preDefinedProps))) {
             // todo: componentType Может быть Объектом
-            _componentsEmitter.emit(componentType as string);
+            _componentsEmitter.emit(componentType as string, status);
         }
 
         return reactFCDescriptor?.[0] || null;
@@ -2715,6 +3073,10 @@ export namespace EventSignal {
         wasSourceSettingFromEvent = 1 << 3,
         wasThrottleTrigger = 1 << 4,
         wasForceUpdateTrigger = 1 << 5,
+        /* todo:
+        wasSetSourceSetting = 1 << 6,
+        wasMutateSourceSetting = 1 << 7,
+        */
 
         isNeedToCalculateNewValue = 1 << 8,
         hasSourceEmitter = 1 << 9,
@@ -3075,6 +3437,14 @@ function _getReactFunctionComponent(
             : _reactFunctionComponentByComponentType_Map.get(componentType as number | string)
     ) || null;
 
+    if (status === 'error-boundary') {
+        return reactFCs?.['error-boundary'] || null;
+    }
+
+    if (status === 'error-only') {
+        return reactFCs?.['error'] || null;
+    }
+
     return reactFCs
         ? ((status != null ? reactFCs[status] : null) || reactFCs["default"] || null)
         : null
@@ -3108,6 +3478,7 @@ function _setReactFunctionComponent(
         }
     }
     else {
+        // todo: Судя по тестам производительности, использование тут массива более производительно (и тратит меньше памяти)
         const componentDescriptionForStatus: _ComponentDescription<any, any, any, any> = {
             0: reactFC,
             1: preDefinedProps,
