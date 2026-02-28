@@ -4,7 +4,7 @@ import * as React from "react";
 import { useState } from "react";
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import type { PlaceholderUser$ } from "../state/AppStates";
 

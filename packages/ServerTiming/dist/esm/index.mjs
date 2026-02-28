@@ -597,4 +597,3 @@ export function parseServerTimingsString(serverTimingsString) {
 function _rnd(prefix = '') {
     return `${prefix}${(Math.floor(Math.random() * 9e9)).toString(36)}${(Date.now()).toString(36)}`;
 }
-//# sourceMappingURL=index.js.map

@@ -2,7 +2,7 @@
 
 import type * as React from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import { randomNumber } from "../lib/utils";
 import { i18n, i18n$$ } from "./i18n";

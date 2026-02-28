@@ -9,4 +9,3 @@ class ProgressControllerX extends AbortController {
 exports.ProgressControllerX = ProgressControllerX;
 /** @deprecated */
 exports.ProgressControllerEx = ProgressControllerX;
-//# sourceMappingURL=index.js.map

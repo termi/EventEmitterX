@@ -1,5 +1,8 @@
 'use strict';
 
+import '@termi/eventemitterx/utils/es2025.Intl.d.ts';
+import '@termi/eventemitterx/utils/es2023.promise.d.ts';
+
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error `TS2732: Cannot find module ../ static/ data/ capitals. json. Consider using --resolveJsonModule to import module with .json extension.`
 import _capitals from '../static/data/capitals.json' assert { type: 'css' };
@@ -270,7 +273,6 @@ export function setCurrentLocale(newCurrentLocale: string) {
     _currentLocale = newCurrentLocale;
 }
 
-/** A copy of {@link import('cftools/common/IntlTools.ts').getCurrentLocale} */
 export function getSystemLocale(): string {
     const FALLBACK_LOCALE = defaultLocale;
     let locale: string | undefined;
@@ -360,7 +362,6 @@ function _filterNodeDefaultSystemLocale(locale: string | undefined) {
 // internal call for auto-detect current locale
 getCurrentLocale();
 
-/** A copy of {@link import('cftools/common/IntlTools.ts').normalizeLocale} */
 export function normalizeLocale(locale: string) {
     locale = String(locale)
         // handle 'en_US.UTF-8' like string to 'en_US'

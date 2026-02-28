@@ -25,8 +25,7 @@ export default defineConfig({
     server: {
         fs: {
             allow: [
-                './',
-                import.meta.resolve('cftools'),
+                './'
             ],
         },
     },
@@ -40,20 +39,12 @@ export default defineConfig({
                         return 'react';
                     }
 
-                    if (id.includes('cftools')) {
-                        console.log(id);
-                    }
-
                     if (id.includes('/modules/EventEmitterX/')
                         // 'cftools/modules/EventEmitterEx' is for backward compatibility
                         || id.includes('/modules/EventEmitterEx/')
                         || id.includes('/modules/events')
                     ) {
                         return 'events';
-                    }
-
-                    if (id.includes('/cftools/')) {
-                        return 'cftools';
                     }
 
                     if (id.includes('/node_modules/')) {

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import css from './AsyncSpinner.module.css';
 

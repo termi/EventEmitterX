@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-magic-numbers */
 'use strict';
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
-import hashSum from 'cftools/common/hashSum';
-import { throttle } from 'cftools/common/FunctionTools';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
+import hashSum from '../lib/hashSum';
+import { throttle } from '../lib/functions';
 
 import { currentLocale$ } from "./i18n";
 import { getCurrentTimeZoneOffset, getLocaleInfo } from "../lib/i18n";

@@ -1378,4 +1378,3 @@ function _isPropertyEditable(obj, propertyName, options = {}) {
 exports.default = __AbortController;
 exports.hasNativeSupport = _hasNativeSupport;
 exports.isFetchAbortable = _isFetchAbortable;
-//# sourceMappingURL=index.js.map

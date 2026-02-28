@@ -16,15 +16,19 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@termi/eventemitterx": "link:../../",
     "@oddbird/popover-polyfill": "^0.6.1",
     "country-flag-emoji-polyfill": "^0.1.8",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "react-error-boundary": "^6.0.0"
   },
   "devDependencies": {
     "@babel/cli": "7.17.6",
     "@babel/core": "7.17.5",
+    "@babel/preset-env": "7.16.11",
+    "@types/react": "19.2.4",
+    "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "countries-and-timezones": "^3.8.0",
     "vite": "5.4.8",

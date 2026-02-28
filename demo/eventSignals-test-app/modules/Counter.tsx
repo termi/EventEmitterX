@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 
 import * as React from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import type { mainState } from "../state/AppStates";
 

@@ -1,10 +1,10 @@
 'use strict';
 
-// noinspection ES6UnusedImports
-import {} from 'cftools/ts_types/index';
+import '@termi/eventemitterx/utils/es2024.collections.d.ts';
+
 import type { MouseEventHandler, ChangeEventHandler } from "react";
 
-import { EventSignal, isEventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal, isEventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 import {
     getDefaultLocale,
     getCurrentLocale,

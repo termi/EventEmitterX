@@ -12,3 +12,11 @@ This project includes:
 2. `eventsAsyncIterator` - alias for `static on`
 3. `eventAwait` - alias for `static once`
 4. `EventSignal` - implementation of signals compatible with `EventEmitter`/`EventTarget`
+
+## Demo `EventSignal`
+
+Demo application to demonstrate how `EventSignal` library works with `React`.
+
+```bash
+cd demo/eventSignals-test-app ; pnpm i ; pnpm run dev
+```

@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useCallback, useState } from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import { closestElement } from "../../lib/dom";
 import { i18nNumber, i18n$$, i18nString$$ } from "../../state/i18n";

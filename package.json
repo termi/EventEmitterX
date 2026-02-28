@@ -1,5 +1,5 @@
 {
-  "name": "eventemitterx",
+  "name": "@termi/eventemitterx",
   "version": "0.1.0",
   "description": "Another implementation of EventEmitter for Nodejs and browsers",
   "license": "ISC",

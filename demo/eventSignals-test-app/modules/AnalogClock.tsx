@@ -4,7 +4,7 @@
 import * as React from "react";
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 const AnalogClockM = React.memo(AnalogClock);
 
@@ -15,7 +15,7 @@ function AnalogClock({ current$, onManualTime, onResetClick }: {
     onManualTime?: AnalogClockCanvas["_onManualTime"],
     onResetClick?: React.MouseEventHandler<any>,
 }) {
-    const $canvasRef = useRef<HTMLCanvasElement>();
+    const $canvasRef = useRef<HTMLCanvasElement>(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const canvasController = useMemo(AnalogClockCanvas.factory, [ current$, onManualTime ]);
     const onReset = useCallback<React.MouseEventHandler>((event) => {
@@ -61,7 +61,7 @@ const { PI } = Math;
 class AnalogClockCanvas {
     private _canvas: HTMLCanvasElement | null = null;
     private _ctx: CanvasRenderingContext2D | null = null;
-    private _states: AnalogClockCanvas.States = 0;
+    private _states: AnalogClockCanvas.States = AnalogClockCanvas.States.none;
     private _centerX = 0;
     private _centerY = 0;
     private _clockRadius = 0;
@@ -446,6 +446,7 @@ class AnalogClockCanvas {
 
 namespace AnalogClockCanvas {
     export const enum States {
+        none = 0,
         isMouseDown = 1 << 1,
         isManualMode = 1 << 3,
     }

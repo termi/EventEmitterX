@@ -748,7 +748,7 @@ export const isWebAudioWorklet = ENVIRONMENT_IS_WEB_WORKLED
  *
  * @see [Documentation - Apache Cordova]{@link https://cordova.apache.org/docs/en/latest/}
  */
-export const isCordova = 
+export const isCordova =
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error
 typeof cordova === "object";
@@ -1028,4 +1028,3 @@ if (!(IS_WEB_STORM_DEBUGGER || IS_VSCODE_INSPECTOR)) {
 }
 export const envDetailsFull = _envDetailsFull;
 export const envDetails = _envDetails;
-//# sourceMappingURL=index.js.map
