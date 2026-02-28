@@ -2,7 +2,7 @@
 
 import type * as React from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import { routersList, routerEmptyObject } from './routers.prebuild';
 

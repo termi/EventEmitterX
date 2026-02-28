@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 export default function ErrorView({ current$, children }: { current$: EventSignal<any, any, any>, children?: React.ReactNode }) {
     const { lastError } = current$;

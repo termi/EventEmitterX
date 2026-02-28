@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useState } from "react";
 
-import type { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import type { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 const is_fieldSizing_supported = CSS.supports(`field-sizing: content`);
 

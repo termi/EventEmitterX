@@ -1,8 +1,5 @@
 'use strict';
 
-// noinspection ES6UnusedImports
-import type {} from 'cftools/ts_types/index';
-
 function _fetchData(_cache: Map<string, Promise<{id: number, title: string, year: number}[]>>, url: string): ReturnType<typeof getData> {
     let isNewValue = true;
     const resultPromise = _cache.getOrInsertComputed(url, function(key) {

@@ -12,7 +12,7 @@ import { ErrorBoundary } from 'react-error-boundary';
 
 import 'termi@polyfills';
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import './lib/polyfills/emojis';
 import { initNavigation } from "./lib/history_navigation";

@@ -6,4 +6,3 @@ export class ProgressControllerX extends AbortController {
 }
 /** @deprecated */
 export const ProgressControllerEx = ProgressControllerX;
-//# sourceMappingURL=index.js.map

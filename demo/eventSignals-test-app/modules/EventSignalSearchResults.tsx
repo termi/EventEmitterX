@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { ChangeEvent } from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import ErrorView from "../$components/ErrorView";
 import AsyncSpinner from "../$components/AsyncSpinner";

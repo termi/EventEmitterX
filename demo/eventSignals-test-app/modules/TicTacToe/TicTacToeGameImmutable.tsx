@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 type Player = 'O' | 'X';
 type Squares = (Player | null)[];

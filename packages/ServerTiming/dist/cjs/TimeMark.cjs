@@ -245,4 +245,3 @@ function _toMarkName(value) {
     }
     return value;
 }
-//# sourceMappingURL=TimeMark.js.map

@@ -26,4 +26,3 @@ function classof(obj) {
     const klass = _toString.call(obj);
     return klass.slice(8, -1);
 }
-//# sourceMappingURL=_utils.js.map

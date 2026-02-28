@@ -1367,4 +1367,3 @@ export { __AbortController as AbortController };
 export { __AbortSignal as AbortSignal };
 export const hasNativeSupport = _hasNativeSupport;
 export const isFetchAbortable = _isFetchAbortable;
-//# sourceMappingURL=index.js.map

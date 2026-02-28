@@ -3,7 +3,7 @@
 
 import type * as React from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 type NewPipWindowOptions<P extends Record<string, any>=Record<string, any>> = {
     width?: number,

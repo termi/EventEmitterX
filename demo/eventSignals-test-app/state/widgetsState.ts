@@ -3,7 +3,7 @@
 
 import { createRef } from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import { makePlaceholderUserEventSignal, clearPlaceholderUserEventSignalCache } from "./AppStates";
 

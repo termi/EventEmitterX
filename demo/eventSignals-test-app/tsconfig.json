@@ -4,6 +4,7 @@
     "baseUrl": ".",
     "types": ["vite/client"],
     "outDir": "./build/ts-output",
+    "lib": [ "DOM", "ESNext", "ES2025", "ES2024", "ES2023", "ES2022", "ES2021", "ES2020", "ES2019", "ES2018", "ES2017", "ES2016", "ES2015" ],
     // https://www.typescriptlang.org/tsconfig/#allowSyntheticDefaultImports
     // Решение ошибки `TS1259: Module '"@types/react/index"' can only be default-imported using the 'esModuleInterop' flag`.
     // Используется совместно с `"esModuleInterop": true`
@@ -26,7 +27,8 @@
     "moduleResolution": "node",
     "jsx": "react",
     "newLine": "lf",
-    "resolveJsonModule": false
+    "resolveJsonModule": false,
+    "allowImportingTsExtensions": true
   },
   "__include": [
     "./types/global.d.ts",

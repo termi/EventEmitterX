@@ -6,7 +6,7 @@ import type { MouseEvent } from "react";
 import * as React from "react";
 import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
-import { EventSignal } from '~/modules/EventEmitterEx/EventSignal';
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import { getCurrentTimeZoneOffsetName } from "../lib/i18n";
 import {
