@@ -1,7 +1,7 @@
 'use strict';
 
 import * as React from 'react';
-import { Suspense, useDeferredValue, useState } from "react";
+import { Suspense, useDeferredValue, useState, use } from "react";
 
 import { fetchData } from '../state/requestData';
 
@@ -67,6 +67,7 @@ function SearchResults({ query }: { query: string }) {
     );
 }
 
+/*
 // This is a workaround for a bug to get the demo running.
 // TODO: replace with real implementation when the bug is fixed.
 function use<T>(promise: Promise<T> & { status?: string, value?: T, reason?: string }): T {
@@ -97,3 +98,4 @@ function use<T>(promise: Promise<T> & { status?: string, value?: T, reason?: str
         throw promise;
     }
 }
+*/

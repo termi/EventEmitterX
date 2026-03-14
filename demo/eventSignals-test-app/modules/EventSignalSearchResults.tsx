@@ -25,9 +25,6 @@ export const requestDataSignal$ = new EventSignal([] as unknown as ReturnType<ty
         onChanges: (event: ChangeEvent<HTMLInputElement>) => {
             requestDataSignal$.set(String(event.target.value || ''));
         },
-        retry: () => {
-            requestDataSignal$.set(requestDataSignal$.getSourceValue());
-        },
         resetRenders: () => {
             EventSignalSearchResults.rendersCounter = 0;
         },
@@ -43,7 +40,7 @@ function EventSignalSearchResults({ current$, current$Value }: { current$: typeo
     const { status } = current$;
     const query = current$.getSourceValue() || '';
     const albums = current$Value;
-    const content = status === 'error' ? <ErrorView current$={current$}><button onClick={current$.data.retry}>retry</button></ErrorView>
+    const content = status === 'error' ? <ErrorView current$={current$}><button onClick={current$.retry}>retry</button></ErrorView>
         : status === 'pending' ? <AsyncSpinner hint={query} />
         : query === '' ? null
         : albums.length === 0 ? <p>No matches for <i>&quot;{query}&quot;</i></p>

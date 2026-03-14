@@ -27,6 +27,7 @@ export default function PageOne() {
 
                     <mainState.computed1$.component sFC={Counter} classes={counterClasses}/>
 
+                    {/* Explicit render WITHOUT subscription to signal */}
                     <Counter current$={mainState.computed2$} classes={counterClasses}/>
 
                     {mainState.computed2$}

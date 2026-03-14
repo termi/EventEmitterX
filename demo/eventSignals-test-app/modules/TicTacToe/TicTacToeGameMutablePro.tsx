@@ -152,6 +152,11 @@ function Settings() {
     }, settingsEqual);
 
     const { ticTacToeLogic } = gameStore$.data;
+    //todo:
+    // const matrixSize$ = useSignal(ticTacToeSettings.matrixSize);
+    // const winnerRowSize$ = useSignal(ticTacToeSettings.winnerLineSize);
+    // const fieldDisplaySize$ = useSignal(() => { const matrixSizeDisplay = i18nNumber(matrixSize$.get()); return `${matrixSizeDisplay}x${matrixSizeDisplay}`; });
+    // const winLine$ = useSignal(() => `Для поля ${fieldDisplaySize.get()} нужно ${i18nNumber(winnerRowSize$.get())} в ряд для победы`, { componentType: i18n$$.componentType });
     const [ matrixSize, setMatrixSize ] = useState(ticTacToeSettings.matrixSize);
     const [ winnerRowSize, setWinnerRowSize ] = useState(ticTacToeSettings.winnerLineSize);
     const onFormChange = useCallback<React.FormEventHandler<HTMLFormElement>>((event) => {
@@ -201,7 +206,7 @@ function Settings() {
     const fieldDisplaySize = `${matrixSizeDisplay}x${matrixSizeDisplay}`;
 
     return (
-        <form className="settings-panel" onChange={onFormChange} onSubmit={onFormSubmit}>
+        <form className="settings-panel" onChange={onFormChange} onSubmit={onFormSubmit} data-renders-counter={++Settings.rendersCounter}>
             <h3><i className="fas fa-sliders-h"></i>{i18nString$$('Настройки игры')}</h3>
 
             <fieldset className="setting-group">
@@ -253,6 +258,8 @@ function Settings() {
     );
 }
 
+Settings.rendersCounter = 0;
+
 function GameLayout() {
     gameStore$.use();
 
@@ -281,9 +288,9 @@ function GameLayout() {
     </>);
 }
 
-const TicTacToeGameMutablePro = React.memo(function TicTacToeGameMutablePro() {
+export default function TicTacToeGameMutablePro() {
     return (
-        <div className={css.TicTacToeGameMutablePro}>
+        <div className={css.TicTacToeGameMutablePro} data-renders-counter={++TicTacToeGameMutablePro.rendersCounter}>
             <header>
                 <h1><i className="fas fa-gamepad"></i>{i18nString$$('||en-US||:Tic tac toe PRO')}</h1>
                 <p className="subtitle">{i18nString$$('Настраивай поле и правила игры по своему вкусу!')}</p>
@@ -295,6 +302,6 @@ const TicTacToeGameMutablePro = React.memo(function TicTacToeGameMutablePro() {
             </div>
         </div>
     );
-});
+}
 
-export default TicTacToeGameMutablePro;
+TicTacToeGameMutablePro.rendersCounter = 0;

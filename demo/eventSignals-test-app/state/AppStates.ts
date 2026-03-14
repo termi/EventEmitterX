@@ -137,25 +137,36 @@ const style: React.CSSProperties = {
 const userFirstName$ = new EventSignal('Вася', {
     description: 'userFirstName',
     data: {
-        title: 'First name',
+        title: i18n$$`Имя||en-US||:First name`,
         cssClasses: 'form-input first-name',
         style,
         onChanges: (event: React.ChangeEvent<HTMLInputElement>) => {
+            // todo: Добавить `reason: onChanges` и добавить игнорирование этого `reason` в SignalInputComponent
             userFirstName$.set(String(event.target.value || ''));
+        },
+        inputProps: {
+            name: 'firstName',
+            placeholder: i18n$$`Имя||en-US||:First name`,
         },
     },
 });
 const userSecondName$ = new EventSignal('Пупкин', {
     description: 'userSecondName',
     data: {
-        title: 'Second name',
+        title: i18n$$`Фамилия||en-US||:Last name`,
         cssClasses: 'form-input seconds-name',
         style,
         onChanges: (event: React.ChangeEvent<HTMLInputElement>) => {
+            // todo: Добавить `reason: onChanges` и добавить игнорирование этого `reason` в SignalInputComponent
             userSecondName$.set(String(event.target.value || ''));
+        },
+        inputProps: {
+            name: 'secondName',
+            placeholder: i18n$$`Фамилия||en-US||:Last name`,
         },
     },
 });
+
 const happySymbols_array = Array.from("🔥😂😊😁🙏😎💪😋😇🎉🙌🤘👍🤑🤩🤪🤠🥳😌🤤😍😀");
 const happySymbols_max = happySymbols_array.length - 1;
 const userFullNameComponentType = '--UserCard--';

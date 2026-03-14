@@ -2,11 +2,14 @@
 'use strict';
 
 import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
+import { assertIsDefined, assertIsString } from "termi@type_guards";
 import hashSum from '../lib/hashSum';
 import { throttle } from '../lib/functions';
 
 import { currentLocale$ } from "./i18n";
 import { getCurrentTimeZoneOffset, getLocaleInfo } from "../lib/i18n";
+import { checkHasWeekMapSymbolsSupport, getIterableDiff } from "../lib/object";
+import { WeakCache } from "../lib/cache";
 
 const componentTypeGlobalTimesList = Symbol('GlobalTimes/List');
 const componentTypeGlobalTimesCity = Symbol('GlobalTimes/City');
@@ -14,22 +17,37 @@ const componentTypeGlobalTimesCity = Symbol('GlobalTimes/City');
 export const mostPopularCities$ = new EventSignal(
     [] as mostPopularCities$.CityDescription$[],
     function(prevMostPopularCitiesList) {
+        const mostPopularCitiesList = getMostPopularCities(currentLocale$.get());
+
+        const newList = mostPopularCitiesList.map(cityDescription => {
+            return _makeCityTimeWithCache$$(cityDescription);
+        });
+
+        for (const cityDescription$ of getIterableDiff(prevMostPopularCitiesList, newList).removedSet) {
         // Обязательно нужно уничтожить предыдущие сигналы, иначе они будут висеть в памяти процесса бесконечно (будет утечка памяти).
         // todo: Разработать механизм автоматической очистки и/или Weak-подписок.
-        for (const cityDescription$ of prevMostPopularCitiesList) {
+            //  Или переделать механизм подписок сигналов между собой, чтобы они не использовали глобальный объект для этого.
             cityDescription$.destructor();
         }
 
-        const mostPopularCitiesList = getMostPopularCities(currentLocale$.get());
-
-        return mostPopularCitiesList.map(cityDescription => {
-            return _makeCityTime$$(cityDescription);
-        });
+        return newList;
     }, {
         description: 'mostPopularCities',
         componentType: componentTypeGlobalTimesList,
         data: {
             elementsComponentType: componentTypeGlobalTimesCity,
+            get emptyCitySignal$() {
+                const value = new EventSignal(getMostPopularCities('', [])[0]);
+
+                Object.defineProperty(this, 'emptyCitySignal$', {
+                    value,
+                    enumerable: true,
+                    configurable: true,
+                    writable: false,
+                });
+
+                return value;
+            },
         },
     }
 );
@@ -89,12 +107,24 @@ const _DisplayNames_options: Intl.DisplayNamesOptions = Object.freeze(Object.set
     type: 'region',
 } satisfies Intl.DisplayNamesOptions, null));
 
+const cityTime$WeakCache = new WeakCache<RawCityDescription["cacheKey"], ReturnType<typeof _makeCityTime$$>>();
+
+function _makeCityTimeWithCache$$(cityDescription: RawCityDescription) {
+    return cityTime$WeakCache.emplace(cityDescription.cacheKey, {
+        update(value) {
+            if (value.destroyed) {
+                return void 0;
+            }
+
+            return value;
+        },
+        insert() {
+            return _makeCityTime$$(cityDescription);
+        },
+    });
+}
+
 function _makeCityTime$$(cityDescription: RawCityDescription) {
-    const id = hashSum([
-        cityDescription.name,
-        cityDescription.locale,
-        cityDescription.country,
-    ]);
     let timeOfDay: TimeOfDay = 'day';
 
     const cityTime$ = new EventSignal({} as CityDescription, function(prev, rawCityDescription) {
@@ -102,13 +132,18 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
         const regionNames = _dnCache.getOrNew(currentLocale);
         const nowDate = nowDate$.get();
         const timeInfo = formatLocalTime(rawCityDescription, nowDate);
+        const { id, cacheKey } = rawCityDescription;
+
+        assertIsString(id);
+        assertIsDefined(cacheKey);
 
         timeOfDay = timeInfo.timeOfDay;
 
         const country = regionNames.getByRegionCodeSafe(rawCityDescription.localeInfo.region) || rawCityDescription.country;
         const cityDescription: CityDescription = {
-            id,
             ...rawCityDescription,
+            id,
+            cacheKey,
             country,
             enable: prev.enable ?? true,
             timeOfDay,
@@ -141,12 +176,13 @@ function _makeCityTime$$(cityDescription: RawCityDescription) {
                 canvasAnimations.set($canvas, animation);
                 cityTime$.addListener(animation.updateTimeOfDayFromObject);
 
-                return () => {
+                return cityTime$.data.destroyCanvas = () => {
                     canvasAnimations.delete($canvas);
                     animation.destructor();
                     cityTime$.removeListener(animation.updateTimeOfDayFromObject);
                 };
             },
+            destroyCanvas: () => {},
         },
     });
 
@@ -165,6 +201,7 @@ type CityDescription = RawCityDescription & {
     time: string,
     date: string,
     timeZoneName: string,
+    cacheKey: symbol,
     __proto__: null,
 };
 
@@ -176,6 +213,8 @@ type RawCityDescription = {
     timeZoneOffset: number,
     locale: string,
     flag: string,
+    id?: string,
+    cacheKey?: symbol,
     isCapital?: boolean,
     isCurrentOffset: boolean,
     localeInfo: ReturnType<typeof getLocaleInfo>,
@@ -227,7 +266,6 @@ function formatLocalTime(city: RawCityDescription, nowDate = new Date(Date.now()
         timeOfDay,
         dayLightSign,
         timeZoneName,
-        __proto__: null,
     };
 }
 
@@ -303,10 +341,7 @@ type From_0_To_59 =
     | 50 | 51 | 52 | 53 | 54 | 55 | 56 | 57 | 58 | 59
     ;
 
-// Список популярных городов с их временными зонами и локалями
-function getMostPopularCities(currentLocale: string): RawCityDescription[] {
-    const date = new Date();
-    const mostPopularCities: RawCityDescription[] = ([
+const predefinedCitiesList = ([
         {
             name: "Токио",
             country: "Япония",
@@ -434,27 +469,41 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
             flag: "",
         },
     ] as RawCityDescription[]);
+const hasWeekMapSymbolsSupport = checkHasWeekMapSymbolsSupport();
+
+// Список популярных городов с их временными зонами и локалями
+function getMostPopularCities(currentLocale: string, mostPopularCities = predefinedCitiesList): RawCityDescription[] {
+    const date = new Date();
 
     if (!mostPopularCities.some(cityDescription => {
         return cityDescription.locale === currentLocale;
     })) {
         const localeInfo = getLocaleInfo(currentLocale, true);
-        const timeZone = localeInfo.defaultTimezone;
         const cityDescription = {
             name: localeInfo.capital,
             nameLocale: localeInfo.capitalOriginateLocale,
             country: '',
-            timeZone,
+            timeZone: localeInfo.defaultTimezone,
             locale: currentLocale,
             flag: localeInfo.flag,
             isCapital: true,
             localeInfo,
         } as RawCityDescription;
 
-        mostPopularCities.push(cityDescription);
+        // Make a mostPopularCities copy with custom `cityDescription`
+        mostPopularCities = [ ...mostPopularCities, cityDescription ];
     }
 
+    /** @avoid do not use this variable in code bellow */
+    void currentLocale;
+    // avoid currentLocale;
+
     for (const cityDescription of mostPopularCities) {
+        if (cityDescription.cacheKey) {
+            // Already normalized
+            continue;
+        }
+
         const localeInfo = getLocaleInfo(cityDescription.locale, true);
 
         cityDescription.localeInfo = localeInfo;
@@ -489,8 +538,23 @@ function getMostPopularCities(currentLocale: string): RawCityDescription[] {
 
         cityDescription.timeZoneOffset = timeZoneOffset;
         cityDescription.isCurrentOffset = timeZoneOffset === currentTimeZoneOffset;
+        cityDescription.id = hashSum([
+            cityDescription.name,
+            cityDescription.locale,
+            cityDescription.country,
+        ]);
+
+        if (hasWeekMapSymbolsSupport) {
+            cityDescription.cacheKey = Symbol();
+        }
+        else {
+            cityDescription.cacheKey = { toString() { return 'FakeSymbol()'; }, description: '' } as unknown as symbol;
+
+            Object.defineProperty(cityDescription, 'cacheKey', { enumerable: false, configurable: true, writable: true });
+        }
     }
 
+    // Mutate array!
     // Сортируем города по часовому поясу (по UTC смещению)
     return mostPopularCities.sort((a, b) => {
         return b.timeZoneOffset - a.timeZoneOffset;
@@ -509,7 +573,6 @@ class TimeCanvas {
         speedX: number,
         speedY: number,
         opacity: number,
-        __proto__: null,
     }[] = [];
     animationId = 0;
     _resizeObserver: ResizeObserver | null = null;
@@ -589,7 +652,6 @@ class TimeCanvas {
                 speedX: (Math.random() - 0.5) * 0.5,
                 speedY: (Math.random() - 0.5) * 0.5,
                 opacity: Math.random() * 0.5 + 0.3,
-                __proto__: null,
             });
         }
     }
@@ -632,8 +694,12 @@ class TimeCanvas {
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        const { particles } = this;
+
         // Рисуем частицы
-        for (const particle of this.particles) {
+        for (let i = 0, len = particles.length ; i < len ; i++) {
+            const particle = particles[i];
+
             // Обновляем позицию
             particle.x += particle.speedX;
             particle.y += particle.speedY;
@@ -850,8 +916,10 @@ const elementsObserverManager = new HTMLElementsObserverManager();
 
 Object.assign(globalThis, {
     __test__canvasAnimations: canvasAnimations,
+    __test__mostPopularCities$: mostPopularCities$,
     __test__nowTime$: nowDate$,
     __test__elementsObserverManager: elementsObserverManager,
+    __test__cityTime$WeakCache: cityTime$WeakCache,
 });
 
 // https://www.w3schools.com/charsets/ref_utf_misc_symbols.asp

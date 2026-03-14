@@ -16,6 +16,7 @@ import {
     fetchGoogleTranslateApi,
     saveLocalizationToLocalStorage,
 } from "../lib/i18n";
+import { shallowEqual } from "../lib/object";
 
 const defaultLocale = getDefaultLocale();
 const systemLocale = getSystemLocale();
@@ -120,8 +121,16 @@ export const i18nNumber = Object.assign(function i18nNumber(num: number) {
         // return numberFormatOptions$.use();
         return currentLocale$.use(currentLocale => {
             return getLocaleInfo(currentLocale).numberFormatOptions;
-        });
+        }, shallowEqual);
     },
+
+    /* todo:
+    get() {
+        return currentLocale$.get(currentLocale => {
+            return getLocaleInfo(currentLocale).numberFormatOptions;
+        }, shallowEqual);
+    },
+    */
 });
 
 export function i18nNumber$$(num: number) {
@@ -146,11 +155,11 @@ export function i18n<T>(template: TemplateStringsArray, ...values: T[]) {
         return i18nString(template[0]);
     }
 
-    const result = _i18n_computation<T>('', { template, values, __proto__: null });
+    const result = _i18n$_computation<T>('', { template, values, __proto__: null });
 
     // _i18nString$_computation МОЖЕТ (несмотря на типизацию) вернуть Promise.
     // Но нам нельзя тут возвращать Promise, поэтому возвращаем исходное значение.
-    // Если возвращать Promise, то это будет провоцировать React Suspense механизм.
+    // Если возвращать Promise, то это будет провоцировать React Suspense механизм (но это не точно и я не могу это воспроизвести).
     if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') { // eslint-disable-line promise/prefer-await-to-then
         return (result as unknown as Promise<string> & { "pendingValue": string })["pendingValue"]
             ?? fulfillTranslationTemplate(template.reduce((string, val, index) => {
@@ -162,6 +171,10 @@ export function i18n<T>(template: TemplateStringsArray, ...values: T[]) {
     return result;
 }
 
+/**
+ * @example
+ * i18n$$`Привет ${name}||<en-US>||:Hello ${name}||es-ES||:Hola ${name}`
+ */
 export function i18n$$<T>(template: TemplateStringsArray, ...values: T[]) {
     if (template.length === 1 && values.length === 0) {
         return i18nString$$(template[0]);
@@ -175,12 +188,14 @@ export function i18n$$<T>(template: TemplateStringsArray, ...values: T[]) {
     */
 }
 
+i18n$$.componentType = i18n_componentType;
+
 export const i18nString = Object.assign(function i18nString(string: string) {
     const result = _i18nString$_computation('', string);
 
     // _i18nString$_computation МОЖЕТ (несмотря на типизацию) вернуть Promise.
     // Но нам нельзя тут возвращать Promise, поэтому возвращаем исходное значение.
-    // Если возвращать Promise, то это будет провоцировать React Suspense механизм.
+    // Если возвращать Promise, то это будет провоцировать React Suspense механизм (но это не точно и я не могу это воспроизвести).
     if (typeof (result as unknown) === 'object' && typeof (result as unknown as Promise<string>).then === 'function') { // eslint-disable-line promise/prefer-await-to-then
         return (result as unknown as Promise<string> & { "pendingValue": string })["pendingValue"] ?? string;
     }
@@ -199,16 +214,35 @@ export function i18nString$$(string: string) {
     return i18nStringCache.getOrInsertComputed(string, _create_i18nString$$);
 }
 
+i18nString$$.componentType = i18n_componentType;
+
 function _create_i18n$$<T>(template: TemplateStringsArray, values: T[]) {
-    return new EventSignal('', _i18n_computation, {
+    return new EventSignal('', _i18n$_computation, {
         description: 'i18n.template',
         initialSourceValue: { template, values, __proto__: null },
         componentType: i18n_componentType,
+        //todo: Тут нельзя использовать destroyOnUnmount, т.к. это будет влиять и на сигналы созданные вне
+        // React-компонентов (например `AppStates.ts`~i18n$$`Счетчик ${'1'} со строкой-префиксом`
+        // reactFC: [ null, null, { destroyOnUnmount: true } ],
         __proto__: null,
     });
 }
 
 function fulfillTranslationTemplate<T>(translation: string, values: T[]) {
+    if (!translation.includes('@{')) {
+        // В некоторых переводах вставляется пробел между '@' и '{'.
+        //  Например: для uk-UA 'Игрок @{0}'->'Гравець @ {0}' (https://translate.google.ru/?sl=ru&tl=uk&text=%D0%98%D0%B3%D1%80%D0%BE%D0%BA%20%40%7B0%7D&op=translate).
+        // Можно попытаться бороться с этим, подобрав другие символы в качестве отметок для шаблонизатора.
+        //  Например, на что можно заменить: `@{i}@` или `@@{i}`, или подставив символ после i: `@{i|}`.
+        //  Или вообще цифры заменить буквами Английского алфавита, обёрнутыми в псевдо-тег: <A>a</A> (`/(<A>\w+<\/A>)/g`)
+        //  Однако, это может привести к тому, что перевод надписи измениться - это всё нужно проверять.
+        translation = translation.replaceAll('@ {', '@{');
+    }
+
+    // todo: Для некоторых языков, цифры могли замениться на местный аналог.
+    //  Например:
+    //   * `0 -> ०` https://translate.google.ru/?sl=ru&tl=new&text=%D0%98%D0%B3%D1%80%D0%BE%D0%BA%20%40%7B0%7D&op=translate
+    //   * `2 -> २` https://translate.google.ru/?sl=ru&tl=new&text=%D0%A1%D1%82%D1%80%D0%BE%D0%BA%D0%B0%20%40%7B2%7D&op=translate
     return translation.replace(/@{(\d+)}/g, function(_match, indexString: string) {
         const i = Number.parseInt(indexString, 10);
 
@@ -216,7 +250,11 @@ function fulfillTranslationTemplate<T>(translation: string, values: T[]) {
     });
 }
 
-function _i18n_computation<T>(prevValue: string, sourceValue: { template: TemplateStringsArray, values: T[], __proto__: null }, eventSignal?: EventSignal<string, { template: TemplateStringsArray, values: T[], __proto__: null }>) {
+function _i18n$_computation<T>(
+    prevValue: string,
+    sourceValue: { template: TemplateStringsArray, values: T[], __proto__: null },
+    eventSignal?: EventSignal<string, { template: TemplateStringsArray, values: T[], __proto__: null }>,
+) {
     const currentLocale = currentLocale$.get();
     const isDefaultLocale = currentLocale === defaultLocale;
     const translationsMap = translations.getOrInsertComputed(currentLocale, translations.createValue);
@@ -481,7 +519,7 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
                     temporaryEventSignal.set(true);
                     temporaryEventSignal.destructor();
                 }, () => {
-                    // ignore any error
+                    temporaryEventSignal.destructor();
                 });
             }
 

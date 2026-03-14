@@ -179,11 +179,19 @@ function PageGlobalTimesLegend() {
 
     const currentLocale = currentLocale$.use();
     const currentLocaleCityInfo$ = mostPopularCities$.use(cityDescription$List => {
-        return cityDescription$List.find(cityDescription$ => cityDescription$.get().locale === currentLocale);
+        return cityDescription$List.find(cityDescription$ => cityDescription$.get().locale === currentLocale)
+            || mostPopularCities$.data.emptyCitySignal$
+        ;
     });
     const $ref = useRef<HTMLDivElement | null>(null);
 
-    const cityDescription = currentLocaleCityInfo$.useListener((cityDescription) => {
+    const cityDescriptionInfo = currentLocaleCityInfo$.useReducedListener((cityDescription) => {
+        return {
+            dayLightSign: cityDescription.dayLightSign,
+            cityDescription,
+        };
+    }, (info) => {
+        const { cityDescription } = info;
         const $current = $ref.current;
 
         if ($current) {
@@ -195,9 +203,14 @@ function PageGlobalTimesLegend() {
 
             $current.setAttribute('data-city-name', cityDescription.name);
             $current.setAttribute('data-city-version', currentLocaleCityInfo$.getSnapshotVersion());
-            $current.style.setProperty("--city-dayLightSign", `"${cityDescription.dayLightSign}"`);
+            $current.style.setProperty("--city-dayLightSign", `"${info.dayLightSign}"`);
         }
+    }, {
+        areReducedValuesEqual(prevValue, newValue) {
+            return prevValue?.dayLightSign === newValue.dayLightSign;
+        },
     });
+    const { cityDescription } = cityDescriptionInfo;
 
     return <div
         ref={$ref}

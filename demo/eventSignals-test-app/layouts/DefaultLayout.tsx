@@ -36,6 +36,6 @@ const DefaultLayout = React.memo(function DefaultLayout({ children, pageTitle, p
         </header>
         {children || null}
     </main>;
-})
+});
 
 export default DefaultLayout;

@@ -3,6 +3,7 @@
 import * as React from 'react';
 
 import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
+
 import { currentLocale$ } from "../../state/i18n";
 
 type Player = 'O' | 'X';
@@ -173,7 +174,7 @@ function WinnerLine() {
         return isDraw ? 'Draw' : winner ? `Winner: ${winner}` : 'Now playing';
     });
 
-    return <div>{text} ({WinnerLine.renderCounter})</div>;
+    return <div>{text} ({++WinnerLine.renderCounter})</div>;
 }
 
 WinnerLine.renderCounter = 0;

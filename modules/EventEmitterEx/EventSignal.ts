@@ -121,11 +121,38 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         if (hasNoThrottle_or_wasThrottleTrigger) {
+            const { id, _signalSymbol } = this;
+
+            if (isReactDev) {
+                // todo: На время, пока не удасться отловить и исправить 'too much recursion' ошибку
+                if (signalEventsEmitter.hasListener(this._signalSymbol, this._oneOfDepUpdated)) {
+                    console.error('EventSignal: self listening');
+
+                    // Такая ситуация точно воспроизводиться и нужно отловить почему она получается.
+                    // eslint-disable-next-line no-debugger
+                    debugger;
+                }
+            }
+
             // todo: В конструкторе EventSignal может приходить кастомный EventsEmitter.
             // Уведомим всех наших подписчиков, что наши зависимости изменились и это значит, что наше значение может стать новым.
             // todo: Проверить и исправить, что при любой пачки изменений мы посылаем событие в signalEventsEmitter ровно
             //  один раз до тех пор, как не "реализуем" это изменение.
-            signalEventsEmitter.emit(this._signalSymbol);
+            try {
+                signalEventsEmitter.emit(this._signalSymbol);
+            }
+            catch (error) {
+                if (String(error).includes('too much recursion')) {
+                    console.log({ id, _signalSymbol });
+
+                    // Такая ситуация точно воспроизводиться и нужно отловить почему она получается.
+                    // eslint-disable-next-line no-debugger
+                    debugger;
+                }
+
+                throw error;
+            }
+
             this._recalculateIfNeeded();
         }
     };
@@ -3363,6 +3390,10 @@ export namespace EventSignal {
         valuesAsObjectShouldBeForceSettled = 1 << 21,
 
         isDestroyed = 1 << 30,
+    }
+
+    export namespace component {
+        export type Test = 123;
     }
 }
 

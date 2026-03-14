@@ -1,5 +1,8 @@
 'use strict';
 
+import fs from 'node:fs';
+import path from 'node:path';
+
 /*
 import * as ts from 'typescript';
 import { ModuleKind } from 'typescript';
@@ -93,6 +96,62 @@ export default defineConfig({
         */
         createCSSHotReloadConfirmPlugin(),
         createPrebuildPlugin({ projectRoot: __dirname }),
+        {
+            name: 'remove-vite-json',
+            // Turn off internal 'vite:json' plugin
+            configResolved(config) {
+                const index = config.plugins.findIndex(p => p.name === 'vite:json');
+
+                if (index !== -1) {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore TS2551: Property splice does not exist on type readonly Plugin<any>[]. Did you mean slice?
+                    config.plugins.splice(index, 1);
+                }
+            },
+        },
+        {
+            // see [The cost of JavaScript in 2019 / The cost of parsing JSON](https://v8.dev/blog/cost-of-javascript-2019#json)
+            // see [Subsume JSON a.k.a. JSON ⊂ ECMAScript/ Embedding JSON into JavaScript programs with JSON.parse](https://v8.dev/features/subsume-json#embedding-json-parse)
+            name: 'custom-json-loader',
+            enforce: 'pre',
+
+            resolveId(id, importer) {
+                if (id.endsWith('.json')) {
+                    return path.resolve(importer ? path.dirname(importer) : process.cwd(), id);
+                }
+            },
+
+            load(id) {
+                if (id.endsWith('.json')) {
+                    // eslint-disable-next-line unicorn/prefer-json-parse-buffer
+                    const raw = fs.readFileSync(id, 'utf8');
+                    const json = JSON.parse(raw);
+                    /**
+                     * Support [Named export](https://vite.dev/guide/features#json)
+                     * ```
+                     * // import a root field as named exports - helps with tree-shaking!
+                     * // import { field } from './example.json'
+                     * ```
+                     */
+                    const parsedKeys = Object.keys(json);
+                    const rawString = JSON.stringify(json);
+                    // for using not '`', but "'": const escapedString = JSON.stringify(rawString);
+
+                    return {
+                        code: `
+const __json = JSON.parse(\`${rawString}\`);
+export default __json;
+${
+    parsedKeys
+        .map(key => `export const ${key} = __json[${JSON.stringify(key)}];`)
+        .join('\n')
+}
+                        `,
+                        map: null,
+                    };
+                }
+            },
+        },
     ],
 });
 

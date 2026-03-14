@@ -429,6 +429,12 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         return cachedValue;
     }
 
+    const isNeedEmptyObject = !localeCode;
+
+    if (isNeedEmptyObject) {
+        localeCode = 'en-US';
+    }
+
     const intlLocale = new Intl.Locale(normalizeLocale(localeCode));
     const { language } = intlLocale;
     const region = intlLocale.region || '';
@@ -453,6 +459,8 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
     const numberFormatOptions = new Intl.NumberFormat(localeCode).resolvedOptions();
 
     numberFormatOptions.numberingSystem = defaultNumberingSystem;
+
+    delete numberFormatOptions.locale;
 
     const result: getLocaleInfo.Result = {
         locale: localeCode,
@@ -496,6 +504,19 @@ export function getLocaleInfo(localeCode: string, getExtendedInfo?: boolean): ge
         _result.defaultTimezone = defaultTimezone || 'UTC';
     }
 
+    if (isNeedEmptyObject) {
+        result.locale = '';
+        result.flag = '';
+        result.language = '';
+        result.region = '';
+
+        const _result = result as getLocaleInfo.ExtendedResult;
+
+        if (_result.capital) {
+            _result.capital = '';
+        }
+    }
+
     Object.freeze(Object.setPrototypeOf(numberFormatOptions, null));
     Object.freeze(Object.setPrototypeOf(result, null));
 
@@ -512,7 +533,9 @@ export namespace getLocaleInfo {
         region: string,
         defaultNumberingSystem: string,
         textDirection: 'ltr' | 'rtl',
-        numberFormatOptions: ConstructorParameters<typeof Intl["NumberFormat"]>[1],
+        // 'locale' Не нужен в numberFormatOptions, потому что для разных locale может быть объект с одинаковыми
+        // значениями в numberFormatOptions. Что можно проверять при перерендере.
+        numberFormatOptions: Omit<ConstructorParameters<typeof Intl["NumberFormat"]>[1], 'locale'>,
         __proto__: null,
     };
 
@@ -525,7 +548,7 @@ export namespace getLocaleInfo {
 
 const _displayNamesMap = new Map<string, Intl.DisplayNames>();
 const _displayNamesMap_newValue = function(locale: string) {
-    return new Intl.DisplayNames([ locale ], { type: 'language' });
+    return new Intl.DisplayNames(locale, { type: 'language' });
 };
 
 export function getLanguageName(languageCode: string, displayLocale: string) {

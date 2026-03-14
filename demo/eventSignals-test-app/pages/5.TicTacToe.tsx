@@ -5,6 +5,7 @@ import * as React from 'react';
 import { useCallback, useState } from "react";
 
 import { i18nString$$ } from "../state/i18n";
+import { closestElement } from "../lib/dom";
 
 import TicTacToeGameImmutable from "../modules/TicTacToe/TicTacToeGameImmutable";
 import TicTacToeGameMutable from "../modules/TicTacToe/TicTacToeGameMutable";
@@ -15,7 +16,7 @@ import css from './5.TicTacToe.module.css';
 export default function TicTacToe() {
     const [ currentTab, setCurrentTab ] = useState(0);
     const onTabMenuClick = useCallback<React.MouseEventHandler<HTMLElement>>((event) => {
-        const { target } = event.nativeEvent;
+        const target = closestElement(event.nativeEvent.target, `.${css.tabButton}`, event.currentTarget);
         const tabIndex = Number((target as HTMLElement | undefined)?.getAttribute?.('data-tab-index') ?? void 0);
 
         if (Number.isInteger(tabIndex)) {
