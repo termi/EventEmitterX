@@ -24,15 +24,15 @@ new EventEmitterX(options?: ConstructorOptions)
 
 ### ConstructorOptions
 
-| Опция | Тип | По умолчанию | Описание |
-|-------|-----|-------------|----------|
-| `maxListeners` | `number` | `Infinity` | Максимальное количество слушателей на событие (предупреждение при превышении) |
-| `listenerOncePerEventType` | `boolean` | `false` | Если `true`, слушатель может быть зарегистрирован не более одного раза на тип события (аналогично поведению `EventTarget`) |
-| `captureRejections` | `boolean` | `false` | Автоматический перехват отклонений в async-слушателях |
-| `emitCounter` | `Console \| ICounter` | — | Подсчёт вызовов emit. Передайте `console` для console.count или кастомный `ICounter` |
-| `listenerWithoutThis` | `boolean` | `false` | Вызывать слушатели без привязки `this` к эмиттеру |
-| `supportEventListenerObject` | `boolean` | `false` | Поддержка DOM-паттерна `{ handleEvent }` |
-| `isDebugTraceListeners` | `boolean` | `false` | Прикрепление стека вызовов к слушателям через `listener.__debugTrace` |
+| Опция                        | Тип                   | По умолчанию | Описание                                                                                                                   |
+|------------------------------|-----------------------|--------------|----------------------------------------------------------------------------------------------------------------------------|
+| `maxListeners`               | `number`              | `Infinity`   | Максимальное количество слушателей на событие (предупреждение при превышении)                                              |
+| `listenerOncePerEventType`   | `boolean`             | `false`      | Если `true`, слушатель может быть зарегистрирован не более одного раза на тип события (аналогично поведению `EventTarget`) |
+| `captureRejections`          | `boolean`             | `false`      | Автоматический перехват отклонений в async-слушателях                                                                      |
+| `emitCounter`                | `Console \| ICounter` | —            | Подсчёт вызовов emit. Передайте `console` для console.count или кастомный `ICounter`                                       |
+| `listenerWithoutThis`        | `boolean`             | `false`      | Вызывать слушатели без привязки `this` к эмиттеру                                                                          |
+| `supportEventListenerObject` | `boolean`             | `false`      | Поддержка DOM-паттерна `{ handleEvent }`                                                                                   |
+| `isDebugTraceListeners`      | `boolean`             | `false`      | Прикрепление стека вызовов к слушателям через `listener.__debugTrace`                                                      |
 
 ### Пример
 
@@ -52,23 +52,23 @@ const emitter = new EventEmitterX({
 
 Эти методы ведут себя идентично Node.js `EventEmitter`:
 
-| Метод | Сигнатура |
-|-------|-----------|
-| `on(event, listener)` | Добавить слушатель для `event`. Возвращает `this`. |
-| `addListener(event, listener)` | Алиас для `on`. |
-| `once(event, listener)` | Добавить одноразовый слушатель. Удаляется после первого вызова. Возвращает `this`. |
-| `off(event, listener)` | Алиас для `removeListener`. |
-| `removeListener(event, listener)` | Удалить конкретный слушатель. Возвращает `this`. |
-| `removeAllListeners(event?)` | Удалить все слушатели (опционально для конкретного события). Возвращает `this`. |
-| `prependListener(event, listener)` | Добавить слушатель в начало списка. Возвращает `this`. |
-| `prependOnceListener(event, listener)` | Добавить одноразовый слушатель в начало. Возвращает `this`. |
-| `emit(event, ...args)` | Отправить событие. Возвращает `true`, если слушатели существовали. |
-| `listeners(event)` | Возвращает копию массива слушателей (разворачивает once-обёртки). |
-| `rawListeners(event)` | Возвращает копию «сырого» массива слушателей (включая once-обёртки). |
-| `listenerCount(event)` | Возвращает количество слушателей для `event`. |
-| `eventNames()` | Возвращает массив имён событий с зарегистрированными слушателями. |
-| `setMaxListeners(n)` | Установить максимум слушателей. Возвращает `this`. |
-| `getMaxListeners()` | Получить текущее максимальное значение слушателей. |
+| Метод                                  | Сигнатура                                                                          |
+|----------------------------------------|------------------------------------------------------------------------------------|
+| `on(event, listener)`                  | Добавить слушатель для `event`. Возвращает `this`.                                 |
+| `addListener(event, listener)`         | Алиас для `on`.                                                                    |
+| `once(event, listener)`                | Добавить одноразовый слушатель. Удаляется после первого вызова. Возвращает `this`. |
+| `off(event, listener)`                 | Алиас для `removeListener`.                                                        |
+| `removeListener(event, listener)`      | Удалить конкретный слушатель. Возвращает `this`.                                   |
+| `removeAllListeners(event?)`           | Удалить все слушатели (опционально для конкретного события). Возвращает `this`.    |
+| `prependListener(event, listener)`     | Добавить слушатель в начало списка. Возвращает `this`.                             |
+| `prependOnceListener(event, listener)` | Добавить одноразовый слушатель в начало. Возвращает `this`.                        |
+| `emit(event, ...args)`                 | Отправить событие. Возвращает `true`, если слушатели существовали.                 |
+| `listeners(event)`                     | Возвращает копию массива слушателей (разворачивает once-обёртки).                  |
+| `rawListeners(event)`                  | Возвращает копию «сырого» массива слушателей (включая once-обёртки).               |
+| `listenerCount(event)`                 | Возвращает количество слушателей для `event`.                                      |
+| `eventNames()`                         | Возвращает массив имён событий с зарегистрированными слушателями.                  |
+| `setMaxListeners(n)`                   | Установить максимум слушателей. Возвращает `this`.                                 |
+| `getMaxListeners()`                    | Получить текущее максимальное значение слушателей.                                 |
 
 ### Нестандартные методы
 
@@ -146,18 +146,18 @@ static once(eventTarget: EventTarget, types: string | string[], options?: Static
 
 #### Опции (StaticOnceOptions)
 
-| Опция | Тип | Описание |
-|-------|-----|----------|
-| `prepend` | `boolean` | Добавить слушатель в начало списка |
-| `signal` | `AbortSignal` | Отменить ожидание через abort-сигнал |
-| `abortControllers` | `AbortController[]` | Группа abort-контроллеров |
-| `timeout` | `number` | Таймаут в мс до реджекта с `TimeoutError` |
-| `errorEventName` | `EventName` | Кастомное имя события ошибки (по умолчанию: `'error'`) |
-| `filter` | `(emitEventName, ...args) => boolean` | Функция-фильтр — резолвить только при возврате `true` |
-| `onDone` | `(emitEventName, ...args) => void` | Колбек, вызываемый перед резолвом |
-| `timing` | `ServerTiming` | Отслеживание Server-Timing |
-| `Promise` | `PromiseConstructor` | Кастомный конструктор Promise |
-| `debugInfo` | `Object` | Отладочная информация для ошибок таймаута/отмены |
+| Опция              | Тип                                   | Описание                                               |
+|--------------------|---------------------------------------|--------------------------------------------------------|
+| `prepend`          | `boolean`                             | Добавить слушатель в начало списка                     |
+| `signal`           | `AbortSignal`                         | Отменить ожидание через abort-сигнал                   |
+| `abortControllers` | `AbortController[]`                   | Группа abort-контроллеров                              |
+| `timeout`          | `number`                              | Таймаут в мс до реджекта с `TimeoutError`              |
+| `errorEventName`   | `EventName`                           | Кастомное имя события ошибки (по умолчанию: `'error'`) |
+| `filter`           | `(emitEventName, ...args) => boolean` | Функция-фильтр — резолвить только при возврате `true`  |
+| `onDone`           | `(emitEventName, ...args) => void`    | Колбек, вызываемый перед резолвом                      |
+| `timing`           | `ServerTiming`                        | Отслеживание Server-Timing                             |
+| `Promise`          | `PromiseConstructor`                  | Кастомный конструктор Promise                          |
+| `debugInfo`        | `Object`                              | Отладочная информация для ошибок таймаута/отмены       |
 
 #### Примеры
 
@@ -251,12 +251,12 @@ static on(emitter: EventEmitter | EventTarget, event: EventName, options?: Optio
 
 #### Опции
 
-| Опция | Тип | Описание |
-|-------|-----|----------|
-| `signal` | `AbortSignal` | Прервать итератор |
-| `computeValue` | `(eventName, eventArgs, addCallback) => T` | Трансформировать аргументы события перед yield |
-| `stopEventName` | `EventName` | Событие, останавливающее итератор |
-| `errorEventName` | `EventName` | Событие, вызывающее throw в итераторе (по умолчанию: `'error'`) |
+| Опция            | Тип                                        | Описание                                                        |
+|------------------|--------------------------------------------|-----------------------------------------------------------------|
+| `signal`         | `AbortSignal`                              | Прервать итератор                                               |
+| `computeValue`   | `(eventName, eventArgs, addCallback) => T` | Трансформировать аргументы события перед yield                  |
+| `stopEventName`  | `EventName`                                | Событие, останавливающее итератор                               |
+| `errorEventName` | `EventName`                                | Событие, вызывающее throw в итераторе (по умолчанию: `'error'`) |
 
 #### Пример
 
@@ -302,23 +302,23 @@ disposable[Symbol.dispose]();
 
 ## Статические свойства
 
-| Свойство | Тип | Описание |
-|----------|-----|----------|
-| `errorMonitor` | `symbol` | Символ для мониторинга событий ошибок без их перехвата |
-| `captureRejectionSymbol` | `symbol` | `Symbol.for('nodejs.rejection')` |
-| `usingDomains` | `false` | Домены не поддерживаются |
+| Свойство                 | Тип      | Описание                                               |
+|--------------------------|----------|--------------------------------------------------------|
+| `errorMonitor`           | `symbol` | Символ для мониторинга событий ошибок без их перехвата |
+| `captureRejectionSymbol` | `symbol` | `Symbol.for('nodejs.rejection')`                       |
+| `usingDomains`           | `false`  | Домены не поддерживаются                               |
 
 ---
 
 ## Специальные события
 
-| Событие | Когда отправляется |
-|---------|-------------------|
-| `'newListener'` | Перед добавлением нового слушателя |
-| `'removeListener'` | После удаления слушателя |
-| `'error'` | При ошибке. Если нет слушателя — бросает исключение. |
+| Событие                | Когда отправляется                                                      |
+|------------------------|-------------------------------------------------------------------------|
+| `'newListener'`        | Перед добавлением нового слушателя                                      |
+| `'removeListener'`     | После удаления слушателя                                                |
+| `'error'`              | При ошибке. Если нет слушателя — бросает исключение.                    |
 | `'duplicatedListener'` | Когда `listenerOncePerEventType` включён и обнаружен дубликат слушателя |
-| `kDestroyingEvent` | Во время вызова `destructor()`, до удаления всех слушателей |
+| `kDestroyingEvent`     | Во время вызова `destructor()`, до удаления всех слушателей             |
 
 ---
 

@@ -2,6 +2,8 @@
 
 A cross-platform `EventEmitter` implementation for Node.js and browsers, with an advanced reactive signals system (**EventSignal**) deeply integrated with React.
 
+<a href="https://termi.github.io/EventEmitterX/" target="_blank" rel="noopener noreferrer"><strong>Online documentation and Demo ↗</strong></a>
+
 ## Key Features
 
 ### EventEmitterX

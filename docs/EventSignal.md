@@ -17,17 +17,17 @@ Most signal libraries are built in isolation — they operate within their own e
 
 ### Feature Overview
 
-| Feature | Description |
-|---------|-------------|
-| ⚡ **Auto-tracking** | Dependencies are tracked automatically on `.get()` calls inside a computation |
-| ⚛️ **React-native** | `use()` hook, direct JSX rendering, polymorphic component system — no adapters |
-| 🔀 **Async-ready** | First-class async computations with `status`, `lastError`, and deduplication |
-| 📡 **Event bridge** | Subscribe to any `EventEmitter` / `EventTarget` via `sourceEmitter` |
-| ⏰ **Triggers** | Clock, emitter, or signal-based recomputation with throttle support |
-| 🔗 **Derived signals** | `map()`, `createMethod()`, computed chains — compose complex state from simple pieces |
-| 🔮 **Promise & async** | `toPromise()`, `for await...of` async iteration support |
-| 🏷️ **TypeScript-native** | Full generics: `EventSignal<T, S, D, R>` — typed value, source, data, and return |
-| ♻️ **Safe lifecycle** | `destructor()`, `Symbol.dispose`, `finaleValue` — no memory leaks |
+| Feature                   | Description                                                                           |
+|---------------------------|---------------------------------------------------------------------------------------|
+| ⚡ **Auto-tracking**       | Dependencies are tracked automatically on `.get()` calls inside a computation         |
+| ⚛️ **React-native**       | `use()` hook, direct JSX rendering, polymorphic component system — no adapters        |
+| 🔀 **Async-ready**        | First-class async computations with `status`, `lastError`, and deduplication          |
+| 📡 **Event bridge**       | Subscribe to any `EventEmitter` / `EventTarget` via `sourceEmitter`                   |
+| ⏰ **Triggers**            | Clock, emitter, or signal-based recomputation with throttle support                   |
+| 🔗 **Derived signals**    | `map()`, `createMethod()`, computed chains — compose complex state from simple pieces |
+| 🔮 **Promise & async**    | `toPromise()`, `for await...of` async iteration support                               |
+| 🏷️ **TypeScript-native** | Full generics: `EventSignal<T, S, D, R>` — typed value, source, data, and return      |
+| ♻️ **Safe lifecycle**     | `destructor()`, `Symbol.dispose`, `finaleValue` — no memory leaks                     |
 
 ### Quick Start
 
@@ -126,12 +126,12 @@ new EventSignal<T, S, D, R>(initialValue: T, computation: ComputationFn, options
 
 ### Type Parameters
 
-| Param | Description |
-|-------|-------------|
-| `T` | Value type |
-| `S` | Source value type (defaults to `T`) |
-| `D` | Data payload type (defaults to `undefined`) |
-| `R` | Return type from `get()` (defaults to `T`) |
+| Param | Description                                 |
+|-------|---------------------------------------------|
+| `T`   | Value type                                  |
+| `S`   | Source value type (defaults to `T`)         |
+| `D`   | Data payload type (defaults to `undefined`) |
+| `R`   | Return type from `get()` (defaults to `T`)  |
 
 ### Computation Function
 
@@ -147,29 +147,29 @@ Returning `undefined` from a computation means "no update" — the current value
 
 ### NewOptions
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `description` | `string` | Human-readable name (used in Symbol description, React DevTools) |
-| `deps` | `{ eventName: symbol }[]` | Explicit dependencies (signal symbols) |
-| `data` | `D` | Arbitrary payload attached to the signal |
-| `signal` | `AbortSignal` | Abort signal for lifecycle management |
-| `finaleValue` | `Awaited<R>` | Value set when signal is destroyed |
-| `finaleSourceValue` | `S` | Source value set when signal is destroyed |
-| `componentType` | `string \| symbol \| number` | React component type identifier |
-| `reactFC` | `ReactFC` | Direct React function component for rendering |
-| `trigger` | `TriggerDescription` | External trigger (clock, emitter, or eventSignal) |
-| `throttle` | `TriggerDescription` | Throttle trigger for rate-limiting |
-| `onDestroy` | `() => void` | Callback when signal is destroyed |
+| Option              | Type                         | Description                                                      |
+|---------------------|------------------------------|------------------------------------------------------------------|
+| `description`       | `string`                     | Human-readable name (used in Symbol description, React DevTools) |
+| `deps`              | `{ eventName: symbol }[]`    | Explicit dependencies (signal symbols)                           |
+| `data`              | `D`                          | Arbitrary payload attached to the signal                         |
+| `signal`            | `AbortSignal`                | Abort signal for lifecycle management                            |
+| `finaleValue`       | `Awaited<R>`                 | Value set when signal is destroyed                               |
+| `finaleSourceValue` | `S`                          | Source value set when signal is destroyed                        |
+| `componentType`     | `string \| symbol \| number` | React component type identifier                                  |
+| `reactFC`           | `ReactFC`                    | Direct React function component for rendering                    |
+| `trigger`           | `TriggerDescription`         | External trigger (clock, emitter, or eventSignal)                |
+| `throttle`          | `TriggerDescription`         | Throttle trigger for rate-limiting                               |
+| `onDestroy`         | `() => void`                 | Callback when signal is destroyed                                |
 
 ### NewOptionsWithSource (extends NewOptions)
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `sourceEmitter` | `EventEmitter \| EventTarget` | External event source |
-| `sourceEvent` | `EventName \| EventName[]` | Event name(s) to listen to |
-| `sourceMap` | `(eventName, ...args) => S` | Map event args to source value |
-| `sourceFilter` | `(eventName, ...args) => boolean` | Filter events |
-| `initialSourceValue` | `S` | Initial source value |
+| Option               | Type                              | Description                    |
+|----------------------|-----------------------------------|--------------------------------|
+| `sourceEmitter`      | `EventEmitter \| EventTarget`     | External event source          |
+| `sourceEvent`        | `EventName \| EventName[]`        | Event name(s) to listen to     |
+| `sourceMap`          | `(eventName, ...args) => S`       | Map event args to source value |
+| `sourceFilter`       | `(eventName, ...args) => boolean` | Filter events                  |
+| `initialSourceValue` | `S`                               | Initial source value           |
 
 ---
 
@@ -674,18 +674,18 @@ Remove all dependency subscriptions without destroying the signal.
 
 ## Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `id` | `number` | Auto-incrementing unique ID |
-| `key` | `string` | String key (base-36 of id), usable as React key |
-| `isEventSignal` | `true` | Type guard marker |
-| `data` | `D` | Arbitrary payload |
-| `status` | `string?` | Current status: `'default'`, `'pending'`, `'error'` |
-| `lastError` | `unknown?` | Last computation error |
-| `componentType` | `string?` | React component type identifier |
-| `version` | `number` | Increments on each value change |
-| `computationsCount` | `number` | Total computations count |
-| `eventName` | `symbol` | Internal signal symbol |
+| Property            | Type       | Description                                         |
+|---------------------|------------|-----------------------------------------------------|
+| `id`                | `number`   | Auto-incrementing unique ID                         |
+| `key`               | `string`   | String key (base-36 of id), usable as React key     |
+| `isEventSignal`     | `true`     | Type guard marker                                   |
+| `data`              | `D`        | Arbitrary payload                                   |
+| `status`            | `string?`  | Current status: `'default'`, `'pending'`, `'error'` |
+| `lastError`         | `unknown?` | Last computation error                              |
+| `componentType`     | `string?`  | React component type identifier                     |
+| `version`           | `number`   | Increments on each value change                     |
+| `computationsCount` | `number`   | Total computations count                            |
+| `eventName`         | `symbol`   | Internal signal symbol                              |
 
 ---
 
@@ -693,19 +693,19 @@ Remove all dependency subscriptions without destroying the signal.
 
 Access via `signal$.getStateFlags()`. Use with `EventSignal.StateFlags` enum:
 
-| Flag | Description |
-|------|-------------|
-| `wasDepsUpdate` | A dependency was updated |
-| `wasSourceSetting` | Source value was set (via `set()` or source emitter) |
-| `wasSourceSettingFromEvent` | Source value came from a source emitter event |
-| `wasThrottleTrigger` | Throttle trigger fired |
-| `wasForceUpdateTrigger` | Force update trigger fired |
-| `isNeedToCalculateNewValue` | Computation is pending |
-| `hasSourceEmitter` | Has a source emitter configured |
-| `hasComputation` | Has a computation function |
-| `hasDepsFromProps` | Has explicit deps from constructor |
-| `hasThrottle` | Has throttle configured |
-| `isDestroyed` | Signal is destroyed |
+| Flag                        | Description                                          |
+|-----------------------------|------------------------------------------------------|
+| `wasDepsUpdate`             | A dependency was updated                             |
+| `wasSourceSetting`          | Source value was set (via `set()` or source emitter) |
+| `wasSourceSettingFromEvent` | Source value came from a source emitter event        |
+| `wasThrottleTrigger`        | Throttle trigger fired                               |
+| `wasForceUpdateTrigger`     | Force update trigger fired                           |
+| `isNeedToCalculateNewValue` | Computation is pending                               |
+| `hasSourceEmitter`          | Has a source emitter configured                      |
+| `hasComputation`            | Has a computation function                           |
+| `hasDepsFromProps`          | Has explicit deps from constructor                   |
+| `hasThrottle`               | Has throttle configured                              |
+| `isDestroyed`               | Signal is destroyed                                  |
 
 ---
 

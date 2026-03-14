@@ -132,14 +132,14 @@ A full-stack application (frontend + backend) demonstrating real-time multiplaye
 
 > These are internal libraries, slated to become separate npm packages.
 
-| Package             | Purpose                                      |
-|---------------------|----------------------------------------------|
-| `abortable`         | AbortController/AbortSignal utilities         |
-| `polyfills`         | ES2024+ polyfills                             |
-| `ProgressControllerX` | Progress tracking controller                |
-| `runEnv`            | Runtime environment detection                 |
-| `ServerTiming`      | Server-Timing header utilities                |
-| `type_guards`       | TypeScript type guard functions               |
+| Package               | Purpose                               |
+|-----------------------|---------------------------------------|
+| `abortable`           | AbortController/AbortSignal utilities |
+| `polyfills`           | ES2024+ polyfills                     |
+| `ProgressControllerX` | Progress tracking controller          |
+| `runEnv`              | Runtime environment detection         |
+| `ServerTiming`        | Server-Timing header utilities        |
+| `type_guards`         | TypeScript type guard functions       |
 
 ---
 

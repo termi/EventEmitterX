@@ -24,15 +24,15 @@ new EventEmitterX(options?: ConstructorOptions)
 
 ### ConstructorOptions
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `maxListeners` | `number` | `Infinity` | Maximum number of listeners per event before a warning is emitted |
-| `listenerOncePerEventType` | `boolean` | `false` | If `true`, a listener can be registered at most once per event type (similar to `EventTarget` behavior) |
-| `captureRejections` | `boolean` | `false` | Enable automatic rejection capture for async listeners |
-| `emitCounter` | `Console \| ICounter` | — | Count emit calls. Pass `console` for console.count or a custom `ICounter` |
-| `listenerWithoutThis` | `boolean` | `false` | Call listener functions without binding `this` to the emitter |
-| `supportEventListenerObject` | `boolean` | `false` | Support DOM `{ handleEvent }` pattern |
-| `isDebugTraceListeners` | `boolean` | `false` | Attach call stack to listeners via `listener.__debugTrace` |
+| Option                       | Type                  | Default    | Description                                                                                             |
+|------------------------------|-----------------------|------------|---------------------------------------------------------------------------------------------------------|
+| `maxListeners`               | `number`              | `Infinity` | Maximum number of listeners per event before a warning is emitted                                       |
+| `listenerOncePerEventType`   | `boolean`             | `false`    | If `true`, a listener can be registered at most once per event type (similar to `EventTarget` behavior) |
+| `captureRejections`          | `boolean`             | `false`    | Enable automatic rejection capture for async listeners                                                  |
+| `emitCounter`                | `Console \| ICounter` | —          | Count emit calls. Pass `console` for console.count or a custom `ICounter`                               |
+| `listenerWithoutThis`        | `boolean`             | `false`    | Call listener functions without binding `this` to the emitter                                           |
+| `supportEventListenerObject` | `boolean`             | `false`    | Support DOM `{ handleEvent }` pattern                                                                   |
+| `isDebugTraceListeners`      | `boolean`             | `false`    | Attach call stack to listeners via `listener.__debugTrace`                                              |
 
 ### Example
 
@@ -52,23 +52,23 @@ const emitter = new EventEmitterX({
 
 These methods behave identically to Node.js `EventEmitter`:
 
-| Method | Signature |
-|--------|-----------|
-| `on(event, listener)` | Add a listener for `event`. Returns `this`. |
-| `addListener(event, listener)` | Alias for `on`. |
-| `once(event, listener)` | Add a one-time listener. Removed after first call. Returns `this`. |
-| `off(event, listener)` | Alias for `removeListener`. |
-| `removeListener(event, listener)` | Remove a specific listener. Returns `this`. |
-| `removeAllListeners(event?)` | Remove all listeners (optionally for a specific event). Returns `this`. |
-| `prependListener(event, listener)` | Add listener to the beginning of the list. Returns `this`. |
-| `prependOnceListener(event, listener)` | Add one-time listener to the beginning. Returns `this`. |
-| `emit(event, ...args)` | Emit an event. Returns `true` if listeners existed. |
-| `listeners(event)` | Returns a copy of the listener array (unwraps once-wrappers). |
-| `rawListeners(event)` | Returns a copy of the raw listener array (includes once-wrappers). |
-| `listenerCount(event)` | Returns the number of listeners for `event`. |
-| `eventNames()` | Returns an array of event names with registered listeners. |
-| `setMaxListeners(n)` | Set max listeners. Returns `this`. |
-| `getMaxListeners()` | Get current max listeners value. |
+| Method                                 | Signature                                                               |
+|----------------------------------------|-------------------------------------------------------------------------|
+| `on(event, listener)`                  | Add a listener for `event`. Returns `this`.                             |
+| `addListener(event, listener)`         | Alias for `on`.                                                         |
+| `once(event, listener)`                | Add a one-time listener. Removed after first call. Returns `this`.      |
+| `off(event, listener)`                 | Alias for `removeListener`.                                             |
+| `removeListener(event, listener)`      | Remove a specific listener. Returns `this`.                             |
+| `removeAllListeners(event?)`           | Remove all listeners (optionally for a specific event). Returns `this`. |
+| `prependListener(event, listener)`     | Add listener to the beginning of the list. Returns `this`.              |
+| `prependOnceListener(event, listener)` | Add one-time listener to the beginning. Returns `this`.                 |
+| `emit(event, ...args)`                 | Emit an event. Returns `true` if listeners existed.                     |
+| `listeners(event)`                     | Returns a copy of the listener array (unwraps once-wrappers).           |
+| `rawListeners(event)`                  | Returns a copy of the raw listener array (includes once-wrappers).      |
+| `listenerCount(event)`                 | Returns the number of listeners for `event`.                            |
+| `eventNames()`                         | Returns an array of event names with registered listeners.              |
+| `setMaxListeners(n)`                   | Set max listeners. Returns `this`.                                      |
+| `getMaxListeners()`                    | Get current max listeners value.                                        |
 
 ### Non-Standard Methods
 
@@ -146,18 +146,18 @@ static once(eventTarget: EventTarget, types: string | string[], options?: Static
 
 #### Options (StaticOnceOptions)
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `prepend` | `boolean` | Add listener at the beginning of the list |
-| `signal` | `AbortSignal` | Cancel the waiting with an abort signal |
-| `abortControllers` | `AbortController[]` | Group of abort controllers to listen to |
-| `timeout` | `number` | Timeout in ms before rejection with `TimeoutError` |
-| `errorEventName` | `EventName` | Custom error event name (default: `'error'`) |
-| `filter` | `(emitEventName, ...args) => boolean` | Filter function — only resolve when returns `true` |
-| `onDone` | `(emitEventName, ...args) => void` | Callback executed before resolve |
-| `timing` | `ServerTiming` | Server-Timing tracking |
-| `Promise` | `PromiseConstructor` | Custom Promise constructor |
-| `debugInfo` | `Object` | Debug info attached to timeout/abort errors |
+| Option             | Type                                  | Description                                        |
+|--------------------|---------------------------------------|----------------------------------------------------|
+| `prepend`          | `boolean`                             | Add listener at the beginning of the list          |
+| `signal`           | `AbortSignal`                         | Cancel the waiting with an abort signal            |
+| `abortControllers` | `AbortController[]`                   | Group of abort controllers to listen to            |
+| `timeout`          | `number`                              | Timeout in ms before rejection with `TimeoutError` |
+| `errorEventName`   | `EventName`                           | Custom error event name (default: `'error'`)       |
+| `filter`           | `(emitEventName, ...args) => boolean` | Filter function — only resolve when returns `true` |
+| `onDone`           | `(emitEventName, ...args) => void`    | Callback executed before resolve                   |
+| `timing`           | `ServerTiming`                        | Server-Timing tracking                             |
+| `Promise`          | `PromiseConstructor`                  | Custom Promise constructor                         |
+| `debugInfo`        | `Object`                              | Debug info attached to timeout/abort errors        |
 
 #### Examples
 
@@ -251,12 +251,12 @@ static on(emitter: EventEmitter | EventTarget, event: EventName, options?: Optio
 
 #### Options
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `signal` | `AbortSignal` | Abort the iterator |
-| `computeValue` | `(eventName, eventArgs, addCallback) => T` | Transform event args before yielding |
-| `stopEventName` | `EventName` | Event that stops the iterator |
-| `errorEventName` | `EventName` | Event that causes the iterator to throw (default: `'error'`) |
+| Option           | Type                                       | Description                                                  |
+|------------------|--------------------------------------------|--------------------------------------------------------------|
+| `signal`         | `AbortSignal`                              | Abort the iterator                                           |
+| `computeValue`   | `(eventName, eventArgs, addCallback) => T` | Transform event args before yielding                         |
+| `stopEventName`  | `EventName`                                | Event that stops the iterator                                |
+| `errorEventName` | `EventName`                                | Event that causes the iterator to throw (default: `'error'`) |
 
 #### Example
 
@@ -302,23 +302,23 @@ disposable[Symbol.dispose]();
 
 ## Static Properties
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `errorMonitor` | `symbol` | Symbol for monitoring error events without catching them |
-| `captureRejectionSymbol` | `symbol` | `Symbol.for('nodejs.rejection')` |
-| `usingDomains` | `false` | Domains are not supported |
+| Property                 | Type     | Description                                              |
+|--------------------------|----------|----------------------------------------------------------|
+| `errorMonitor`           | `symbol` | Symbol for monitoring error events without catching them |
+| `captureRejectionSymbol` | `symbol` | `Symbol.for('nodejs.rejection')`                         |
+| `usingDomains`           | `false`  | Domains are not supported                                |
 
 ---
 
 ## Special Events
 
-| Event | When emitted |
-|-------|-------------|
-| `'newListener'` | Before a new listener is added |
-| `'removeListener'` | After a listener is removed |
-| `'error'` | On error. If no listener — throws. |
+| Event                  | When emitted                                                                    |
+|------------------------|---------------------------------------------------------------------------------|
+| `'newListener'`        | Before a new listener is added                                                  |
+| `'removeListener'`     | After a listener is removed                                                     |
+| `'error'`              | On error. If no listener — throws.                                              |
 | `'duplicatedListener'` | When `listenerOncePerEventType` is enabled and a duplicate listener is detected |
-| `kDestroyingEvent` | During `destructor()` call, before all listeners are removed |
+| `kDestroyingEvent`     | During `destructor()` call, before all listeners are removed                    |
 
 ---
 
