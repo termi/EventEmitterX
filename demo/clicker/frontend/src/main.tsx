@@ -8,7 +8,7 @@ import { createRoot } from 'react-dom/client';
 import './config/globals';
 
 import mainProcessChangeDataCapture from "../../logic/mainProcessChangeDataCapture";
-import { applicationStats} from '../../develop/ApplicationStats';
+import { applicationStats } from '../../develop/ApplicationStats';
 
 import App from './App';
 

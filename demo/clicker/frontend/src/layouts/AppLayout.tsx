@@ -1,6 +1,6 @@
 'use strict';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet, Link } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
@@ -20,6 +20,7 @@ function _detectBrowserDarkMode() {
 const _localStorage_darkMode_key = 'darkMode_3865bf1381c7';
 
 export default function AppLayout() {
+    const rendersCounter = useRef(0);
     const { isAuthenticated, logout } = useAuth();
     const { 0: darkMode, 1: setDarkMode } = useState(() => {
         // Проверяем предпочтения пользователя или сохраненную тему
@@ -27,6 +28,8 @@ export default function AppLayout() {
 
         return savedMode && savedMode === 'true' ? true : _detectBrowserDarkMode();
     });
+
+    (globalThis as unknown as { __AppLayout__rendersCounter: number }).__AppLayout__rendersCounter = ++rendersCounter.current;
 
     useEffect(() => {
         if (darkMode) {

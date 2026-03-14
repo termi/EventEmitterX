@@ -16,7 +16,7 @@ export const handleNewRoundFormSubmit = Object.assign(function(event: React.Form
             event.currentTarget as HTMLFormElement
         )
     )
-        .catch(error => {
+        .catch((error) => {
             // todo: Выводить в панели нотификации
             mainProcessChangeDataCapture.emit('error', error, 'handleNewRoundFormSubmit:activeRoundsStore.createNewRound:');
         })
