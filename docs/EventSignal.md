@@ -1,5 +1,106 @@
 # EventSignal — API Reference
 
+> **EventSignal** is not just another reactive primitive. It's a full-featured, battle-tested signals system designed to bridge event-driven code and modern React UIs — with zero glue code and automatic dependency tracking.
+
+---
+
+## Why EventSignal?
+
+Most signal libraries are built in isolation — they operate within their own ecosystem and require adaptation to work with existing event-based infrastructure. EventSignal is different:
+
+- It natively integrates with **any `EventEmitter` or `EventTarget`** as a reactive data source
+- It renders **directly in JSX** without wrapper components or adapters
+- It tracks dependencies **automatically** — no manual subscriptions, no selector boilerplate
+- It handles both **sync and async** computations with built-in `pending` / `error` status
+- It ships with **React hooks** (`use()`, `useListener()`) and a full **component type system**
+- It manages its own **lifecycle** cleanly — destructors, `Symbol.dispose`, AbortSignal
+
+### Feature Overview
+
+| Feature | Description |
+|---------|-------------|
+| ⚡ **Auto-tracking** | Dependencies are tracked automatically on `.get()` calls inside a computation |
+| ⚛️ **React-native** | `use()` hook, direct JSX rendering, polymorphic component system — no adapters |
+| 🔀 **Async-ready** | First-class async computations with `status`, `lastError`, and deduplication |
+| 📡 **Event bridge** | Subscribe to any `EventEmitter` / `EventTarget` via `sourceEmitter` |
+| ⏰ **Triggers** | Clock, emitter, or signal-based recomputation with throttle support |
+| 🔗 **Derived signals** | `map()`, `createMethod()`, computed chains — compose complex state from simple pieces |
+| 🔮 **Promise & async** | `toPromise()`, `for await...of` async iteration support |
+| 🏷️ **TypeScript-native** | Full generics: `EventSignal<T, S, D, R>` — typed value, source, data, and return |
+| ♻️ **Safe lifecycle** | `destructor()`, `Symbol.dispose`, `finaleValue` — no memory leaks |
+
+### Quick Start
+
+```typescript
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
+
+// Simple writable store
+const count$ = new EventSignal(0);
+
+// Computed — automatically tracks count$, recomputes on change
+const doubled$ = new EventSignal(0, () => count$.get() * 2);
+
+count$.set(5);
+console.log(doubled$.get()); // 10
+
+// Async computed with built-in status tracking
+const user$ = new EventSignal(null, async (prev, userId) => {
+  const res = await fetch(`/api/users/${userId}`);
+  return res.json();
+});
+// user$.status === 'pending' while fetching, 'error' on failure
+
+// React integration
+EventSignal.initReact(React);
+
+function Counter() {
+  const n = count$.use();  // subscribes & triggers re-render on change
+  return <button onClick={() => count$.set(n + 1)}>{n}</button>;
+}
+
+// Render a signal directly in JSX — no component wrapper needed
+const label$ = new EventSignal('Hello', { componentType: 'my-label' });
+EventSignal.registerReactComponentForComponentType('my-label', MyLabelComponent);
+
+function App() {
+  return <div>{label$}</div>;  // renders as <MyLabelComponent current$={label$} />
+}
+```
+
+### Reactive Composition
+
+EventSignal excels at building complex state from simple pieces:
+
+```typescript
+const a$ = new EventSignal(2);
+const b$ = new EventSignal(3);
+
+// Computed chain — automatically stays in sync
+const sum$     = new EventSignal(0, () => a$.get() + b$.get());
+const product$ = new EventSignal(0, () => a$.get() * b$.get());
+const label$   = new EventSignal('', () => `${a$.get()} + ${b$.get()} = ${sum$.get()}`);
+
+a$.set(10);
+console.log(label$.get()); // "10 + 3 = 13"
+```
+
+### Bridging External Events
+
+Connect any `EventEmitter` or `EventTarget` to reactive state:
+
+```typescript
+const windowWidth$ = new EventSignal(window.innerWidth, (prev, event) => {
+  return (event?.target as Window)?.innerWidth ?? prev;
+}, {
+  sourceEmitter: window,
+  sourceEvent: 'resize',
+});
+
+// Now windowWidth$ stays in sync with window resize events automatically
+```
+
+---
+
 ## Overview
 
 `EventSignal` is a reactive signals system compatible with `EventEmitter`/`EventTarget` and deeply integrated with React. Signals hold reactive values that automatically track dependencies, support computed values (sync and async), and can be rendered directly in JSX.
@@ -635,4 +736,123 @@ if (isEventSignal(maybeSignal)) {
 5. **Destroyed signal reads** — `get()` returns the last value (or `finaleValue` if set). `set()` is a no-op.
 
 6. **React StrictMode** — Compatible. Double-invocations from StrictMode are handled correctly.
+
+---
+
+## 🗺️ Roadmap — Coming Soon
+
+EventSignal is actively developed. Here are the planned improvements and new features on the horizon.
+
+---
+
+### ⚛️ Enhanced React Support
+
+- **Visibility-aware rendering** — Signals will leverage `IntersectionObserver` to automatically skip re-rendering components that are currently off-screen. This dramatically reduces wasted renders in long lists, virtualized layouts, and off-viewport panels — with zero configuration required.
+
+- **HTML signal bindings** — First-class JSX wrappers for native HTML elements with automatic **two-way binding**: DOM events update the signal, signal changes update the DOM:
+
+  ```tsx
+  // Two-way binding out of the box
+  <EventSignal.$.input    value={text$}     />
+  <EventSignal.$.textarea value={bio$}      />
+  <EventSignal.$.select   value={country$}  />
+  <EventSignal.$.input    type="checkbox" checked={isDark$} />
+  ```
+
+  No `onChange` handlers, no `value={x}` + `onChange={() => setX(...)}` boilerplate.
+
+---
+
+### 🏭 Signal Factory Helpers
+
+Ergonomic factory functions as the primary API — replacing `new EventSignal(...)` with intent-revealing helpers:
+
+```typescript
+import { createSignal, createComputedSignal, createReadonlySignal,
+         createAsyncSignal, createSourceSignal } from '@termi/eventsignal';
+
+const count$    = createSignal(0);                              // writable store
+const doubled$  = createComputedSignal(() => count$.get() * 2);// auto-tracked computed
+const readonly$ = createReadonlySignal(count$);                 // read-only view
+const user$     = createAsyncSignal(async () =>                 // async computed
+  fetchUser(id$.get())
+);
+const resize$   = createSourceSignal(window, 'resize',          // EventTarget source
+  (e) => e.target.innerWidth
+);
+```
+
+---
+
+### 📦 Standalone `@termi/eventsignal` Package
+
+EventSignal will be extracted as a fully **independent npm package** — **zero dependency** on `EventEmitterX`. If you only need reactive signals and don't use the event system, you'll be able to install just:
+
+```bash
+npm install @termi/eventsignal
+```
+
+Same API, same TypeScript types, smaller bundle.
+
+---
+
+### ⏱️ Advanced Throttle & Debounce
+
+`ThrottleDescriptionDebounce` — full control over how and when subscriber notifications are fired:
+
+```typescript
+// Debounce mode: notify 300ms after the *last* update
+const search$ = new EventSignal('', async (prev, query) => fetchResults(query), {
+  throttle: {
+    type: 'debounce',
+    ms: 300,
+  },
+});
+
+// Throttle mode: notify no more often than every 200ms
+const scroll$ = new EventSignal(0, () => window.scrollY, {
+  throttle: {
+    type: 'throttle',
+    ms: 200,
+  },
+});
+```
+
+Two configurable modes:
+- **Throttle** — fire notifications no more often than every N ms ("leading edge")
+- **Debounce** — fire notification only after N ms of inactivity since the last update ("trailing edge")
+
+---
+
+### 💾 External Sync API
+
+New `sync` option for persisting signal values to external storage — signals that survive page reloads, share state across tabs, or sync with a server:
+
+```typescript
+// Persist to localStorage
+const theme$ = new EventSignal('light', {
+  sync: {
+    load: ()      => localStorage.getItem('theme') ?? 'light',
+    save: (value) => localStorage.setItem('theme', value),
+  },
+});
+
+// Async sync with custom API
+const settings$ = new EventSignal(defaultSettings, {
+  sync: {
+    load: ()      => api.getSettings(),
+    save: (value) => api.saveSettings(value),
+  },
+});
+```
+
+---
+
+### And much more…
+
+- `batch()` — group multiple signal updates into a single subscriber notification
+- `peek()` — read a signal's value inside a computation without registering a dependency
+- Improved React DevTools integration with signal names and dependency graphs
+- Performance improvements and bundle size reduction
+
 

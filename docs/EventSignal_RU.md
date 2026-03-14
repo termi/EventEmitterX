@@ -1,5 +1,106 @@
 # EventSignal — Справочник API
 
+> **EventSignal** — это не просто ещё одна реактивная примитива. Это полноценная, проверенная в бою система сигналов, созданная чтобы связать событийный код и современные React-интерфейсы — без лишнего кода и с автоматическим отслеживанием зависимостей.
+
+---
+
+## Почему EventSignal?
+
+Большинство библиотек сигналов создаются в изоляции — они работают в собственной экосистеме и требуют адаптации для работы с существующей событийной инфраструктурой. EventSignal устроен иначе:
+
+- Он нативно интегрируется с **любым `EventEmitter` или `EventTarget`** как реактивным источником данных
+- Он рендерится **напрямую в JSX** без компонентов-обёрток и адаптеров
+- Он отслеживает зависимости **автоматически** — никаких ручных подписок, никакого boilerplate с селекторами
+- Он обрабатывает как **синхронные, так и асинхронные** вычисления со встроенным статусом `pending` / `error`
+- Он поставляется с **React-хуками** (`use()`, `useListener()`) и полноценной **системой типов компонентов**
+- Он управляет собственным **жизненным циклом** — деструкторы, `Symbol.dispose`, AbortSignal
+
+### Обзор возможностей
+
+| Возможность | Описание |
+|-------------|----------|
+| ⚡ **Авто-отслеживание** | Зависимости отслеживаются автоматически при вызовах `.get()` внутри вычисления |
+| ⚛️ **React-native** | Хук `use()`, прямой рендеринг в JSX, полиморфная система компонентов — без адаптеров |
+| 🔀 **Async из коробки** | Асинхронные вычисления первого класса со статусом `status`, `lastError` и дедупликацией |
+| 📡 **Мост к событиям** | Подписка на любой `EventEmitter` / `EventTarget` через `sourceEmitter` |
+| ⏰ **Триггеры** | Перевычисление по таймеру, эмиттеру или другому сигналу с поддержкой throttle |
+| 🔗 **Производные сигналы** | `map()`, `createMethod()`, цепочки computed — составляйте сложное состояние из простых частей |
+| 🔮 **Promise и async** | `toPromise()`, асинхронная итерация `for await...of` |
+| 🏷️ **TypeScript-native** | Полные дженерики: `EventSignal<T, S, D, R>` — типизированы значение, источник, данные и возврат |
+| ♻️ **Безопасный жизненный цикл** | `destructor()`, `Symbol.dispose`, `finaleValue` — никаких утечек памяти |
+
+### Быстрый старт
+
+```typescript
+import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
+
+// Простое хранилище
+const count$ = new EventSignal(0);
+
+// Computed — автоматически отслеживает count$, перевычисляется при изменении
+const doubled$ = new EventSignal(0, () => count$.get() * 2);
+
+count$.set(5);
+console.log(doubled$.get()); // 10
+
+// Асинхронный computed со встроенным отслеживанием статуса
+const user$ = new EventSignal(null, async (prev, userId) => {
+  const res = await fetch(`/api/users/${userId}`);
+  return res.json();
+});
+// user$.status === 'pending' во время загрузки, 'error' при ошибке
+
+// Интеграция с React
+EventSignal.initReact(React);
+
+function Counter() {
+  const n = count$.use();  // подписывается и вызывает ре-рендер при изменении
+  return <button onClick={() => count$.set(n + 1)}>{n}</button>;
+}
+
+// Рендеринг сигнала напрямую в JSX — без компонента-обёртки
+const label$ = new EventSignal('Hello', { componentType: 'my-label' });
+EventSignal.registerReactComponentForComponentType('my-label', MyLabelComponent);
+
+function App() {
+  return <div>{label$}</div>;  // рендерится как <MyLabelComponent current$={label$} />
+}
+```
+
+### Реактивная композиция
+
+EventSignal отлично подходит для построения сложного состояния из простых частей:
+
+```typescript
+const a$ = new EventSignal(2);
+const b$ = new EventSignal(3);
+
+// Цепочка computed — автоматически остаётся синхронизированной
+const sum$     = new EventSignal(0, () => a$.get() + b$.get());
+const product$ = new EventSignal(0, () => a$.get() * b$.get());
+const label$   = new EventSignal('', () => `${a$.get()} + ${b$.get()} = ${sum$.get()}`);
+
+a$.set(10);
+console.log(label$.get()); // "10 + 3 = 13"
+```
+
+### Мост к внешним событиям
+
+Подключите любой `EventEmitter` или `EventTarget` к реактивному состоянию:
+
+```typescript
+const windowWidth$ = new EventSignal(window.innerWidth, (prev, event) => {
+  return (event?.target as Window)?.innerWidth ?? prev;
+}, {
+  sourceEmitter: window,
+  sourceEvent: 'resize',
+});
+
+// windowWidth$ теперь автоматически синхронизируется с событиями resize
+```
+
+---
+
 ## Обзор
 
 `EventSignal` — реактивная система сигналов, совместимая с `EventEmitter`/`EventTarget` и глубоко интегрированная с React. Сигналы хранят реактивные значения, автоматически отслеживают зависимости, поддерживают вычисляемые значения (синхронные и асинхронные) и могут рендериться напрямую в JSX.
@@ -635,4 +736,123 @@ if (isEventSignal(maybeSignal)) {
 5. **Чтение уничтоженного сигнала** — `get()` возвращает последнее значение (или `finaleValue` если установлено). `set()` — no-op.
 
 6. **React StrictMode** — Совместим. Двойные вызовы из StrictMode обрабатываются корректно.
+
+---
+
+## 🗺️ Дорожная карта — Скоро
+
+EventSignal активно развивается. Ниже перечислены запланированные улучшения и новые возможности.
+
+---
+
+### ⚛️ Расширенная поддержка React
+
+- **Рендеринг с учётом видимости** — Сигналы будут использовать `IntersectionObserver`, чтобы автоматически пропускать ре-рендер компонентов, находящихся за пределами области видимости. Это резко сокращает лишние перерисовки в длинных списках, виртуализированных макетах и скрытых панелях — без какой-либо настройки.
+
+- **Биндинг сигналов на HTML-теги** — Специальные JSX-обёртки для нативных HTML-элементов с автоматическим **двусторонним биндингом**: события DOM обновляют сигнал, изменения сигнала обновляют DOM:
+
+  ```tsx
+  // Двусторонний биндинг из коробки
+  <EventSignal.$.input    value={text$}     />
+  <EventSignal.$.textarea value={bio$}      />
+  <EventSignal.$.select   value={country$}  />
+  <EventSignal.$.input    type="checkbox" checked={isDark$} />
+  ```
+
+  Никаких обработчиков `onChange`, никакого boilerplate `value={x}` + `onChange={() => setX(...)}`.
+
+---
+
+### 🏭 Хелперы-фабрики сигналов
+
+Эргономичные фабричные функции как основной API — вместо `new EventSignal(...)`:
+
+```typescript
+import { createSignal, createComputedSignal, createReadonlySignal,
+         createAsyncSignal, createSourceSignal } from '@termi/eventsignal';
+
+const count$    = createSignal(0);                               // записываемое хранилище
+const doubled$  = createComputedSignal(() => count$.get() * 2); // авто-tracked computed
+const readonly$ = createReadonlySignal(count$);                  // представление только для чтения
+const user$     = createAsyncSignal(async () =>                  // асинхронный computed
+  fetchUser(id$.get())
+);
+const resize$   = createSourceSignal(window, 'resize',           // источник EventTarget
+  (e) => e.target.innerWidth
+);
+```
+
+---
+
+### 📦 Отдельный пакет `@termi/eventsignal`
+
+EventSignal будет выделен в полностью **независимый npm-пакет** — **без зависимости** от `EventEmitterX`. Если вам нужны только реактивные сигналы и не нужна система событий, вы сможете установить просто:
+
+```bash
+npm install @termi/eventsignal
+```
+
+Тот же API, те же TypeScript-типы, меньший размер бандла.
+
+---
+
+### ⏱️ Расширенный Throttle и Debounce
+
+`ThrottleDescriptionDebounce` — полный контроль над тем, как и когда уведомляются подписчики:
+
+```typescript
+// Режим debounce: уведомить через 300 мс после *последнего* обновления
+const search$ = new EventSignal('', async (prev, query) => fetchResults(query), {
+  throttle: {
+    type: 'debounce',
+    ms: 300,
+  },
+});
+
+// Режим throttle: уведомлять не чаще раза в 200 мс
+const scroll$ = new EventSignal(0, () => window.scrollY, {
+  throttle: {
+    type: 'throttle',
+    ms: 200,
+  },
+});
+```
+
+Два настраиваемых режима:
+- **Throttle** — уведомлять не чаще чем раз в N мс («leading edge»)
+- **Debounce** — уведомить только спустя N мс бездействия после последнего обновления («trailing edge»)
+
+---
+
+### 💾 Внешнее API синхронизации
+
+Новая опция `sync` для сохранения значений сигнала во внешнем хранилище — сигналы, пережившие перезагрузку страницы, разделяющие состояние между вкладками или синхронизированные с сервером:
+
+```typescript
+// Сохранение в localStorage
+const theme$ = new EventSignal('light', {
+  sync: {
+    load: ()      => localStorage.getItem('theme') ?? 'light',
+    save: (value) => localStorage.setItem('theme', value),
+  },
+});
+
+// Асинхронная синхронизация через пользовательское API
+const settings$ = new EventSignal(defaultSettings, {
+  sync: {
+    load: ()      => api.getSettings(),
+    save: (value) => api.saveSettings(value),
+  },
+});
+```
+
+---
+
+### И многое другое…
+
+- `batch()` — объединить несколько обновлений сигналов в одно уведомление подписчикам
+- `peek()` — прочитать значение сигнала внутри вычисления без регистрации зависимости
+- Улучшенная интеграция с React DevTools: имена сигналов и граф зависимостей
+- Улучшения производительности и уменьшение размера бандла
+
 
