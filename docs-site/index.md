@@ -15,6 +15,7 @@ hero:
     - theme: alt
       text: Live Demo ↗
       link: /demo/
+      target: _blank
 
 features:
   - icon: ⚡
@@ -31,7 +32,8 @@ features:
     title: Live Demo
     details: Try EventSignal in an interactive demo application built with React 19 and Vite.
     link: /demo/
-    linkText: Open Demo
+    linkText: Open Demo ↗
+    target: _blank
 ---
 
 ## Core Modules
