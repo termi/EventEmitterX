@@ -51,5 +51,9 @@ __patches
 .idea_modules
 node_modules
 npm-debug.log
+.pnpm-debug.log
+dist/
+**/.vitepress/dist
+**/.vitepress/cache
 
 pnpm-lock.yaml

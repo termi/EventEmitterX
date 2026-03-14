@@ -22,6 +22,7 @@ import { createCSSHotReloadConfirmPlugin } from "./dev/vite/plugins/cssHotReload
  включен isolatedModules
 */
 export default defineConfig({
+    base: process.env.VITE_BASE_URL ?? '/',
     server: {
         fs: {
             allow: [

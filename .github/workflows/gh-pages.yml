@@ -1,0 +1,90 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── Build demo app (eventSignals-test-app) ───────────────────────────
+      - name: Setup pnpm (for demo app)
+        uses: pnpm/action-setup@v4
+        with:
+          version: 6
+
+      - name: Install root dependencies
+        run: pnpm install --no-frozen-lockfile
+        env:
+          # Skip interactive prompts from postinstall scripts
+          CI: true
+
+      - name: Install demo app dependencies
+        working-directory: demo/eventSignals-test-app
+        run: pnpm install --no-frozen-lockfile
+        env:
+          CI: true
+
+      - name: Build demo app
+        working-directory: demo/eventSignals-test-app
+        run: pnpm run build
+        env:
+          CI: true
+          VITE_BASE_URL: /EventEmitterX/demo/
+
+      # ── Build VitePress documentation site ──────────────────────────────
+      - name: Install docs-site dependencies
+        working-directory: docs-site
+        run: npm install
+
+      - name: Build VitePress docs
+        working-directory: docs-site
+        run: npm run build
+
+      # ── Combine outputs ──────────────────────────────────────────────────
+      - name: Copy demo app build into docs dist
+        run: |
+          mkdir -p docs-site/.vitepress/dist/demo
+          cp -r demo/eventSignals-test-app/dist/. docs-site/.vitepress/dist/demo/
+
+      # ── Deploy to GitHub Pages ───────────────────────────────────────────
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-site/.vitepress/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+
