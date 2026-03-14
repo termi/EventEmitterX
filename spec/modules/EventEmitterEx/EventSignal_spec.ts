@@ -1105,7 +1105,7 @@ describe('EventSignal', () => {
 
             const promise = async$.get();
 
-            expect((promise as unknown) instanceof Promise<string>).toBeTruthy();
+            expect((promise as unknown) instanceof Promise).toBeTruthy();
 
             const pendingValue = async$.getSync();
 
@@ -1187,6 +1187,83 @@ describe('EventSignal', () => {
             expect(await promise2).toBe(currentUser3);
             expect(await promise3_1).toBe(currentUser3);
             expect(await promise3_2).toBe(currentUser3);
+
+            clock.restore();
+        });
+
+        it('handle data racing in hybrid sync/async mode', async function() {
+            const clock = useFakeTimers();
+
+            const SYNC_TIME = 0;
+            const timers = [ 1000, 500, SYNC_TIME ];
+            const values = [ 1, 2, 3 ];
+            const lastValue = values.at(-1);
+
+            assertIsNumber(lastValue);
+            assertIsNumber(timers[2]);
+            assertIsNumber(timers[1]);
+            assertIsNumber(timers[0]);
+
+            const async$ = new EventSignal(0 as unknown as Promise<number>, (prevValue, index) => {
+                const timer = timers[index];
+                const value = values[index];
+
+                if (timer == null || value == null) {
+                    throw new Error('No data available');
+                }
+
+                if (timer === SYNC_TIME) {
+                    return value as unknown as Promise<number>;
+                }
+
+                const promise = new Promise<typeof prevValue>(resolve => {
+                    setTimeout(() => {
+                        resolve(value);
+                    }, timer);
+                }) as Promise<typeof prevValue> & { pendingValue: typeof prevValue };
+
+                // todo: ЭТО ДРАФТ, он может быть ПЕРЕДЕЛАН.
+                //  Может быть заменить на eventSignal.setPendingValue (и eventSignal.getPendingValue)?
+                //  Или просто в редактируемое свойство eventSignal.pendingValue?
+                //  И добавить eventSignal.pendingHint (string)?
+                promise["pendingValue"] = value;
+
+                return promise;
+            }, {
+                initialSourceValue: 0,
+            });
+
+            const promise1 = async$.get();
+
+            async$.set((_, index) => ++index);
+
+            const promise2 = async$.get();
+
+            async$.set((_, index) => ++index);
+
+            // Тут происходит установка синхронного значение и синхронный резолв всех pending промисов.
+            // Все промисы резолвятся со значением lastValue == 3.
+            const promise3 = async$.get();
+
+            expect((promise1 as unknown) instanceof Promise).toBeTruthy();
+            expect((promise2 as unknown) instanceof Promise).toBeTruthy();
+            expect((promise3 as unknown) instanceof Promise).toBeTruthy();
+
+            await advanceTimersByTimeAsync(timers[2]);
+
+            expect(await promise3).toBe(lastValue);
+
+            await advanceTimersByTimeAsync(timers[1]);
+
+            expect(await promise2).toBe(lastValue);
+
+            await advanceTimersByTimeAsync(timers[0]);
+
+            expect(await promise1).toBe(lastValue);
+
+            // Should still be correct value.
+            // No unresolved promises: `lastValue == 3` value should be left.
+            expect(await async$.get()).toBe(lastValue);
 
             clock.restore();
         });

@@ -17,7 +17,7 @@ type Validator<T> = _EventSignal_ReactPropTypes.Validator<T>;
 export namespace EventSignal_ReactCopy {
     type JSXElementConstructor<P> =
         | ((props: P) => ReactElement<any, any> | null);
-    type Key = number | string;
+    type Key = string;
 
     interface ReactElement<P = any, T extends JSXElementConstructor<any> | string = JSXElementConstructor<any> | string> {
         type: T;
@@ -42,7 +42,7 @@ export namespace EventSignal_ReactCopy {
     //
     // We don't just use ComponentType or FunctionComponent types because you are not supposed to attach statics to this
     // object, but rather to the original function.
-    interface ExoticComponent<P = {}> {
+    interface ExoticComponent<P = {}> {// eslint-disable-line @typescript-eslint/ban-types
         /**
          * **NOTE**: Exotic components are not callable.
          */
@@ -50,6 +50,7 @@ export namespace EventSignal_ReactCopy {
         readonly $$typeof: symbol;
     }
 
+    // eslint-disable-next-line @typescript-eslint/ban-types
     interface NamedExoticComponent<P = {}> extends ExoticComponent<P> {
         displayName?: string | undefined;
     }

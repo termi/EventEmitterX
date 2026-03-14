@@ -223,6 +223,7 @@ function _renderOwner(owner: _FakeReactOwner | null, result: unknown[] = []) {
         _unmountOwnerChildren(owner);
         owner.children.length = 0;
         owner.renders++;
+        owner.currentIndex = 0;
 
         currentOwner = owner;
 
