@@ -25,13 +25,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       # ── Build demo app (eventSignals-test-app) ───────────────────────────
       - name: Setup pnpm (for demo app)
         uses: pnpm/action-setup@v4
         with:
-          version: 6
+          version: latest
 
       - name: Install root dependencies
         run: pnpm install --no-frozen-lockfile
@@ -67,7 +67,6 @@ jobs:
           mkdir -p docs-site/.vitepress/dist/demo
           cp -r demo/eventSignals-test-app/dist/. docs-site/.vitepress/dist/demo/
 
-      # ── Deploy to GitHub Pages ───────────────────────────────────────────
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "preinstall": "npx only-allow pnpm",
     "dev": "bash/run_dev_backend_frontend.sh",
     "test": "bash/run_all_tests.sh",
     "postinstall": "bash/postinstall/pnpm_install_inner_deps.sh"
@@ -21,7 +22,6 @@
   },
   "homepage": "https://github.com/termi/tech-task-for-interview#readme",
   "description": "",
-  "packageManager": "pnpm@6.32.1+",
   "dependencies": {
     "@prisma/client": "link:./backend/node_modules/@prisma/client"
   },
