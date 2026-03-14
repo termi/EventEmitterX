@@ -84,7 +84,13 @@ Quality: needs-review
 Area: <comma-separated list of affected areas, e.g.: frontend, tests, auth, backend>
 ```
 
-**Affected Area keywords:** `frontend`, `backend`, `tests`, `auth`, `api`, `logic`, `db`, `ci`, `deps`, `types`, `scripts`, `docs`, `config`
+If a commit contains **only** AI-agent rules/instructions changes (for example in `.github/`, `.cursor/`, `.continue/`, or similar AI-tooling config directories), set:
+
+```
+Area: config/ai
+```
+
+**Affected Area keywords:** `frontend`, `backend`, `tests`, `auth`, `api`, `logic`, `db`, `ci`, `deps`, `types`, `scripts`, `docs`, `config`, `config/ai`
 
 ---
 
@@ -236,4 +242,17 @@ Every changelog file follows this structure:
 > For strategies 2 and 3 — analyze the staged/changed files to generate the changelog content.
 
 **Datetime format:** `YYYYMMDD_hhmmss` (e.g. `20260314_153045`)
+
+---
+---
+
+# Agent Skills — Project Knowledge
+
+> Detailed project architecture, conventions, and patterns are split into separate skill files per module.
+> The AI agent **must** consult these files when working with the corresponding module.
+
+| Skill File                                                   | Covers                                                                                                                                                                                           |
+|--------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| [`.github/skills-EventEmitterX.md`](skills-EventEmitterX.md) | Project overview, repository structure, code conventions, performance patterns, import aliases, EventEmitterX architecture, testing conventions, documentation references, common pitfalls       |
+| [`.github/skills-EventSignal.md`](skills-EventSignal.md)     | EventSignal architecture, internal event buses, signal lifecycle, dependency tracking, React integration (hooks, JSX rendering, component type system), EventSignal-specific naming and pitfalls |
 
