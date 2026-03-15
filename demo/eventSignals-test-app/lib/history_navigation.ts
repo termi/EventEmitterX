@@ -1,5 +1,6 @@
 'use strict';
 
+import type { JSX } from "react";
 import type { createRoot } from 'react-dom/client';
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -9,6 +10,20 @@ type Root = ReturnType<typeof createRoot>;
 
 let isInited = false;
 const defaultUnicodeIcon = 'Ⓢ';
+
+export const applicationRoot = (function(applicationLoadingInitialPathname) {
+    let result = applicationLoadingInitialPathname;
+
+    if (result === '/') {
+        result = '';
+    }
+
+    if (result && !result.endsWith('/')) {
+        result = result.split('/').slice(0, -1).join('/') + '/';
+    }
+
+    return result;
+})(globalThis.location?.pathname || '');
 
 export function initNavigation({
     navigationSignal$,
@@ -41,8 +56,6 @@ export function initNavigation({
         pageTitle: '404',
         importPath: '',
         srcPath: '',
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error `TS2322: Type (() => Element) | (() => string) is not assignable to type FC<{}>`
         Component: page404 ?? (() => '404'),
     } satisfies NavigationRouter) as NavigationRouter;
 

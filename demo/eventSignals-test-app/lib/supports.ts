@@ -1,5 +1,7 @@
 'use strict';
 
+import { checkSafariBrowser } from "./utils";
+
 let _hasStyledSelectSupport: boolean | undefined;
 
 /**
@@ -32,5 +34,8 @@ export function hasCustomizableSelectSupport() {
         && document.createElement('selectedcontent')?.constructor?.name === 'HTMLSelectedContentElement'
         && typeof CSS !== 'undefined'
         && CSS.supports('appearance: base-select')
+        // note: Need to check for Safari, because it can be a bug with select elements and custom select support detection can give a false positive result in it.
+        // todo: Write better detect for Safari. See also [WebKit Bugzilla / Enhanced <select>](https://bugs.webkit.org/show_bug.cgi?id=286642)
+        && !checkSafariBrowser()
     );
 }

@@ -6,6 +6,7 @@ import * as React from 'react';
 
 import type { NavigationRouter } from "../state/routing";
 import { currentNavigatorPage$ } from "../state/routing";
+// import { applicationRoot } from "../lib/history_navigation";
 
 import css from './NavBar.module.css';
 
@@ -68,6 +69,14 @@ function MenuItem({ className, linkClassName, router, currentPageRouter }: {
             />;
         })}
     </div> : null;
+    /* todo: use `absolutePath` instead of `routerPath` in `<a href={routerPath}`, because in some cases `routerPath`
+        can be relative and it can cause incorrect navigation. For example, if `applicationRoot` is `/app/` and `routerPath` is `page1`, then the link will navigate to `/page1` instead of `/app/page1`.
+        The `absolutePath` will be `/app/page1` in this case, which is correct.
+    const absolutePath = /\w{1,5}:/.test(routerPath) || routerPath.startsWith('/')
+        ? routerPath
+        : applicationRoot + routerPath
+    ;
+    */
 
     return <li
         key={routerPath}

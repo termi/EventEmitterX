@@ -46,9 +46,11 @@ export function LocaleSelectorModern({ current$, current$Value, accessKey }: {
 }
 
 declare global {
-    namespace JSX {
-        interface IntrinsicElements {
-            selectedcontent: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+    namespace React {
+        namespace JSX {
+            interface IntrinsicElements {
+                selectedcontent: React.DetailedHTMLProps<React.HTMLAttributes<HTMLDivElement>, HTMLDivElement>;
+            }
         }
     }
 }

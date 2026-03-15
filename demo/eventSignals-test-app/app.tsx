@@ -15,7 +15,7 @@ import 'termi@polyfills';
 import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSignal';
 
 import './lib/polyfills/emojis';
-import { initNavigation } from "./lib/history_navigation";
+import { applicationRoot, initNavigation } from "./lib/history_navigation";
 import { randomColor } from "./lib/utils";
 import { mainState } from "./state/AppStates";
 import { pipPopupWindow$ } from "./state/pipWindowState";
@@ -137,6 +137,10 @@ pipPopupContainer.render(<pipPopupWindow$.component sFC={function({ current$Valu
 
     return createPortal(<Component {...componentProps} />, window.document.body);
 }} />);
+
+if (applicationRoot) {
+    document.head.insertAdjacentHTML('beforeend', `<base href="${applicationRoot}">`);
+}
 
 initNavigation({
     navigationSignal$: currentNavigatorPage$,

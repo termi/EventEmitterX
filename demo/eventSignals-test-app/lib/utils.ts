@@ -7,3 +7,12 @@ export function randomNumber(from = 0, to = 2_147_483_647) {
 }
 
 export const randomColor = () => `#${Math.floor(Math.random() * 16_777_215).toString(16)}`;
+
+export function checkSafariBrowser() {
+    const ua = navigator.userAgent.toLowerCase();
+    const vendor = navigator.vendor;
+
+    return /^((?!chrome|android).)*safari/i.test(ua)
+        && vendor === 'Apple Computer, Inc.'
+    ;
+}

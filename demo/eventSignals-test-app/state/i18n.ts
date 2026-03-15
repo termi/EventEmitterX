@@ -22,10 +22,37 @@ const defaultLocale = getDefaultLocale();
 const systemLocale = getSystemLocale();
 const currentLocale = getCurrentLocale();
 
+const defaultAllowedLocalesList = [
+    'ru',
+    'en',
+    'de',
+    'fr',
+    'es',
+    'zh-CN',
+    'bo-CN',
+    'zh-Hant-TW',
+    'ja',
+    'ar',
+    'pt',
+    'it',
+    'he',
+    'uk',
+    'ko-KP',
+].map(nonNormalizeLocale => normalizeLocale(nonNormalizeLocale));
+const customLocalesList: string[] = [];
+
 export const currentLocale$ = new EventSignal(currentLocale, (prevValue, newLocale, currentLocale$) => {
     newLocale = normalizeLocale(newLocale ?? prevValue);
 
     currentLocale$.data.localInfo = getLocaleInfo(newLocale);
+
+    if (!defaultAllowedLocalesList.includes(newLocale) && !customLocalesList.includes(newLocale)) {
+        customLocalesList.push(newLocale);
+    }
+
+    if (customLocalesList.length > 0) {
+        currentLocale$.data.allowedLocales = _getAllowedLocalesList(customLocalesList);
+    }
 
     localStorage.setItem('i18n.preferredLocale', newLocale);
     setCurrentLocale(newLocale);
@@ -530,24 +557,13 @@ function _getOrLoadI18NTranslate(prevValue: string, sourceValue: string, eventSi
     return translation ?? (prevValue || textForTranslation);
 }
 
-function _getAllowedLocalesList() {
-    return [
-        'ru',
-        'en',
-        'de',
-        'fr',
-        'es',
-        'zh-CN',
-        'bo-CN',
-        'zh-Hant-TW',
-        'ja',
-        'ar',
-        'pt',
-        'it',
-        'he',
-        'uk',
-        'ko-KP',
-    ].map(locale => getLocaleInfo(normalizeLocale(locale)));
+function _getAllowedLocalesList(customLocalesList?: string[]) {
+    return (Array.isArray(customLocalesList) && customLocalesList.length > 0 ? [
+        ...defaultAllowedLocalesList,
+        ...customLocalesList.map(nonNormalizedLocale => normalizeLocale(nonNormalizedLocale)),
+    ] : defaultAllowedLocalesList)
+        .map(locale => getLocaleInfo(locale))
+    ;
 }
 
 function _fillDefaultTranslation() {

@@ -400,7 +400,7 @@ function GlobalTimesCity({
         <img ref={$pipIconRef} className={css.pipIcon}
             data-id={id} data-click-mode=""
             onClick={_setPopup}
-            src="/pip.svg" alt="pip" height="24px"
+            src="pip.svg" alt="pip" height="24px"
         />
     </div>);
 }
