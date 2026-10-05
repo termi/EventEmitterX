@@ -48,6 +48,7 @@
 *.pl text
 *.rb text
 *.py text
+*.go text
 *.scm text
 *.sql text
 .htaccess text

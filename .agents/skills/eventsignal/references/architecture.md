@@ -1,3 +1,11 @@
+---
+iso date: "2026-10-05T21:33:25.756Z"
+timestamp: 1791236005756
+ai_model: "GPT6"
+git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
+area: "config/ai"
+---
+
 # Agent Skills — EventSignal
 
 > EventSignal module architecture and React integration knowledge for AI agents.
@@ -6,7 +14,7 @@
 
 ## EventSignal Overview
 
-**EventSignal** (`modules/EventEmitterEx/EventSignal.ts`, ~3850 lines) is a reactive signals system with deep React integration. It is part of the `@termi/eventemitterx` package.
+**EventSignal** (`modules/EventEmitterEx/EventSignal.ts`) is a reactive signals system with deep React integration. It is part of the `@termi/eventemitterx` package.
 
 - Reactive computed values with automatic dependency tracking
 - Supports sync and async computations
@@ -54,7 +62,7 @@ new EventSignal(initialValue, computation?, options?)
 
 - `currentSignal` module-level variable tracks which signal is currently computing
 - When `signal$.get()` is called inside another signal's computation, `_subscribeTo()` is called
-- Dependencies stored in `_subscriptionsToDeps: Set<symbol>` keyed by signal's `_signalSymbol`
+- Dependencies stored in `_subscriptionsToDeps` (symbols identify signal dependencies) keyed by signal's `_signalSymbol`
 
 ### Key Internals
 
@@ -138,6 +146,8 @@ import { fakeReact, FakeMiniHTMLElement } from '../../../spec_utils/simple-react
 ## Naming Conventions (EventSignal-specific)
 
 - **EventSignal instances:** Dollar suffix — `counter$`, `computed1$`, `userFullName$`
+- **Signal-returning functions:** `$$` suffix means the function must return an `EventSignal` instance, not a primitive value
+- **Signal variables:** Use `$` suffix for variables that store signals (for example: `weather$`, `cityTime$`)
 - **Component types:** String constants — `'--counter--'`, `'--UserCard--'`
 - **Internal flags:** `EventSignal.StateFlags` enum with bitfield values
 - **Subscription flags in `_addListener`:** Inline bit positions — `1 << 1` (once), `1 << 2` (prepend), `1 << 3` (makeItEasyAndFast)
@@ -150,6 +160,5 @@ import { fakeReact, FakeMiniHTMLElement } from '../../../spec_utils/simple-react
 2. **Shallow equality for objects** — EventSignal uses `_shallowEqualObjects` by default. Use `markNextValueAsForced()` to bypass.
 3. **Async dependency tracking is limited** — Signals accessed after an `await` inside computation may not be tracked. Only synchronous `.get()` calls register dependencies.
 4. **`set()` inside computation** — Use `_innerGet()` instead of `get()` to avoid cross-signal subscription side-effects when calling `.set()` from within another signal's listener/computation.
-5. **Event name parameter is ignored** — `on('change', cb)`, `on('data', cb)` etc. — the event name is purely decorative. Only `''`, `'change'`, `'changed'`, `'data'`, `'error'` are accepted; others throw `TypeError`.
+5. **Event name parameter is ignored** — `on('change', cb)`, `on('data', cb)` etc. — the event name is purely decorative. Only `''`, `'change'`, `'changed'`, `'data'`, `'error'` are accepted; other names are rejected; verify the current error class.
 6. **`removeAllListeners()` is not implemented** — Throws `Error('Not implemented')`. Use `destructor()` instead.
-

@@ -1,3 +1,11 @@
+---
+iso date: "2026-10-05T21:33:25.756Z"
+timestamp: 1791236005756
+ai_model: "GPT6"
+git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
+area: "config/ai"
+---
+
 # Agent Skills — EventEmitterX
 
 > Project-level knowledge and EventEmitterX module architecture for AI agents.
@@ -8,8 +16,8 @@
 
 **EventEmitterX** (`@termi/eventemitterx`) is a TypeScript library containing two major modules:
 
-1. **EventEmitterX** (`modules/events.ts`, ~3800 lines) — A cross-platform `EventEmitter` implementation for Node.js and browsers.
-2. **EventSignal** (`modules/EventEmitterEx/EventSignal.ts`, ~3850 lines) — A reactive signals system with deep React integration.
+1. **EventEmitterX** (`modules/events.ts`) — A cross-platform `EventEmitter` implementation for Node.js and browsers.
+2. **EventSignal** (`modules/EventEmitterEx/EventSignal.ts`) — A reactive signals system with deep React integration.
 
 Supporting modules:
 - `modules/EventEmitterEx/eventsAsyncIterator.ts` — Async iterator for events (`EventEmitterX.on()`)
@@ -51,7 +59,7 @@ changelogs/                 ← Changelog files
 
 ### TypeScript
 
-- **Strict mode** is always on: `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess`, etc.
+- **Library compiler configuration requests strict checks** (test tooling may relax them): `noImplicitAny`, `strictNullChecks`, `noUncheckedIndexedAccess`, etc.
 - **Target:** ES2020 (output), using latest ESNext features in source
 - **Module system:** CommonJS (main), with ESM build option
 - Files start with `'use strict';`
@@ -75,7 +83,7 @@ The codebase uses specific low-level patterns for performance. **Do not "moderni
 1. **Bitfield flags** — State managed via `|=`, `&=`, `& mask` operations on integer fields (`_f`, `_stateFlags`)
 2. **Specialized emit paths** — Switch on `arguments.length` (1–4 args) to avoid `arguments` object and `.apply()`
 3. **`Object.create(null)`** — Used for hash maps without prototype chain
-4. **`Object.setPrototypeOf(prototype, null)`** — Both `EventEmitterX` and `EventSignal` extend `null`
+4. **`Object.setPrototypeOf(prototype, null)`** — Prototype-chain optimization is used; inspect the current implementation before changing it
 5. **`/*@__NOINLINE__*/`** — Explicit noinline hints for JIT optimization
 6. **Manual array cloning** — `_arrayClone1`, `_arrayClone2`, `_arrayClone3` instead of spread/slice for hot paths
 
@@ -97,7 +105,7 @@ termi@ServerTiming     → packages/ServerTiming
 termi@ProgressControllerX → packages/ProgressControllerX
 ```
 
-When writing imports, use these aliases: `import { ... } from 'termi@abortable';`
+For current checkout development, use the established aliases until the dependency migration is implemented: `import { ... } from 'termi@abortable';`
 
 ---
 
@@ -170,4 +178,3 @@ import { EventEmitterX, once, on } from '../../modules/events';
 4. **Comments in Russian** — Many inline comments and TODOs in the codebase are in Russian. This is normal and expected. Do **not** translate them.
 5. **`termi@*` imports** — These are local pnpm links, not npm packages. Do not try to `npm install` them.
 6. **`EventEmitterEx` is deprecated** — Always use `EventEmitterX` in new code.
-
