@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:59:11.977Z"
-timestamp: 1791237551977
+iso date: "2026-10-06T18:30:42.023Z"
+timestamp: 1791311442023
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -32,6 +32,14 @@ Probe из этой директории:
 node --expose-gc lifecycle-probe.cjs 'D:\work\Projects\EventEmitterX'
 ```
 
-Наблюдения: `100 derived → 100 listeners`; `explicit destructor → 0 listeners`;
+Наблюдения до исправления: `100 derived → 100 listeners`; `explicit destructor → 0 listeners`;
 `drop external child references + 5 event loop/GC cycles → 100 listeners, last child alive`. Проба показывает известный
 retaining path, не является стабильным универсальным GC unit test.
+
+## Проверка исправления lifecycle — 2026-10-06
+
+Проба теперь изолирует создание от приостановленного async frame. Запуск `pnpm test:signals:gc`: девять сценариев
+собирают по восемь забытых сигналов и удаляют записи подписок; контроль с живым владельцем продолжает получать
+обновления. Тот же тест падает на исходной реализации.
+`node --expose-gc _dev/check_signal_lifecycle.cjs --without-weakref` проверяет только явную очистку. Гарантии и
+оставшаяся работа описаны в [этапе 02](../02_LIFECYCLE_RU.md).

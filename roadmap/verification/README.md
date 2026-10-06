@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:59:11.977Z"
-timestamp: 1791237551977
+iso date: "2026-10-06T18:30:42.023Z"
+timestamp: 1791311442023
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -33,6 +33,14 @@ Probe from this directory:
 node --expose-gc lifecycle-probe.cjs 'D:\work\Projects\EventEmitterX'
 ```
 
-Observations: 100 derived → 100 listeners; explicit destructor → 0 listeners; dropped external child references + 5
+Pre-fix observations: 100 derived → 100 listeners; explicit destructor → 0 listeners; dropped external child
+references + 5
 event-loop/GC cycles → 100 listeners, last child alive. The probe demonstrates the known retaining path and is not a
 stable universal GC unit test.
+
+## Lifecycle Repair Verification — 2026-10-06
+
+The probe now isolates construction from its suspended async frame. Run `pnpm test:signals:gc`: nine scenarios collect
+eight forgotten signals each and remove registrations; a live-owner control still receives updates. The same test fails
+on the original implementation. `node --expose-gc _dev/check_signal_lifecycle.cjs --without-weakref` checks explicit
+cleanup only. See [stage 02](../02_LIFECYCLE.md) for guarantees and remaining work.

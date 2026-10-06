@@ -24,9 +24,7 @@ async function probe() {
   const parent = new EventSignal(1);
   let weak;
   for (let i = 0; i < 100; i++) {
-    const child = new EventSignal(0, () => parent.get() * 2);
-    child.get();
-    weak = new WeakRef(child);
+    weak = makeForgottenChild(parent);
   }
   for (let i = 0; i < 5; i++) {
     await new Promise(resolve => setImmediate(resolve));
@@ -34,5 +32,11 @@ async function probe() {
   }
   console.log(JSON.stringify({ stage: 'external child references dropped', listeners: emitter.listenerCount(parent.eventName), lastChildAlive: !!weak.deref() }));
   parent.destructor();
+}
+// Isolate construction from the suspended async frame to avoid accidental local retention.
+function makeForgottenChild(parent$) {
+  const child$ = new EventSignal(0, () => parent$.get() * 2);
+  child$.get();
+  return new WeakRef(child$);
 }
 probe().catch(error => { console.error(error); process.exitCode = 1; });

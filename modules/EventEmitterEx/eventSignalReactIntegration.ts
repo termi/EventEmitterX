@@ -11,6 +11,10 @@ const isReactDev = isRunningInWebDevMode();
 function _noop() {}
 
 export interface EventSignalReactBridge {
+    weakCallback<F extends (...args: any[]) => any>(signal$: EventSignal<any, any, any, any>, callback: F): F;
+    releaseWeakCallback(signal$: EventSignal<any, any, any, any>, callback: (...args: any[]) => any): void;
+    trackCleanup(signal$: EventSignal<any, any, any, any>, cleanup: () => void): void;
+    untrackCleanup(signal$: EventSignal<any, any, any, any>, cleanup: () => void): void;
     getDescription(signal$: EventSignal<any, any, any, any>): string | undefined;
     getStoredValue<T, S, D, R>(signal$: EventSignal<T, S, D, R>): T;
     getComponent<T, S, D, R>(signal$: EventSignal<T, S, D, R>): _ComponentDescription<T, S, D, R> | null;
@@ -721,33 +725,45 @@ export function createEventSignalReact(SignalClass: typeof EventSignal, bridge: 
         /*
         const reducer = subscribeOptions?.reducer;
         */
-        const _listenerWithAnimFrameDebounce = _awaitNextAnimationFrame.bind(null, func);
+        const weakFunc = bridge.weakCallback(signal$, func);
+        const frameCleanup = _unAwaitNextAnimationFrame.bind(null, weakFunc);
+
+        bridge.trackCleanup(signal$, frameCleanup);
+
+        const _listenerWithAnimFrameDebounce = _awaitNextAnimationFrame.bind(null, weakFunc);
         // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
         const unsubscribe = bridge.subscribe(signal$, _listenerWithAnimFrameDebounce);
         let _listenerComponentTypeUpdate: ((status?: string) => void) | undefined;
+        let componentCleanup: (() => void) | undefined;
 
         if (subscribeToComponentTypeUpdate) {
-            _listenerComponentTypeUpdate = (status?: string) => {
+            _listenerComponentTypeUpdate = bridge.weakCallback(signal$, (status?: string) => {
                 bridge.incrementComponentVersion(signal$);
 
                 if (status == null ? (signal$.status == null || signal$.status === 'default') : signal$.status === status) {
                     // Do not emit callback if instance in a status different from the one for which the change was received
                     _listenerWithAnimFrameDebounce();
                 }
-            };
+            });
 
             if (signal$.componentType) {
                 _componentsEmitter.on(signal$.componentType as string, _listenerComponentTypeUpdate);
+                componentCleanup = _componentsEmitter.removeListener.bind(_componentsEmitter, signal$.componentType as string, _listenerComponentTypeUpdate);
+                bridge.trackCleanup(signal$, componentCleanup);
             }
         }
 
         return () => {
-            if (_listenerComponentTypeUpdate && signal$.componentType) {
-                _componentsEmitter.removeListener(signal$.componentType as string, _listenerComponentTypeUpdate);
+            if (_listenerComponentTypeUpdate && componentCleanup) {
+                componentCleanup();
+                bridge.untrackCleanup(signal$, componentCleanup);
+                bridge.releaseWeakCallback(signal$, _listenerComponentTypeUpdate);
                 _listenerComponentTypeUpdate = void 0;
             }
 
-            _unAwaitNextAnimationFrame(func);
+            frameCleanup();
+            bridge.untrackCleanup(signal$, frameCleanup);
+            bridge.releaseWeakCallback(signal$, weakFunc);
             unsubscribe();
         };
     }

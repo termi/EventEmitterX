@@ -19,8 +19,11 @@ import type { _ComponentDescription, _PreDefinedProps } from "./eventSignalReact
 import { isTest, isIDEDebugger } from 'termi@runEnv';
 import { isUniqueSymbol } from 'termi@type_guards';
 import { EventEmitterX } from "../events";
+import { weakCallback, getWeakListener, SignalSubscriptionFlags } from "./weakSignalCallback";
+import type { OwnedWeakCallbacks, WeakListenerCallbacks, SignalListener } from "./weakSignalCallback";
 import { arrayContentStringify, stringifyWithCircularHandle, isRunningInWebDevMode } from "./utils";
 
+// Historical alternatives; weak callbacks now break the retaining path without changing channels.
 // todo:
 //  1. Использовать версию EventEmitterX с WeakMap в качестве _events, чтобы не "держать" сигналы от удаления GC.
 //     А точнее, чтобы подписки на _signalSymbol авто-удалялись при удалении из памяти EventSignal, для которого этот _signalSymbol создавался.
@@ -39,7 +42,7 @@ const subscribersEventsEmitter = new EventEmitterX({
 
 const isReactDev = isRunningInWebDevMode();
 const _is = Object.is;
-let eventSignalsFinalizationRegistry: FinalizationRegistry<symbol> | undefined;
+let eventSignalsFinalizationRegistry: FinalizationRegistry<{ symbol: symbol, cleanups: Set<() => void> }> | undefined;
 let idIncrement = 0;
 // note: can be implemented via stack
 let currentSignal: EventSignal<any, any, any> | null = null;
@@ -67,9 +70,15 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
      * * React keys don't need to be unique globally.
      */
     public readonly key: string;
+    private readonly _ownedCallbacks: OwnedWeakCallbacks = new Map();
+    private readonly _listenerCallbacks: WeakListenerCallbacks = new Map();
+    private readonly _resourceCleanups = new Set<() => void>();
+    private readonly _weakDepUpdated: typeof this._oneOfDepUpdated;
+    private _abortCleanup?: () => void;
     private _value: T;
     private readonly _finaleValue: T | undefined;
     private readonly _finaleSourceValue: S | undefined;
+    private readonly _dependencyCleanups = new Map<number | string | symbol, () => void>();
     private _subscriptionsToDeps: Set<number | string | symbol> | null = null;
     // // this symbol MUST using only for subscriptions
     // private readonly _signalSymbol: symbol;
@@ -129,7 +138,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
 
             if (isReactDev) {
                 // todo: На время, пока не удасться отловить и исправить 'too much recursion' ошибку
-                if (signalEventsEmitter.hasListener(this._signalSymbol, this._oneOfDepUpdated)) {
+                if (signalEventsEmitter.hasListener(this._signalSymbol, this._weakDepUpdated)) {
                     console.error('EventSignal: self listening');
 
                     // Такая ситуация точно воспроизводиться и нужно отловить почему она получается.
@@ -289,6 +298,12 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         const symbolDescription = this.id + (description ? `#${description}` : '');
 
         this._signalSymbol = Symbol(symbolDescription);
+        this._weakDepUpdated = this._ownWeakCallback(this._oneOfDepUpdated);
+        eventSignalsFinalizationRegistry?.register(
+            this,
+            { symbol: this._signalSymbol, cleanups: this._resourceCleanups },
+            this
+        );
         // this._uniqueSymbol = Symbol(symbolDescription);
         this._finaleValue = (options?.finaleValue) as unknown as (T | undefined);
         this._finaleSourceValue = options?.finaleSourceValue;
@@ -354,205 +369,227 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         initialValue = void 0 as Awaited<T>;
 
         if (options) {
-            const {
-                deps,
-                sourceEmitter,
-                sourceEvent,
-                sourceMap,
-                sourceFilter,
-                data,
-                signal: _abortSignal,
-                componentType,
-                reactFC,
-                trigger,
-                throttle,
-                onDestroy,
-            } = options as EventSignal.NewOptionsWithSource<T, S, D, R>;
+            try {
+                const {
+                    deps,
+                    sourceEmitter,
+                    sourceEvent,
+                    sourceMap,
+                    sourceFilter,
+                    data,
+                    signal: _abortSignal,
+                    componentType,
+                    reactFC,
+                    trigger,
+                    throttle,
+                    onDestroy,
+                } = options as EventSignal.NewOptionsWithSource<T, S, D, R>;
 
-            if (Array.isArray(deps) && deps.length > 0) {
-                const _subscriptionsToDeps = this._subscriptionsToDeps ??= new Set();
-
-                stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
-
-                for (const { eventName } of deps) {
-                    _subscriptionsToDeps.add(eventName);
-
-                    signalEventsEmitter.on(eventName, _oneOfDepUpdated);
+                if (onDestroy) {
+                    this._onDestroy = onDestroy;
                 }
-            }
 
-            if (data !== void 0) {
-                this.data = data;
-            }
+                if (Array.isArray(deps) && deps.length > 0) {
+                    const _subscriptionsToDeps = this._subscriptionsToDeps ??= new Set();
 
-            if (sourceEvent && sourceEmitter) {
-                this._sourceMapFn = sourceMap;
-                this._sourceFilterFn = sourceFilter;
+                    stateFlags |= EventSignal.StateFlags.hasDepsFromProps;
 
-                // this._hasSourceEmitter = true;
-                stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
+                    for (const { eventName } of deps) {
+                        _subscriptionsToDeps.add(eventName);
 
-                this._sourceCleanup = _eventTargetAddListeners(sourceEmitter, (...args: unknown[]) => {
-                    // eslint-disable-next-line prefer-spread
-                    if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])) {
-                        return;
+                        this._trackDependency(eventName);
                     }
+                }
 
-                    const { _sourceMapFn } = this;
-                    const _newSourceValue = _sourceMapFn
+                if (data !== void 0) {
+                    this.data = data;
+                }
+
+                if (sourceEvent && sourceEmitter) {
+                    this._sourceMapFn = sourceMap;
+                    this._sourceFilterFn = sourceFilter;
+
+                    // this._hasSourceEmitter = true;
+                    stateFlags |= EventSignal.StateFlags.hasSourceEmitter;
+
+                    this._sourceCleanup = _eventTargetAddListeners(sourceEmitter, this._ownWeakCallback((...args: unknown[]) => {
                         // eslint-disable-next-line prefer-spread
-                        ? _sourceMapFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])
-                        : args[1] as S
-                    ;
-                    // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
-                    const isForceRecomputeWithSameSourceValue = _newSourceValue === void 0;
+                        if (this._sourceFilterFn && !this._sourceFilterFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])) {
+                            return;
+                        }
 
-                    if (isForceRecomputeWithSameSourceValue && _sourceMapFn) {
-                        // _sourceMapFn ничего не вернула - ничего делать не нужно
-                        return;
-                    }
+                        const { _sourceMapFn } = this;
+                        const _newSourceValue = _sourceMapFn
+                            // eslint-disable-next-line prefer-spread
+                            ? _sourceMapFn.apply(null, args as [ event: number | string | symbol, ...args: unknown[] ])
+                            : args[1] as S
+                        ;
+                        // Если в событии не было агрументов (массив args состоит только из названия событий), то форсируем установку sourceValue.
+                        const isForceRecomputeWithSameSourceValue = _newSourceValue === void 0;
 
-                    this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
-                    this._stateFlags &= ~EventSignal.StateFlags.wasDepsUpdate;
+                        if (isForceRecomputeWithSameSourceValue && _sourceMapFn) {
+                            // _sourceMapFn ничего не вернула - ничего делать не нужно
+                            return;
+                        }
 
-                    const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
+                        this._stateFlags |= EventSignal.StateFlags.wasSourceSettingFromEvent;
+                        this._stateFlags &= ~EventSignal.StateFlags.wasDepsUpdate;
 
-                    const isNeedToUpdate = this._setSourceValue(
-                        newSourceValue,
-                        // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
-                        false,
-                        newSourceValue === void 0,
-                    );
+                        const newSourceValue = isForceRecomputeWithSameSourceValue ? this._sourceValue : _newSourceValue;
 
-                    if (!isNeedToUpdate) {
-                        //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
-                        // this._updateReason = 'sourceEmitter';
-                        this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
-                    }
-                }, {
-                    eventName: sourceEvent,
-                    addEventNameToListener: true,
-                    __proto__: null,
-                });
-            }
+                        const isNeedToUpdate = this._setSourceValue(
+                            newSourceValue,
+                            // Срабатывание подписки на событие всегда тригеррит re-computation, даже если newSourceValue === this._sourceValue
+                            false,
+                            newSourceValue === void 0,
+                        );
 
-            if (_abortSignal) {
-                this._abortSignal = _abortSignal;
+                        if (!isNeedToUpdate) {
+                            //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                            // this._updateReason = 'sourceEmitter';
+                            this._stateFlags &= ~EventSignal.StateFlags.wasSourceSettingFromEvent;
+                        }
+                    }), {
+                        eventName: sourceEvent,
+                        addEventNameToListener: true,
+                        __proto__: null,
+                    });
+                }
 
-                _abortSignal.addEventListener('abort', this[Symbol.dispose]);
-            }
+                if (_abortSignal) {
+                    this._abortSignal = _abortSignal;
 
-            if (reactFC) {
-                this.setReactFC(reactFC);
-            }
+                    const abortListener = this._ownWeakCallback(this[Symbol.dispose]);
 
-            this.componentType = componentType ?? void 0;
+                    _abortSignal.addEventListener('abort', abortListener, { once: true });
 
-            if (trigger && typeof trigger === 'object') {
-                // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
-                const _onTrigger = () => {
-                    if ((this._stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0) {
-                        this._stateFlags |= (EventSignal.StateFlags.isNeedToCalculateNewValue | EventSignal.StateFlags.wasForceUpdateTrigger);
+                    this._abortCleanup = _abortSignal.removeEventListener.bind(_abortSignal, 'abort', abortListener);
+                }
 
-                        this._oneOfDepUpdated(true);
-                    }
-                };
+                if (reactFC) {
+                    this.setReactFC(reactFC);
+                }
 
-                Object.defineProperty(_onTrigger, 'name', {
-                    value: `_onTrigger#${this.id}`,
-                    enumerable: false,
-                    configurable: true,
-                    writable: false,
-                });
+                this.componentType = componentType ?? void 0;
 
-                if (isIDEDebugger || isReactDev) {
-                    Object.defineProperty(_onTrigger, 'current$', {
-                        value: this,
+                if (trigger && typeof trigger === 'object') {
+                    // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
+                    const _onTrigger = () => {
+                        if ((this._stateFlags & EventSignal.StateFlags.wasForceUpdateTrigger) === 0) {
+                            this._stateFlags |= (EventSignal.StateFlags.isNeedToCalculateNewValue | EventSignal.StateFlags.wasForceUpdateTrigger);
+
+                            this._oneOfDepUpdated(true);
+                        }
+                    };
+
+                    Object.defineProperty(_onTrigger, 'name', {
+                        value: `_onTrigger#${this.id}`,
                         enumerable: false,
                         configurable: true,
                         writable: false,
                     });
-                }
 
-                const triggerCleanUp = this._subscribeToTrigger(trigger, _onTrigger);
-
-                if (triggerCleanUp) {
-                    this._triggerCleanUp = triggerCleanUp;
-                }
-            }
-
-            if (throttle && typeof throttle === 'object') {
-                // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
-                const _onThrottleTrigger = () => {
-                    this._stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
-
-                    if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
-                        this._oneOfDepUpdated(true);
+                    if (isIDEDebugger || isReactDev) {
+                        Object.defineProperty(_onTrigger, 'current$', {
+                            value: this,
+                            enumerable: false,
+                            configurable: true,
+                            writable: false,
+                        });
                     }
-                };
 
-                Object.defineProperty(_onThrottleTrigger, 'name', {
-                    value: `_onThrottleTrigger#${this.id}`,
-                    enumerable: false,
-                    configurable: true,
-                    writable: false,
-                });
+                    const triggerCleanUp = this._subscribeToTrigger(trigger, _onTrigger);
 
-                if (isIDEDebugger || isReactDev) {
-                    Object.defineProperty(_onThrottleTrigger, 'current$', {
-                        value: this,
+                    if (triggerCleanUp) {
+                        this._triggerCleanUp = triggerCleanUp;
+                    }
+                }
+
+                if (throttle && typeof throttle === 'object') {
+                    // note: Первый параметр занят под объект события (event) при срабатывания обработчика на EventTarget.
+                    const _onThrottleTrigger = () => {
+                        this._stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
+
+                        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
+                            this._oneOfDepUpdated(true);
+                        }
+                    };
+
+                    Object.defineProperty(_onThrottleTrigger, 'name', {
+                        value: `_onThrottleTrigger#${this.id}`,
                         enumerable: false,
                         configurable: true,
                         writable: false,
                     });
-                }
 
-                const throttleCleanUp = this._subscribeToTrigger(throttle, _onThrottleTrigger, () => {
-                    this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
-                    this._throttleCleanUp = void 0;
-
-                    if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) === 0) {
-                        _onThrottleTrigger();
+                    if (isIDEDebugger || isReactDev) {
+                        Object.defineProperty(_onThrottleTrigger, 'current$', {
+                            value: this,
+                            enumerable: false,
+                            configurable: true,
+                            writable: false,
+                        });
                     }
-                });
 
-                if (throttleCleanUp) {
-                    this._throttleCleanUp = throttleCleanUp;
+                    const throttleCleanUp = this._subscribeToTrigger(throttle, _onThrottleTrigger, () => {
+                        this._stateFlags &= ~EventSignal.StateFlags.hasThrottle;
+                        this._throttleCleanUp = void 0;
 
-                    stateFlags |= EventSignal.StateFlags.hasThrottle;
+                        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) === 0) {
+                            _onThrottleTrigger();
+                        }
+                    });
 
-                    if ((stateFlags & (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue))
-                        === (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue)
-                    ) {
-                        // First computation is needed
-                        stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
-                    }
-                }
-            }
+                    if (throttleCleanUp) {
+                        this._throttleCleanUp = throttleCleanUp;
 
-            if (onDestroy) {
-                this._onDestroy = onDestroy;
-            }
+                        stateFlags |= EventSignal.StateFlags.hasThrottle;
 
-            /*
-            if (methods) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                // @ts-ignore `TS2322: Type {} is not assignable to type`
-                const _ = this._ = Object.create(null);
-
-                for (const key of Object.keys(methods)) {
-                    const originalMethod = methods[key];
-
-                    if (typeof originalMethod === 'function') {
-                        _[key] = (...args: any[]) => {
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore dont care about 'never' here
-                            return originalMethod(this.get(), ...args);
-                        };
+                        if ((stateFlags & (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue))
+                            === (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue)
+                        ) {
+                            // First computation is needed
+                            stateFlags |= EventSignal.StateFlags.wasThrottleTrigger;
+                        }
                     }
                 }
+
+                if (onDestroy) {
+                    this._onDestroy = onDestroy;
+                }
+
+                /*
+                if (methods) {
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore `TS2322: Type {} is not assignable to type`
+                    const _ = this._ = Object.create(null);
+
+                    for (const key of Object.keys(methods)) {
+                        const originalMethod = methods[key];
+
+                        if (typeof originalMethod === 'function') {
+                            _[key] = (...args: any[]) => {
+                                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                                // @ts-ignore dont care about 'never' here
+                                return originalMethod(this.get(), ...args);
+                            };
+                        }
+                    }
+                }
+                */
             }
-            */
+            catch (error) {
+                this._stateFlags = stateFlags | 0;
+
+                try {
+                    this.destructor();
+                }
+                catch (cleanupError) {
+                    throw new AggregateError([ error, cleanupError ], 'EventSignal construction and cleanup failed');
+                }
+
+                throw error;
+            }
         }
 
         this._stateFlags = stateFlags | 0;
@@ -581,7 +618,32 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             __proto__: null,
         });
 
-        eventSignalsFinalizationRegistry?.register(this, this._signalSymbol);
+        for (const cleanup of [
+            this._sourceCleanup,
+            this._triggerCleanUp,
+            this._throttleCleanUp,
+            this._abortCleanup,
+        ]) {
+            if (cleanup) {
+                this._resourceCleanups.add(cleanup);
+            }
+        }
+
+        if (this._abortSignal?.aborted) {
+            this.destructor();
+        }
+    }
+
+    private _getWeakListener(listener: SignalListener, flags: SignalSubscriptionFlags) {
+        return getWeakListener(this._listenerCallbacks, listener, flags, _weakRefFabric);
+    }
+
+    private _ownWeakCallback<F extends (...args: any[]) => any>(callback: F): F {
+        const weak = weakCallback(_weakRefFabric(callback));
+
+        this._ownedCallbacks.set(weak, callback);
+
+        return weak;
     }
 
     destructor() {
@@ -594,6 +656,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             _finaleSourceValue,
             _signalSymbol,
             _abortSignal,
+            _abortCleanup,
             _sourceMapFn,
             _sourceFilterFn,
             lastError,
@@ -611,6 +674,22 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
 
         // this.destroyed = true;
         this._stateFlags |= EventSignal.StateFlags.isDestroyed;
+        eventSignalsFinalizationRegistry?.unregister(this);
+
+        const resourceCleanups = [ ...this._resourceCleanups ];
+
+        this._resourceCleanups.clear();
+
+        const cleanupErrors: unknown[] = [];
+        const attempt = (action: () => void) => {
+            try {
+                action();
+            }
+            catch (error) {
+                cleanupErrors.push(error);
+            }
+        };
+
         this._cancelQueuedSets(new Error('EventSignal object is destroyed'));
         this._reducerOutput = void 0;
         this._stateFlags &= ~EventSignal.StateFlags.hasAsyncReducerOutput;
@@ -620,27 +699,29 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         // EventSignal._react.setComponentOnDestroy(this);
 
         if (has_finaleValue || has_finaleSourceValue) {
-            if (this._setSourceValue((has_finaleValue ? _finaleValue : _finaleSourceValue) as unknown as S, true)) {
-                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
-                // this._updateReason = Symbol.dispose;
+            attempt(() => {
+                if (this._setSourceValue((has_finaleValue ? _finaleValue : _finaleSourceValue) as unknown as S, true)) {
+                    //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
+                    // this._updateReason = Symbol.dispose;
 
-                const maybePromise = this._calculateValue(has_finaleValue);
+                    const maybePromise = this._calculateValue(has_finaleValue);
 
-                // eslint-disable-next-line promise/prefer-await-to-then
-                if (typeof (maybePromise as Promise<T>)?.then === 'function') {
-                    // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
-                    (maybePromise as Promise<T>)?.then(null, (error) => {
-                        console.error('EventSignal#destructor: async _calculateValue: error:', error);
-                    });
+                    // eslint-disable-next-line promise/prefer-await-to-then
+                    if (typeof (maybePromise as Promise<T>)?.then === 'function') {
+                        // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
+                        (maybePromise as Promise<T>)?.then(null, (error) => {
+                            console.error('EventSignal#destructor: async _calculateValue: error:', error);
+                        });
+                    }
                 }
-            }
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore ignore readonly attribute
-            this._finaleValue = void 0;
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore ignore readonly attribute
-            this._finaleSourceValue = void 0;
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore readonly attribute
+                this._finaleValue = void 0;
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                // @ts-ignore ignore readonly attribute
+                this._finaleSourceValue = void 0;
+            });
         }
 
         this.clearDeps();
@@ -695,7 +776,8 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         // }
 
         if (_abortSignal) {
-            _abortSignal.removeEventListener('abort', this[Symbol.dispose]);
+            this._abortCleanup?.();
+            this._abortCleanup = void 0;
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore readonly attribute
@@ -721,17 +803,17 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         }
 
         if (_sourceCleanup) {
-            _sourceCleanup();
+            attempt(_sourceCleanup);
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore readonly attribute
             this._sourceCleanup = void 0;
         }
         if (_triggerCleanUp) {
-            _triggerCleanUp();
+            attempt(_triggerCleanUp);
             this._triggerCleanUp = void 0;
         }
         if (_throttleCleanUp) {
-            _throttleCleanUp();
+            attempt(_throttleCleanUp);
             this._throttleCleanUp = void 0;
         }
 
@@ -744,9 +826,33 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
          */
         subscribersEventsEmitter.removeAllListeners(_signalSymbol);
 
-        _onDestroy?.();
+        // Remaining entries detach dependencies or React component-type/RAF subscriptions.
+        // The four constructor resources below were already handled explicitly above.
+        for (const cleanup of resourceCleanups) {
+            if (cleanup !== _sourceCleanup
+                && cleanup !== _triggerCleanUp
+                && cleanup !== _throttleCleanUp
+                && cleanup !== _abortCleanup
+            ) {
+                attempt(cleanup);
+            }
+        }
 
-        EventSignal._react.setComponentOnDestroy(this);
+        this._listenerCallbacks.clear();
+        this._ownedCallbacks.clear();
+        this._onDestroy = void 0;
+
+        if (_onDestroy) {
+            attempt(_onDestroy);
+        }
+
+        attempt(() => {
+            EventSignal._react.setComponentOnDestroy(this)
+        });
+
+        if (cleanupErrors.length) {
+            throw new AggregateError(cleanupErrors, 'EventSignal cleanup failed');
+        }
     }
 
     [Symbol.dispose] = () => {
@@ -764,7 +870,6 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
     clearDeps() {
         const {
             _subscriptionsToDeps,
-            _oneOfDepUpdated,
         } = this;
 
         if (_subscriptionsToDeps) {
@@ -772,10 +877,17 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
              * Удаляем подписки на другие EventSignal.
              */
             for (const eventName of _subscriptionsToDeps) {
-                signalEventsEmitter.removeListener(eventName, _oneOfDepUpdated);
+                this._dependencyCleanups.get(eventName)?.();
+
+                const cleanup = this._dependencyCleanups.get(eventName);
+
+                if (cleanup) {
+                    this._resourceCleanups.delete(cleanup);
+                }
             }
 
             _subscriptionsToDeps.clear();
+            this._dependencyCleanups.clear();
         }
     }
 
@@ -793,6 +905,12 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
 
         if (signal?.aborted) {
             return;
+        }
+
+        listener = this._ownWeakCallback(listener);
+
+        if (onEnd) {
+            onEnd = this._ownWeakCallback(onEnd);
         }
 
         let triggerCleanUp: (() => void) | undefined;
@@ -820,7 +938,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
 
                 triggerCleanUp = _eventTargetAddListeners(emitter, listener, {
                     eventName: event,
-                    filter,
+                    filter: filter && this._ownWeakCallback(filter),
                     once,
                     // Usable only with `emitter is EventTarget`
                     passive: true,
@@ -2054,13 +2172,28 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         }
     }
 
+    private _trackDependency(eventName: number | string | symbol) {
+        if (this._dependencyCleanups.has(eventName)) {
+            return;
+        }
+
+        signalEventsEmitter.addListener(eventName, this._weakDepUpdated);
+
+        const cleanup =
+            signalEventsEmitter.removeListener.bind(signalEventsEmitter, eventName, this._weakDepUpdated)
+        ;
+
+        this._dependencyCleanups.set(eventName, cleanup);
+        this._resourceCleanups.add(cleanup);
+    }
+
     private _subscribeTo(signalSymbol: symbol) {
         const _subscriptionsToDeps = this._subscriptionsToDeps ??= new Set();
         const hasSubscription = _subscriptionsToDeps.has(signalSymbol);
 
         if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             if (hasSubscription) {
-                signalEventsEmitter.removeListener(signalSymbol, this._oneOfDepUpdated);
+                signalEventsEmitter.removeListener(signalSymbol, this._weakDepUpdated);
                 _subscriptionsToDeps.delete(signalSymbol);
             }
 
@@ -2075,7 +2208,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             //  2. Когда в EventEmitterX будет реализован третий параметр, передевать:
             //    2.1. cleanupCallback(onTeardown) - коллбек, который должен вызываться, когда этот listener удаляется
             //    2.2. weakSpyOnTarget - объект, который нужно добавить в WeakMap и при удалении которого GC мы должны удалить listener (это будет проверять setInterval каждые 2-5 минут).
-            signalEventsEmitter.addListener(signalSymbol, this._oneOfDepUpdated);
+            this._trackDependency(signalSymbol);
         }
     }
 
@@ -2088,17 +2221,17 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
     protected _addListener(
         listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         _ignore?: undefined,
-        subscriptionFlags?: number,
+        subscriptionFlags?: SignalSubscriptionFlags,
     ): EventSignal.Subscription;
     protected _addListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
-        subscriptionFlags?: number,
+        subscriptionFlags?: SignalSubscriptionFlags,
     ): EventSignal.Subscription | EventSignal<T, S, D, R>;
     protected _addListener(
         ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
-        subscriptionFlags = 0,
+        subscriptionFlags = SignalSubscriptionFlags.None,
     ): EventSignal.Subscription | EventSignal<T, S, D, R> {
         let shouldReturnThis = false;
 
@@ -2121,7 +2254,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         /**
          * note: If this is `true`, {@link shouldReturnThis} should be `false` and it's not checked for simplicity.
          */
-        const makeItEasyAndFastAndUseSubscription = (subscriptionFlags & 1 << 3) !== 0;
+        const makeItEasyAndFastAndUseSubscription = (subscriptionFlags & SignalSubscriptionFlags.Direct) !== 0;
 
         if (!makeItEasyAndFastAndUseSubscription) {
             _checkListener<(newValue: EventSignal.LastValue<T, R>) => void>(listener);
@@ -2139,21 +2272,24 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         }
 
         const eventName = this._signalSymbol;
+        const signal$ = this;
+        const activeListener = listener;
+        const weakListener = signal$._getWeakListener(activeListener, subscriptionFlags);
 
-        if ((subscriptionFlags & 1 << 1) !== 0) { // isUseOnce
-            if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
-                subscribersEventsEmitter.prependOnceListener(eventName, listener);
+        if ((subscriptionFlags & SignalSubscriptionFlags.Once) !== 0) { // isUseOnce
+            if ((subscriptionFlags & SignalSubscriptionFlags.Prepend) !== 0) { // isUsePrepend
+                subscribersEventsEmitter.prependOnceListener(eventName, weakListener);
             }
             else {
-                subscribersEventsEmitter.once(eventName, listener);
+                subscribersEventsEmitter.once(eventName, weakListener);
             }
         }
         else {
-            if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
-                subscribersEventsEmitter.prependListener(eventName, listener);
+            if ((subscriptionFlags & SignalSubscriptionFlags.Prepend) !== 0) { // isUsePrepend
+                subscribersEventsEmitter.prependListener(eventName, weakListener);
             }
             else {
-                subscribersEventsEmitter.on(eventName, listener);
+                subscribersEventsEmitter.on(eventName, weakListener);
             }
         }
 
@@ -2164,6 +2300,10 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         let closed = false;
         let suspended = false;
         const unsubscribe = () => {
+            if (closed) {
+                return;
+            }
+
             closed = true;
 
             this._removeListener(ignoredEventName, listener, true);
@@ -2175,7 +2315,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             // Cancels the subscription
             unsubscribe,
             suspend: () => {
-                if (suspended) {
+                if (closed || signal$.destroyed || suspended) {
                     return false;
                 }
 
@@ -2187,22 +2327,25 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             },
             resume() {
                 // listener SHOULD be defined. This check is only for TypeScript.
-                if (listener && suspended) {
+                if (!closed && !signal$.destroyed && listener && suspended) {
+                    // noinspection UnnecessaryLocalVariableJS
+                    const resumedListener = listener;
+                    const weakListener = signal$._getWeakListener(resumedListener, subscriptionFlags);
                     // Copy & Paste this code block from above for performance reason
-                    if ((subscriptionFlags & 1 << 1) !== 0) { // isUseOnce
-                        if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
-                            subscribersEventsEmitter.prependOnceListener(eventName, listener);
+                    if ((subscriptionFlags & SignalSubscriptionFlags.Once) !== 0) { // isUseOnce
+                        if ((subscriptionFlags & SignalSubscriptionFlags.Prepend) !== 0) { // isUsePrepend
+                            subscribersEventsEmitter.prependOnceListener(eventName, weakListener);
                         }
                         else {
-                            subscribersEventsEmitter.once(eventName, listener);
+                            subscribersEventsEmitter.once(eventName, weakListener);
                         }
                     }
                     else {
-                        if ((subscriptionFlags & 1 << 2) !== 0) { // isUsePrepend
-                            subscribersEventsEmitter.prependListener(eventName, listener);
+                        if ((subscriptionFlags & SignalSubscriptionFlags.Prepend) !== 0) { // isUsePrepend
+                            subscribersEventsEmitter.prependListener(eventName, weakListener);
                         }
                         else {
-                            subscribersEventsEmitter.on(eventName, listener);
+                            subscribersEventsEmitter.on(eventName, weakListener);
                         }
                     }
 
@@ -2218,7 +2361,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             },
             // A boolean value indicating whether the subscription is closed
             get closed() {
-                return closed;
+                return closed || signal$.destroyed;
             },
             __proto__: null,
         };
@@ -2250,7 +2393,16 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
             }
         }
 
-        subscribersEventsEmitter.removeListener(this._signalSymbol, listener as NonNullable<typeof listener>);
+        const activeListener = listener;
+
+        if (activeListener) {
+            const registered = this._listenerCallbacks.get(activeListener);
+
+            if (registered) {
+                subscribersEventsEmitter.removeListener(this._signalSymbol, registered.weak);
+                this._listenerCallbacks.delete(activeListener);
+            }
+        }
 
         if (shouldReturnThis) {
             return this;
@@ -2262,7 +2414,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
     once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
     once(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
     once(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
-        return this._addListener(arg1, arg2, 1 << 1);
+        return this._addListener(arg1, arg2, SignalSubscriptionFlags.Once);
     }
 
     on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
@@ -2280,13 +2432,13 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
     prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
     prependListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
     prependListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
-        return this._addListener(arg1, arg2, 1 << 2);
+        return this._addListener(arg1, arg2, SignalSubscriptionFlags.Prepend);
     }
 
     prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
     prependOnceListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
     prependOnceListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
-        return this._addListener(arg1, arg2, (1 << 1) | (1 << 2));
+        return this._addListener(arg1, arg2, SignalSubscriptionFlags.Once | SignalSubscriptionFlags.Prepend);
     }
 
     off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
@@ -2449,7 +2601,7 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         }
 
         // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
-        return this._addListener(func, void 0, 1 << 3).unsubscribe;
+        return this._addListener(func, void 0, SignalSubscriptionFlags.Direct).unsubscribe;
     };
 
     //todo: Добавить статический метод для переключения режима подписки в EventSignal:
@@ -2595,10 +2747,26 @@ export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
         getDescription: signal$ => signal$._signalSymbol.description,
         getStoredValue: signal$ => signal$._value,
         getComponent: signal$ => signal$._reactFC,
-        setComponent: (signal$, descriptor) => { signal$._reactFC = descriptor; },
-        subscribe: (signal$, listener) => signal$._addListener(listener, void 0, 1 << 3).unsubscribe,
+        setComponent: (signal$, descriptor) => {
+            signal$._reactFC = descriptor;
+        },
+        weakCallback: (signal$, callback) => signal$._ownWeakCallback(callback),
+        releaseWeakCallback: (signal$, callback) => {
+            signal$._ownedCallbacks.delete(callback);
+        },
+        trackCleanup: (signal$, cleanup) => {
+            signal$._resourceCleanups.add(cleanup);
+        },
+        untrackCleanup: (signal$, cleanup) => {
+            signal$._resourceCleanups.delete(cleanup);
+        },
+        subscribe: (signal$, listener) => {
+            return signal$._addListener(listener, void 0, SignalSubscriptionFlags.Direct).unsubscribe;
+        },
         getComponentVersion: signal$ => signal$._cv,
-        incrementComponentVersion: signal$ => { signal$._cv++; },
+        incrementComponentVersion: signal$ => {
+            signal$._cv++;
+        },
         arePropsEqual: _shallowEqualObjects,
     });
 
@@ -2908,9 +3076,19 @@ const tagEventSignal = 'EventSignal';
 EventSignal.prototype[Symbol.toStringTag] = tagEventSignal;
 
 if (typeof FinalizationRegistry !== 'undefined') {
-    eventSignalsFinalizationRegistry = new FinalizationRegistry(signalSymbol => {
-        signalEventsEmitter.removeAllListeners(signalSymbol);
-        subscribersEventsEmitter.removeAllListeners(signalSymbol);
+    eventSignalsFinalizationRegistry = new FinalizationRegistry(({ symbol, cleanups }) => {
+        for (const cleanup of cleanups) {
+            try {
+                cleanup();
+            }
+            catch (error) {
+                console.error('EventSignal finalization cleanup:', error);
+            }
+        }
+        cleanups.clear();
+        signalEventsEmitter.removeAllListeners(symbol);
+        subscribersEventsEmitter.removeAllListeners(symbol);
+        timersTriggerEventsEmitter.removeAllListeners(symbol);
     });
 }
 
@@ -3164,20 +3342,41 @@ function _eventTargetAddListeners(
         : _weakRefFabric(emitter as EventEmitter | EventTarget)
     ;
     const subscriptions: { 0: number | string | symbol, 1: typeof listener, __proto__: null }[] = [];
+    let closed = false;
     const cancel = function() {
+        if (closed) {
+            return;
+        }
+        closed = true;
         const emitter = emitterWeakRef.deref();
+        const errors: unknown[] = [];
+        const attempt = (cleanup: () => void) => {
+            try {
+                cleanup();
+            }
+            catch (error) {
+                errors.push(error);
+            }
+        };
 
         if (emitter) {
             for (const { 0: eventName, 1: listener } of subscriptions) {
-                _eventTargetAgnosticRemoveListener(emitter, eventName, listener);
+                attempt(() => _eventTargetAgnosticRemoveListener(emitter, eventName, listener));
             }
         }
 
         subscriptions.length = 0;
-        abortCleanup?.();
-        onEnd?.();
+        if (abortCleanup) {
+            attempt(abortCleanup);
+        }
+        if (onEnd) {
+            attempt(onEnd);
+        }
 
         abortCleanup = void 0;
+        if (errors.length) {
+            throw new AggregateError(errors, 'EventSignal source cleanup failed');
+        }
     };
     let abortCleanup: (() => void) | undefined;
 
@@ -3187,7 +3386,7 @@ function _eventTargetAddListeners(
         abortCleanup = signal.removeEventListener.bind(signal, 'abort', cancel);
     }
 
-    {
+    try {
         const _emitter = isWeakRefEmitter
             ? (emitter as WeakRef<EventEmitter | EventTarget>).deref()
             : emitter as EventEmitter | EventTarget
@@ -3228,6 +3427,15 @@ function _eventTargetAddListeners(
 
             return;
         }
+    }
+    catch (error) {
+        try {
+            cancel();
+        }
+        catch (cleanupError) {
+            throw new AggregateError([ error, cleanupError ], 'EventSignal source registration and cleanup failed');
+        }
+        throw error;
     }
 
     // noinspection JSUnusedAssignment
