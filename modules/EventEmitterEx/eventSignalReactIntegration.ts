@@ -5,7 +5,7 @@ import { isUniqueSymbol } from 'termi@type_guards';
 import { EventEmitterX } from "../events";
 import { arrayContentStringify, stringifyWithCircularHandle, isRunningInWebDevMode } from "./utils";
 import { createEventSignalMagicContext, getReactFunctionComponentFromMagicContext } from "./view_utils";
-import { _awaitNextAnimationFrame, _unAwaitNextAnimationFrame } from "./EventSignalReactScheduler";
+import { _awaitNextAnimationFrame, _unAwaitNextAnimationFrame } from "./animationFrameScheduler";
 
 const isReactDev = isRunningInWebDevMode();
 function _noop() {}

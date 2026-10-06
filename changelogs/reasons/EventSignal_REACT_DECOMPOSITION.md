@@ -12,8 +12,8 @@ area: "logic, api, types, tests, docs"
 
 Move React implementation out of EventSignal.ts while preserving the public class,
 its generic contracts, null-rooted prototype, hooks, snapshots and cleanup.
-EventSignalReact.ts owns hooks, initialization, JSX decoration, component registry
-and rendering. EventSignalReactScheduler.ts owns the existing RAF callback pool.
+eventSignalReactIntegration.ts owns hooks, initialization, JSX decoration, component registry
+and rendering. animationFrameScheduler.ts owns the existing RAF callback pool.
 The core keeps computation, dependencies, ordered writes, lifecycle and thin delegates.
 A typed internal bridge supplies only private operations required by React; it does
 not expose private fields publicly. React imports the core only as a type; runtime
@@ -79,18 +79,18 @@ line samples match the original blame at the base revision:
 
 | Destination | Original EventSignal.ts line | Original commit |
 | --- | ---: | --- |
-| EventSignalReact.ts:209 | 3114 | 1b871b8 |
-| EventSignalReact.ts:515 | 2425 | 1b871b8 |
-| EventSignalReact.ts:607 | 2530 | 1b871b8 |
-| EventSignalReact.ts:224 | 3129 | abaff27 |
-| EventSignalReact.ts:389 | 3293 | 356c08a |
-| EventSignalReact.ts:1014 | 4075 | 4d817e2 |
-| EventSignalReactScheduler.ts:9 | 3959 | 532c4ff |
-| EventSignalReactScheduler.ts:26 | 3976 | 532c4ff |
+| eventSignalReactIntegration.ts:209 | 3114 | 1b871b8 |
+| eventSignalReactIntegration.ts:515 | 2425 | 1b871b8 |
+| eventSignalReactIntegration.ts:607 | 2530 | 1b871b8 |
+| eventSignalReactIntegration.ts:224 | 3129 | abaff27 |
+| eventSignalReactIntegration.ts:389 | 3293 | 356c08a |
+| eventSignalReactIntegration.ts:1014 | 4075 | 4d817e2 |
+| animationFrameScheduler.ts:9 | 3959 | 532c4ff |
+| animationFrameScheduler.ts:26 | 3976 | 532c4ff |
 | EventSignal.ts:87 | 90 | 4e3b6c1 |
 
-Use git --no-pager blame -M -C -C -- modules/EventEmitterEx/EventSignalReact.ts
-and the same command for EventSignalReactScheduler.ts. Default blame follows
+Use git --no-pager blame -M -C -C -- modules/EventEmitterEx/eventSignalReactIntegration.ts
+and the same command for animationFrameScheduler.ts. Default blame follows
 RAF lines, but can attribute reordered React blocks to the extraction commit;
 -M follows moves within the file. New signatures, bridge accesses and renamed
 signal references appropriately belong to the extraction. This is verified line
@@ -119,7 +119,7 @@ in a separate behavioral change.
 
 ### [Info] React Version Switching
 
-File: modules/EventEmitterEx/EventSignalReact.ts, lines 184–201:
+File: modules/EventEmitterEx/eventSignalReactIntegration.ts, lines 184–201:
 
 ```ts
 if (isReactGte19) {
@@ -140,8 +140,8 @@ version-switch/reset semantics and test them separately with real React consumer
 
 Вынести реализацию React из EventSignal.ts, сохранив публичный класс, его generic
 контракты, прототип с null в основании, hooks, snapshots и очистку.
-EventSignalReact.ts владеет hooks, инициализацией, JSX-декорацией, регистром компонентов
-и рендерингом. EventSignalReactScheduler.ts владеет существующим пулом RAF callbacks.
+eventSignalReactIntegration.ts владеет hooks, инициализацией, JSX-декорацией, регистром компонентов
+и рендерингом. animationFrameScheduler.ts владеет существующим пулом RAF callbacks.
 Ядро сохраняет вычисления, зависимости, упорядоченные записи, lifecycle и тонкое делегирование.
 Типизированный внутренний адаптер предоставляет только приватные операции,
 необходимые React; приватные поля не становятся публичными. React импортирует ядро
@@ -208,18 +208,18 @@ split/eventsignal-react-scheduler-history (d1ec5e7). Rename-предки объ�
 
 | Целевой файл | Исходная строка EventSignal.ts | Исходный коммит |
 | --- | ---: | --- |
-| EventSignalReact.ts:209 | 3114 | 1b871b8 |
-| EventSignalReact.ts:515 | 2425 | 1b871b8 |
-| EventSignalReact.ts:607 | 2530 | 1b871b8 |
-| EventSignalReact.ts:224 | 3129 | abaff27 |
-| EventSignalReact.ts:389 | 3293 | 356c08a |
-| EventSignalReact.ts:1014 | 4075 | 4d817e2 |
-| EventSignalReactScheduler.ts:9 | 3959 | 532c4ff |
-| EventSignalReactScheduler.ts:26 | 3976 | 532c4ff |
+| eventSignalReactIntegration.ts:209 | 3114 | 1b871b8 |
+| eventSignalReactIntegration.ts:515 | 2425 | 1b871b8 |
+| eventSignalReactIntegration.ts:607 | 2530 | 1b871b8 |
+| eventSignalReactIntegration.ts:224 | 3129 | abaff27 |
+| eventSignalReactIntegration.ts:389 | 3293 | 356c08a |
+| eventSignalReactIntegration.ts:1014 | 4075 | 4d817e2 |
+| animationFrameScheduler.ts:9 | 3959 | 532c4ff |
+| animationFrameScheduler.ts:26 | 3976 | 532c4ff |
 | EventSignal.ts:87 | 90 | 4e3b6c1 |
 
-Использовать git --no-pager blame -M -C -C -- modules/EventEmitterEx/EventSignalReact.ts
-и ту же команду для EventSignalReactScheduler.ts. Обычный blame прослеживает
+Использовать git --no-pager blame -M -C -C -- modules/EventEmitterEx/eventSignalReactIntegration.ts
+и ту же команду для animationFrameScheduler.ts. Обычный blame прослеживает
 RAF-строки, но может приписать переупорядоченные React-блоки коммиту выделения;
 -M отслеживает перемещения внутри файла. Новые сигнатуры, обращения к bridge и
 переименованные ссылки на сигналы обоснованно относятся к выделению. Это проверенная
@@ -248,7 +248,7 @@ unmount/unsubscribe отдельным изменением поведения.
 
 ### [Info] Переключение версий React
 
-Файл: modules/EventEmitterEx/EventSignalReact.ts, строки 184–201:
+Файл: modules/EventEmitterEx/eventSignalReactIntegration.ts, строки 184–201:
 
 ```ts
 if (isReactGte19) {

@@ -14,7 +14,7 @@ area: "docs, api, types, deps, tests"
 
 ## Границы модулей
 
-- [x] Вынести всю React-работу EventSignal в отдельный адаптер, например `EventSignalReact.ts`: initReact,
+- [x] Вынести всю React-работу EventSignal в отдельный адаптер, например `eventSignalReactIntegration.ts`: initReact,
   hooks/use/useListener, JSX element properties, component registration/context/error boundary и React scheduler.
 - [x] Ядро EventSignal отвечает за значение, зависимости, scheduling вычислений, subscriptions и lifecycle. Связь с
   React — узкий adapter interface; существующие методы временно делегируют, сохраняя API. Не устраивать runtime cycle
@@ -31,8 +31,8 @@ area: "docs, api, types, deps, tests"
 
 ## Завершённое выделение React
 
-Реализовано в dev от main 4e3b6c1. EventSignalReact.ts содержит hooks, initialization,
-JSX, component registry/context и rendering; EventSignalReactScheduler.ts содержит
+Реализовано в dev от main 4e3b6c1. eventSignalReactIntegration.ts содержит hooks, initialization,
+JSX, component registry/context и rendering; animationFrameScheduler.ts содержит
 RAF pool. Ядро сохраняет state, computation, dependencies, writes/lifecycle и
 публичные delegating методы. Обратный импорт ядра в адаптере — только type-only.
 

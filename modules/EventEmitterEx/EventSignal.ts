@@ -13,8 +13,8 @@
 
 import type { EventEmitter } from "node:events";
 
-import { createEventSignalReact } from "./EventSignalReact";
-import type { _ComponentDescription, _PreDefinedProps } from "./EventSignalReact";
+import { createEventSignalReact } from "./eventSignalReactIntegration";
+import type { _ComponentDescription, _PreDefinedProps } from "./eventSignalReactIntegration";
 
 import { isTest, isIDEDebugger } from 'termi@runEnv';
 import { isUniqueSymbol } from 'termi@type_guards';

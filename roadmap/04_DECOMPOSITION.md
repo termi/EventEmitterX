@@ -13,7 +13,7 @@ rewrite existing branch history or mix moves with behavior changes, formatting o
 
 ## Module Boundaries
 
-- [x] Extract all React work from EventSignal into a separate adapter, for example EventSignalReact.ts: initReact,
+- [x] Extract all React work from EventSignal into a separate adapter, for example eventSignalReactIntegration.ts: initReact,
   hooks/use/useListener, JSX element properties, component registration/context/error boundary and the React scheduler.
 - [x] EventSignal core owns values, dependencies, computation scheduling, subscriptions and lifecycle. Connect React
   through a narrow adapter interface; existing methods temporarily delegate to preserve API. Avoid a runtime cycle
@@ -30,8 +30,8 @@ rewrite existing branch history or mix moves with behavior changes, formatting o
 
 ## Completed React Extraction
 
-Implemented on dev from main 4e3b6c1. EventSignalReact.ts contains hooks, initialization,
-JSX, component registry/context and rendering; EventSignalReactScheduler.ts contains
+Implemented on dev from main 4e3b6c1. eventSignalReactIntegration.ts contains hooks, initialization,
+JSX, component registry/context and rendering; animationFrameScheduler.ts contains
 the RAF pool. Core keeps state, computation, dependencies, writes/lifecycle and
 public delegating methods. The adapter's reverse core import is type-only.
 
