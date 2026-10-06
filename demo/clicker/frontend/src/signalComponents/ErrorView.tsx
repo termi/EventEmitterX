@@ -31,7 +31,7 @@ export default function ErrorView({ eventSignal, children, childrenRender, addRe
         </dialog>
     ) : '';
 
-    return (<div className="ErrorView" style={{ color: 'red' }}>
+    return (<div className="ErrorView">
         <p className="ErrorView__error" onClick={() => { $popoverRef.current?.showModal(); }} title={hint}>
             <span className="ErrorView__error__sign">⚠️</span><span className="ErrorView__error__text">{stringifyError(lastError)}</span>
         </p>

@@ -23,7 +23,8 @@ export default function AuthForm() {
     return (
         <div className="auth-card">
             <h2 className="auth-title">{isRegistration ? 'Register' : 'Login'}</h2>
-            {lastError && <div style={{ color: 'red' }}>{stringifyError(lastError)}</div>}
+            <p className="auth-caption">{isRegistration ? 'Создайте аккаунт, чтобы присоединиться к игре.' : 'С возвращением. Ваш следующий раунд уже здесь.'}</p>
+            {lastError && <div className="auth-error" role="alert">{stringifyError(lastError)}</div>}
             <FormFromSchema
                 onSubmit={handleAuthFormSubmit} data-is-registration={isRegistration}
                 className="auth-form" disabled={isPending}

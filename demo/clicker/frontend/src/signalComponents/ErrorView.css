@@ -1,33 +1,54 @@
-
 .ErrorView {
-  button {
-    background: var(--btn-bg);
-    color: var(--btn-text-color);
-  }
+  padding: 1.5rem;
+  background: var(--error-bg);
+  color: var(--error-color);
+  border: 1px solid var(--header-border);
+  border-radius: 18px;
 }
-
+.ErrorView__error {
+  display: flex;
+  align-items: start;
+  gap: .75rem;
+  margin: 0 0 1rem;
+  font-size: .95rem;
+  overflow-wrap: anywhere;
+}
 .ErrorView__error__text {
   cursor: pointer;
   text-decoration: underline;
+  text-underline-offset: 3px;
 }
-
+.ErrorView__children {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin: .5rem;
+}
+.ErrorView button {
+  background: var(--card-bg);
+  color: var(--text-color);
+  font-size: .85rem;
+}
 .ErrorView__detailed-dialog {
-  &::backdrop {
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(3px);
-  }
+  width: min(850px,calc(100% - 2rem));
+  max-height: 85vh;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border: 1px solid var(--header-border);
+  border-radius: 20px;
+  padding: 2rem;
 }
-
+.ErrorView__detailed-dialog::backdrop {
+  background: rgb(13 35 31 / 55%);
+}
 .ErrorView__details {
   position: relative;
-
-  .ErrorView__details__closeBtn {
-    position: absolute;
-    top: 0;
-    right: 0;
-  }
-
-  & > p:nth-of-type(1) {
-    margin-block-start: 0;
-  }
+  overflow-wrap: anywhere;
+}
+.ErrorView__details pre {
+  white-space: pre-wrap;
+  font-size: .8rem;
+}
+.ErrorView__details__closeBtn {
+  float: right;
 }

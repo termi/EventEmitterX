@@ -51,6 +51,14 @@ export default function RoundsListItem({ eventSignal }: { eventSignal: RoundMode
 
     return (
         <div data-round-id={id}
+            role="button" tabIndex={0} aria-pressed={isSelected}
+            aria-label={`Выбрать раунд: ${title}`}
+            onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                }
+            }}
             data-signal-key={eventSignal.key} data-id-destroyed={eventSignal.isDestroyed}
             onClick={onRoundCardSelectClick}
             className={`

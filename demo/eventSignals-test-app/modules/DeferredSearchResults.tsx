@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Suspense, useDeferredValue, useState, use } from "react";
 
 import { fetchData } from '../state/requestData';
+import AlbumResults from './AlbumResults';
 
 // Note: this component is written using an experimental API
 // that's not yet available in stable versions of React.
@@ -51,20 +52,7 @@ function SearchResults({ query }: { query: string }) {
 
     const albums = use(fetchData(`/search?q=${query}`));
 
-    if (albums.length === 0) {
-        // eslint-disable-next-line react/no-unescaped-entities
-        return <p>No matches for <i>"{query}"</i></p>;
-    }
-
-    return (
-        <ul>
-            {albums.map(album => (
-                <li key={album.id}>
-                    {album.title} ({album.year})
-                </li>
-            ))}
-        </ul>
-    );
+    return <AlbumResults albums={albums} query={query} />;
 }
 
 /*

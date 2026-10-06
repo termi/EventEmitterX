@@ -4,21 +4,31 @@
 import * as React from "react";
 
 import { widgetsList$ } from "../state/widgetsState";
+import { i18n$$ } from '../state/i18n';
+import css from './examples.module.css';
 /*
 import type { JsonPlaceholderUser1$ } from "../state/AppStates";
 import { mainState } from "../state/AppStates";
 */
 
 const { addWidgetsDisable$, clearWidgetsDisable$ } = widgetsList$.data;
+const emptyWidgetsLabel$ = i18n$$`Здесь появятся виджеты. Добавьте пользователя или готовый набор.||en-US||:Widgets will appear here. Add a user or a preset batch.`;
 // const { jsonPlaceholderUserComponentType } = mainState;
 
 export default function PageFour() {
+    const emptyWidgetsLabel = emptyWidgetsLabel$.use();
     console.log('render PageFour');
 
-    return (<>
-        <fieldset>
+    return (<div className={css.lesson}>
+        <header className={css.intro}>
+            <span className={css.eyebrow}>EventSignal · Shared widgets</span>
+            <h2>{i18n$$`Коллекция реактивных виджетов||en-US||:A collection of reactive widgets`}</h2>
+            <p>{i18n$$`Добавляйте пользователей по одному или набором. Каждый виджет показывает независимую загрузку и результат общего кеша.||en-US||:Add users one at a time or as a batch. Each widget shows its loading state and the result from the shared cache.`}</p>
+        </header>
+        <fieldset className={`${css.panel} ${css.toolbar}`}>
+            <legend>{i18n$$`Управление коллекцией||en-US||:Collection controls`}</legend>
             <addWidgetsDisable$.component sFC={WidgetButtonDisableSignal}>
-                <span style={{ color: 'red' }}> random</span>
+                <span> random</span>
             </addWidgetsDisable$.component>
             <button
                 ref={widgetsList$.data.addWidgetBtnRef}
@@ -30,7 +40,7 @@ export default function PageFour() {
                 onClick={widgetsList$.data.clearCache}
             >clearCache</button>
         </fieldset>
-        <div style={{ display: 'flex', alignItems: 'stretch', flexWrap: 'wrap', gap: '20px' }}>
+        <div className={css.widgets} data-empty-label={emptyWidgetsLabel}>
             <widgetsList$.component context={{
                 //todo: Как оно могло бы быть
                 // onWidgetDelete(id) {
@@ -39,7 +49,7 @@ export default function PageFour() {
             }} />
             {/*<$widgetsList.component sComponents={new Map([ [ jsonPlaceholderUserComponentType, UserSimpleCart ] ])} />*/}
         </div>
-    </>);
+    </div>);
 }
 
 function WidgetButtonDisableSignal({ current$, current$Value, onClick, children }: {

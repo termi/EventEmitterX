@@ -1,11 +1,13 @@
 'use strict';
 
-import { i18nString$$ } from "../state/i18n";
+import { i18n$$ } from "../state/i18n";
 
-const menuItemTitle = 'Тест три';
-const menuItemTitle$ = i18nString$$(menuItemTitle);
+const menuItemTitle = 'Поиск альбомов';
+const menuItemTitle$ = i18n$$`Поиск альбомов||en-US||:Album search`;
+const pageTitle = menuItemTitle;
 
 export {
     menuItemTitle,
     menuItemTitle$,
+    pageTitle,
 };

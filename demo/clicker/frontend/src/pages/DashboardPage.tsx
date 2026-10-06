@@ -25,12 +25,13 @@ export default function DashboardPage() {
     const $newRoundButton = canCreateNewRound ? (
         <button
             className="add-card-button"
+            aria-label="Создать новый раунд"
             onClick={() => {
                 reRenderState[1](a => ++a);
                 $dialogRef.current?.showModal();
             }}
         >
-            <span title="Создать новый раунд">+</span>
+            <span aria-hidden="true">+</span> Новый раунд
         </button>
     ) : '';
     const $modalWindow = canCreateNewRound ? (
@@ -61,11 +62,12 @@ export default function DashboardPage() {
 
     return (
         <div className="page-content">
+            <span className="eyebrow">Игра в реальном времени</span>
             <h1 className="page-title">
                 <span>Раунды</span>
                 {$newRoundButton}
             </h1>
-            <p className="page-description"></p>
+            <p className="page-description">Выберите раунд и набирайте очки, пока идёт отсчёт. Здесь видны общий результат и ваш вклад.</p>
             {activeRoundsStore.signal$}
             {$modalWindow}
         </div>

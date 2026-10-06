@@ -1,0 +1,86 @@
+.results {
+  margin-top: 1.25rem;
+}
+.summary {
+  color: #62728d;
+  font-size: .8rem;
+  margin: 0 0 .75rem;
+}
+.list {
+  display: grid;
+  gap: .75rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.album {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: .85rem;
+  border: 1px solid #e0e6f1;
+  border-radius: 14px;
+  background: #fff;
+}
+.artwork {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 68px;
+  width: 68px;
+  height: 68px;
+  border-radius: 12px;
+  background: hsl(var(--album-hue) 50% 88%);
+  overflow: hidden;
+}
+.artwork::before {
+  content: "";
+  position: absolute;
+  width: 90px;
+  height: 20px;
+  transform: rotate(-35deg);
+  background: hsl(var(--album-hue) 55% 73%);
+}
+.record {
+  z-index: 1;
+  width: 47px;
+  height: 47px;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle at center, #25314b 0 2px, #35415b 2px 3px);
+  display: grid;
+  place-items: center;
+}
+.record::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: hsl(var(--album-hue) 65% 70%);
+  border: 4px solid hsl(var(--album-hue) 45% 85%);
+}
+.info {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+}
+.artist {
+  font-size: .75rem;
+  color: #62728d;
+}
+.title {
+  font-size: .95rem;
+  line-height: 1.4;
+  color: #24334f;
+  overflow-wrap: anywhere;
+}
+.year {
+  font-size: .75rem;
+  color: #4955c8;
+  font-variant-numeric: tabular-nums;
+}
+.empty {
+  color: #62728d;
+  padding: 1rem;
+  border-radius: 12px;
+  background: #f4f6fc;
+}

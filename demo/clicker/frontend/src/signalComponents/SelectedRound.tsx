@@ -146,24 +146,12 @@ function SelectedRoundClicker({ eventSignal }: { eventSignal: RoundModel["signal
     }
 
     return (
-        <div className="selected-card-clicker" data-round-id={id}
+        <button type="button" className="selected-card-clicker" data-round-id={id}
             onClick={onSelectedCardClicked}
         >
+            <span className="selected-card-clicker__symbol" aria-hidden="true">↗</span>
             <span>Кликайте сюда</span>
-            <pre className="selected-card-clicker__zone">
-                ┌───────────────────────────────────────┐<br />
-                │            ░░░░░░░░░░░░░░░            │<br />
-                │          ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░           │<br />
-                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br />
-                │        ░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░         │<br />
-                │      ░░░░▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░       │<br />
-                │    ░░▒▒▒▒░░░░▓▓▓▓▓▓▓▓▓▓▓▓░░░░▒▒▒▒░░   │<br />
-                │    ░░▒▒▒▒▒▒▒▒░░░░░░░░░░░░▒▒▒▒▒▒▒▒░░   │<br />
-                │    ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░   │<br />
-                │      ░░▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒░░     │<br />
-                │        ░░░░░░░░░░░░░░░░░░░░░░░░░░     │<br />
-                └───────────────────────────────────────┘<br />
-            </pre>
-        </div>
+            <small>Каждое нажатие — ваш вклад в результат</small>
+        </button>
     );
 }

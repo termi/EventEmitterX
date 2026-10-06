@@ -8,6 +8,7 @@ import { EventSignal } from '@termi/eventemitterx/modules/EventEmitterEx/EventSi
 import ErrorView from "../$components/ErrorView";
 import AsyncSpinner from "../$components/AsyncSpinner";
 import { fetchData2 } from "../state/requestData";
+import AlbumResults from './AlbumResults';
 
 export const requestDataSignal$ = new EventSignal([] as unknown as ReturnType<typeof fetchData2>, async function(_prev, searchQuery) {
     const query = searchQuery || '';
@@ -43,12 +44,7 @@ function EventSignalSearchResults({ current$, current$Value }: { current$: typeo
     const content = status === 'error' ? <ErrorView current$={current$}><button onClick={current$.retry}>retry</button></ErrorView>
         : status === 'pending' ? <AsyncSpinner hint={query} />
         : query === '' ? null
-        : albums.length === 0 ? <p>No matches for <i>&quot;{query}&quot;</i></p>
-        : (albums.map(album => (
-            <li key={album.id}>
-                {album.title} ({album.year})
-            </li>
-        )))
+        : <AlbumResults albums={albums} query={query} />
     ;
 
     return (<div>

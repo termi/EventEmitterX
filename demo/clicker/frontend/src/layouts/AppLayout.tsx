@@ -1,7 +1,7 @@
 'use strict';
 
 import { useState, useEffect, useRef } from 'react';
-import { Navigate, Outlet, Link } from 'react-router-dom';
+import { Navigate, Outlet, NavLink } from 'react-router-dom';
 
 import { useAuth } from '../hooks/useAuth';
 
@@ -52,14 +52,17 @@ export default function AppLayout() {
                 <header className="app-header">
                     <nav className="app-nav">
                         <ul className="nav-list">
-                            <li className="nav-item">
-                                <Link to="/" className="nav-link">Dashboard</Link>
+                            <li className="nav-item nav-brand">
+                                <span className="app-brand"><span className="app-brand-mark" aria-hidden="true">↗</span> Clicker</span>
                             </li>
                             <li className="nav-item">
-                                <Link to="/profile" className="nav-link">Profile</Link>
+                                <NavLink to="/" end className="nav-link">Dashboard</NavLink>
                             </li>
                             <li className="nav-item">
-                                <Link to="/settings" className="nav-link">Settings</Link>
+                                <NavLink to="/profile" className="nav-link">Profile</NavLink>
+                            </li>
+                            <li className="nav-item">
+                                <NavLink to="/settings" className="nav-link">Settings</NavLink>
                             </li>
                             <li className="nav-item ml-auto">
                                 <button

@@ -1,85 +1,74 @@
-
 .card {
+  width: 100%;
+  text-align: left;
   background: var(--card-bg);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 10px;
+  border-radius: 16px;
+  padding: 1.25rem;
   cursor: pointer;
   box-shadow: var(--card-shadow);
-  transition: all 0.2s ease;
   border: 1px solid var(--header-border);
   position: relative;
   overflow: hidden;
 }
-
 .card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  background: var(--soft-bg);
 }
-
 .card.card--selected {
-  border-left: 4px solid var(--nav-link-hover);
-  /*background-color: var(--theme-toggle-hover);*/
+  border-color: var(--nav-link-hover);
+  box-shadow: inset 3px 0 var(--nav-link-hover);
 }
-
 .card-title {
-  margin: 0 0 6px 0;
-  font-size: 16px;
+  margin: 0 0 .75rem;
+  font-size: 1rem;
   color: var(--text-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
-
 .card-description {
-  margin: 0 0 8px 0;
-  font-size: 14px;
-  color: var(--text-color);
-  opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: .85rem;
+  color: var(--muted-color);
+  overflow-wrap: anywhere;
 }
-
+.card > span {
+  font-size: .8rem;
+  color: var(--muted-color);
+}
 .card-time {
-  font-size: 13px;
+  font-size: 1.1rem;
   color: var(--nav-link-hover);
-  font-family: monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  margin: .25rem 0 .75rem;
 }
-
 .card-score-info {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-
-  .card-score-info__user {
-    padding-inline-start: 5px;
-  }
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .5rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--header-border);
+  font-size: .8rem;
+  color: var(--muted-color);
 }
-
-.card-score-info--you-are-the-winner {
-  .card-score-info__user {
-    color: red;
-  }
+.card-score-info__user {
+  color: var(--nav-link-hover);
+  font-weight: 600;
 }
-
 .card__progress-container {
   position: absolute;
-  bottom: -4px;
-  padding: 0;
-  margin: 0;
+  bottom: -3px;
   left: 0;
   right: 0;
-  height: 1em;
-
-  meter {
-    padding: 0;
-    margin: 0;
-    inline-size: 100%;
-    vertical-align: 0;
-    height: 1em;
-    block-size: 1em;
-    width: 102%;
-    position: relative;
-    left: -1%;
-  }
+  height: 10px;
+}
+.card__progress-container meter {
+  width: 100%;
+  height: 10px;
+  display: block;
+}
+meter::-webkit-meter-bar {
+  background: var(--soft-bg);
+  border: 0;
+}
+meter::-webkit-meter-optimum-value,meter::-webkit-meter-suboptimum-value,meter::-webkit-meter-even-less-good-value {
+  background: var(--nav-link-hover);
 }

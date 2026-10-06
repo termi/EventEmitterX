@@ -1,6 +1,13 @@
 'use strict';
 
-function _fetchData(_cache: Map<string, Promise<{id: number, title: string, year: number}[]>>, url: string): ReturnType<typeof getData> {
+export type Album = {
+    id: number,
+    title: string,
+    artist: string,
+    year: number,
+};
+
+function _fetchData(_cache: Map<string, Promise<Album[]>>, url: string): ReturnType<typeof getData> {
     let isNewValue = true;
     const resultPromise = _cache.getOrInsertComputed(url, function(key) {
         isNewValue = false;
@@ -47,62 +54,91 @@ async function getData(url: string) {
     }
 }
 
-const allAlbums: {
-    id: number,
-    title: string,
-    year: number,
-}[] = [ {
+const allAlbums: Album[] = [ {
     id: 13,
     title: 'Let It Be',
+    artist: 'The Beatles',
     year: 1970,
 }, {
     id: 12,
     title: 'Abbey Road',
+    artist: 'The Beatles',
     year: 1969,
 }, {
     id: 11,
     title: 'Yellow Submarine',
+    artist: 'The Beatles',
     year: 1969,
 }, {
     id: 10,
     title: 'The Beatles',
+    artist: 'The Beatles',
     year: 1968,
 }, {
     id: 9,
     title: 'Magical Mystery Tour',
+    artist: 'The Beatles',
     year: 1967,
 }, {
     id: 8,
     title: 'Sgt. Pepper\'s Lonely Hearts Club Band',
+    artist: 'The Beatles',
     year: 1967,
 }, {
     id: 7,
     title: 'Revolver',
+    artist: 'The Beatles',
     year: 1966,
 }, {
     id: 6,
     title: 'Rubber Soul',
+    artist: 'The Beatles',
     year: 1965,
 }, {
     id: 5,
     title: 'Help!',
+    artist: 'The Beatles',
     year: 1965,
 }, {
     id: 4,
     title: 'Beatles For Sale',
+    artist: 'The Beatles',
     year: 1964,
 }, {
     id: 3,
     title: 'A Hard Day\'s Night',
+    artist: 'The Beatles',
     year: 1964,
 }, {
     id: 2,
     title: 'With The Beatles',
+    artist: 'The Beatles',
     year: 1963,
 }, {
     id: 1,
     title: 'Please Please Me',
+    artist: 'The Beatles',
     year: 1963,
+}, {
+    id: 14, title: 'Homework', artist: 'Daft Punk', year: 1997,
+}, {
+    id: 15, title: 'Discovery', artist: 'Daft Punk', year: 2001,
+}, {
+    id: 16, title: 'Human After All', artist: 'Daft Punk', year: 2005,
+}, {
+    id: 17, title: 'Random Access Memories', artist: 'Daft Punk', year: 2013,
+}, {
+    id: 18, title: 'Meddle', artist: 'Pink Floyd', year: 1971,
+}, {
+    id: 19, title: 'Obscured by Clouds', artist: 'Pink Floyd', year: 1972,
+}, {
+    id: 20, title: 'The Dark Side of the Moon', artist: 'Pink Floyd', year: 1973,
+}, {
+    id: 21, title: 'Wish You Were Here', artist: 'Pink Floyd', year: 1975,
+}, {
+    id: 22, title: 'Animals', artist: 'Pink Floyd', year: 1977,
+}, {
+    id: 23, title: 'The Wall', artist: 'Pink Floyd', year: 1979,
 } ];
 
 let useRandomError = true;
@@ -113,7 +149,7 @@ export function setUseRandomError(newUseRandomError: boolean) {
 
 let wasErrorResult = false;
 
-async function getSearchResults(query) {
+async function getSearchResults(query: string) {
     // Add a fake delay to make waiting noticeable.
     await new Promise(resolve => {
         setTimeout(resolve, 500);
@@ -148,12 +184,20 @@ async function getSearchResults(query) {
         return [];
     }
 
-    return allAlbums.filter(album => {
-        const lowerTitle = album.title.toLowerCase();
+    return searchAlbums(query);
+}
 
-        return (
-            lowerTitle.startsWith(lowerQuery)
-            || lowerTitle.includes(` ${  lowerQuery}`)
-        );
-    });
+/** Shared local matching contract for both asynchronous search implementations. */
+export function searchAlbums(query: string): Album[] {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+        return [];
+    }
+
+    return allAlbums.filter(album => (
+        album.title.toLowerCase().includes(normalizedQuery)
+        || album.artist.toLowerCase().includes(normalizedQuery)
+        || String(album.year).includes(normalizedQuery)
+    ));
 }

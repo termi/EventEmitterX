@@ -1,5 +1,6 @@
 
 .page-header {
+  font-family: "Segoe UI", system-ui, sans-serif;
   /*position: sticky;*/
   top: 0;
   background: white;
@@ -26,7 +27,7 @@
     font-size: 1.8rem;
     font-weight: 700;
     color: #2c3e50;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .header-actions {
@@ -69,5 +70,16 @@
   .header-bottom {
     position: relative;
     padding-top: 10px;
+  }
+
+  @media (max-width: 600px) {
+    .header-top {
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .page-title {
+      font-size: 1.4rem;
+    }
   }
 }

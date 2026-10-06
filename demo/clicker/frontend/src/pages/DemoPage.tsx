@@ -18,7 +18,10 @@ export default function DemoPage() {
 
     return (
         <div className="page--demo">
-            <div>
+            <span className="eyebrow">Песочница интерфейса</span>
+            <h1>Vite + React</h1>
+            <p className="demo-description">Небольшой интерактивный пример для проверки интерфейса.</p>
+            <div className="demo-technologies">
                 <a href="https://vite.dev" target="_blank">
                     <img src={viteLogo} className="logo" alt="Vite logo" />
                 </a>
@@ -26,17 +29,16 @@ export default function DemoPage() {
                     <img src={reactLogo} className="logo react" alt="React logo" />
                 </a>
             </div>
-            <h1>Vite + React</h1>
-            <div className="card">
+            <div className="demo-counter-card">
                 <button onClick={() => setCount(count => count + 1)}>
                     count is {count}
                 </button>
                 <p>
-                    Edit <code>src/App.tsx</code> and save to test HMR
+                    Нажмите на кнопку, чтобы обновить локальный счётчик.
                 </p>
             </div>
             <p className="read-the-docs">
-                Click on the Vite and React logos to learn more
+                Логотипы ведут к документации используемых технологий.
             </p>
         </div>
     );
