@@ -14,6 +14,49 @@ audit. Documentation compliance update: 2026-10-06.
 Goal: an independently installable event and signal library with reliable lifecycle management, precise types, CJS/ESM
 and TypeScript sources, separately published dependencies, and a clear consumer contract.
 
+## First Fix Candidates — Reducer Accumulation (P0)
+
+- [ ] Address this contract immediately after the reproducible baseline in [stage 01](01_BASELINE.md),
+  as one of the first API fixes in [stage 03](03_API_TYPES.md). Do not wait for decomposition or release packaging.
+
+#### 🟠 Warning — Consecutive reducers lose increments without intermediate reads
+
+**File:** `modules/EventEmitterEx/EventSignal.ts`, lines 1426 and 1447–1449 (current checkout).
+
+**Problem:** `set` obtains the reducer's first argument through `_innerGet()`, while its second argument uses
+`_sourceValue`. In the pinned Junction ORM integration (`junct.io` / `f3bb99e2b4c34152de74dc5b04885122e3880fde`), the first argument
+remains stale across consecutive unobserved writes. Consumer reads therefore change the outcome of a counter.
+The owner considers this behavior illogical and requests that it be among the first refactoring candidates.
+Reproduce against the current checkout before changing it; the experiment below was run against the pinned integration.
+
+```ts
+const currentValue = this._innerGet();
+const { _sourceValue } = this;
+const currentSourceValue = (_sourceValue !== void 0 ? _sourceValue : currentValue) as S;
+const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(
+    currentValue as T, currentSourceValue, this.data,
+);
+```
+
+```ts
+const changes = EventSignal.createSignal(0);
+changes.set(prev => ++prev);
+changes.set(prev => ++prev);
+changes.set(prev => ++prev);
+changes.get(); // Observed: 1. Expected: 3.
+```
+
+**Recommendation:** Make reducers on ordinary writable signals consume the latest accepted value, regardless of
+intermediate `get()` calls or subscriptions. Preserve lazy derived computations and the distinction between source
+and computed values for mapped signals; specify their reducer contract separately rather than blindly replacing
+`prev` everywhere. The temporary Junction ORM workaround is `set((_prev, sourceValue) => ++sourceValue)`; it must not
+become a requirement for an ordinary counter.
+
+**Acceptance checks:** Three increments produce `3` without reads, with intermediate reads, with a subscriber,
+and across microtask boundaries. Add cases for mapped/computed signals, distinct source/output types, and reducer
+errors. Verify notification scheduling and laziness independently: coalescing callbacks must not discard increments.
+Deferring this fix risks incorrect revision counters and accumulated state, with results depending on observation.
+
 ## Navigation and Order
 
 | Document                                           | Priority          | Result                                                               | Depends on                                                                 |
@@ -56,7 +99,7 @@ were not changed. Observed results are separated from hypotheses and future acce
 development plan; existing PROJECT_ANALYSIS and docs/IMPROVEMENTS remain historical overviews.
 
 Integration documents: `../modules/EventEmitterEx/EventSignal/JUNCT_INTEGRATION_REVIEW.md` and `_RU.md`; existing demo
-plans: `../demo/eventSignals-test-app/_dev/todo/WEATHER_INTEGRATION_PLAN.md` and `_RU.md`. The Junct.io repository was
+plans: `../demo/eventSignals-test-app/_dev/todo/WEATHER_INTEGRATION_PLAN.md` and `_RU.md`. The Junction ORM repository was
 not modified.
 
 Update task status in the relevant stage: `[ ]` means incomplete, `[x]` means completed with evidence, and “deferred”
