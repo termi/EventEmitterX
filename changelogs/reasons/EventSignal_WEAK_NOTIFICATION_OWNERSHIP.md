@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T20:11:43.377Z"
-timestamp: 1791317503377
+iso date: "2026-10-06T21:00:50.351Z"
+timestamp: 1791320450351
 ai_model: "GPT6"
 git user: '"Egor Halimonenko" <termi_uc@inbox.ru>'
 area: "logic, frontend, tests, docs"
@@ -83,7 +83,7 @@ subscription.resume(); // false: a closed subscription cannot be revived
 ## Alternatives and limits
 
 - Moving channels to signals removes global listener ownership but still needs weak reverse links from live sources to
-  forgotten dependents. It is the agreed second step, deliberately excluded here.
+  forgotten dependents. It was evaluated separately and deferred; see the decision below.
 - A custom adjacency-list implementation could replace EventEmitterX entirely; it must separately preserve
   duplicate/once/prepend/removal behavior and notification timing.
 - A Map or symbol-keyed WeakMap alone does not repair callbacks pointing back to their targets. Finalization alone also
@@ -95,6 +95,18 @@ subscription.resume(); // false: a closed subscription cannot be revived
 - Pending asynchronous computations can retain their owner until the external Promise settles. This step fixes registry
   ownership, not every arbitrary Promise retaining path. Existing queue-disposal and late-completion behavior is
   preserved. Multi-runtime and real React/SSR lifetime validation remain future work.
+
+## Subsequent architecture decision
+
+After evaluation, the owner chose to retain this phase 1 implementation on `dev`. Phase 2 is preserved on
+`experiment/eventsignal-instance-channels`, commit `d17917f2518a7b3a0700131b2076a949fdb0ae89`, without merging.
+Both variants pass GC verification, while phase 2 uses about 12.7% more marginal heap for active computed owners
+with subscribers in the measured workload and has overlapping full-graph update time ranges.
+
+[Comparison and measurements](../../roadmap/verification/SIGNAL_CHANNEL_COMPARISON.md) remain on `dev`.
+The linked-list prototype and phase 2 implementation are available in the experimental branch. Reconsider them only
+with demonstrated benefits and preserved subscription semantics; channel relocation is no longer a required next step.
+Other stage 02 lifecycle/runtime work remains open.
 
 ## Evidence
 
@@ -190,7 +202,7 @@ subscription.resume(); // false: a closed subscription cannot be revived
 ## [RU] Альтернативы и ограничения
 
 - Перенос каналов к сигналам удаляет глобальное владение слушателями, но всё равно требует слабых обратных связей от
-  живых источников к забытым зависимым сигналам. Это согласованный второй шаг, намеренно не включённый сюда.
+  живых источников к забытым зависимым сигналам. Этот вариант оценён отдельно и отложен; см. решение ниже.
 - Собственная реализация списков связей может полностью заменить EventEmitterX; она должна отдельно сохранить поведение
   duplicate/once/prepend/removal и время уведомлений.
 - Map или WeakMap с символом сами по себе не исправляют callbacks, указывающие обратно на свои цели. Одна финализация
@@ -201,6 +213,18 @@ subscription.resume(); // false: a closed subscription cannot be revived
 - Незавершённые асинхронные вычисления могут удерживать владельца до завершения внешнего Promise. Этот шаг исправляет
   владение реестров, а не все произвольные пути удержания через Promise. Существующее поведение dispose очереди и
   позднего завершения сохранено. Проверка нескольких runtime и lifetime реального React/SSR остаётся будущей работой.
+
+## [RU] Последующее архитектурное решение
+
+После оценки владелец решил оставить эту реализацию первого варианта в `dev`. Второй вариант сохранён в
+`experiment/eventsignal-instance-channels`, коммит `d17917f2518a7b3a0700131b2076a949fdb0ae89`, без слияния.
+Оба варианта проходят GC-проверки, но второй использует примерно на 12,7% больше предельного прироста heap для
+активных computed-владельцев с подписчиком в измеренной нагрузке, а диапазоны времени обновления полного графа пересекаются.
+
+[Сравнение и измерения](../../roadmap/verification/SIGNAL_CHANNEL_COMPARISON_RU.md) остаются в `dev`.
+Прототип списка и реализация второго варианта доступны в экспериментальной ветке. Возвращаться к ним следует только
+при доказанной выгоде и сохранении семантики подписок; перенос каналов больше не является обязательным следующим шагом.
+Остальная работа этапа 02 по lifecycle/runtime остаётся открытой.
 
 ## [RU] Подтверждение
 

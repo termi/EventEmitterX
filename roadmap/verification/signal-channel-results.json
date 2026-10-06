@@ -1,0 +1,164 @@
+{
+  "node": "v26.8.1",
+  "platform": "win32",
+  "arch": "x64",
+  "baseline": "686c0d19603b447a8b31ead6552b705c60acafca",
+  "samples": 5,
+  "core": {
+    "phase1": [
+      {
+        "bareBytes": 3059.95,
+        "activeBytes": 4280.064,
+        "updateMs": 73.66399999999993
+      },
+      {
+        "bareBytes": 3059.862,
+        "activeBytes": 4279.768,
+        "updateMs": 73.70229999999998
+      },
+      {
+        "bareBytes": 3057.814,
+        "activeBytes": 4279.768,
+        "updateMs": 68.9667
+      },
+      {
+        "bareBytes": 3057.24,
+        "activeBytes": 4279.768,
+        "updateMs": 68.50419999999997
+      },
+      {
+        "bareBytes": 3057.244,
+        "activeBytes": 4280.048,
+        "updateMs": 69.96979999999996
+      }
+    ],
+    "phase2": [
+      {
+        "bareBytes": 3093.572,
+        "activeBytes": 4824.064,
+        "updateMs": 76.00620000000004
+      },
+      {
+        "bareBytes": 3093.57,
+        "activeBytes": 4823.72,
+        "updateMs": 73.34409999999997
+      },
+      {
+        "bareBytes": 3094.268,
+        "activeBytes": 4824.168,
+        "updateMs": 73.7792
+      },
+      {
+        "bareBytes": 3094.106,
+        "activeBytes": 4823.728,
+        "updateMs": 69.66050000000001
+      },
+      {
+        "bareBytes": 3093.55,
+        "activeBytes": 4823.736,
+        "updateMs": 69.5598
+      }
+    ]
+  },
+  "channels": {
+    "global": [
+      {
+        "bytes": 549.4992,
+        "dispatchMs": 60.12110000000001,
+        "churnMs": 25.26329999999996,
+        "fanoutMs": 23.7774
+      },
+      {
+        "bytes": 549.5064,
+        "dispatchMs": 58.64789999999999,
+        "churnMs": 26.3279,
+        "fanoutMs": 23.3947
+      },
+      {
+        "bytes": 549.4984,
+        "dispatchMs": 60.0061,
+        "churnMs": 26.099800000000016,
+        "fanoutMs": 24.530100000000004
+      },
+      {
+        "bytes": 549.5,
+        "dispatchMs": 60.42539999999997,
+        "churnMs": 25.6456,
+        "fanoutMs": 23.589099999999974
+      },
+      {
+        "bytes": 549.5,
+        "dispatchMs": 59.89799999999997,
+        "churnMs": 25.333499999999958,
+        "fanoutMs": 24.150500000000022
+      }
+    ],
+    "instance": [
+      {
+        "bytes": 967.1312,
+        "dispatchMs": 55.33520000000004,
+        "churnMs": 16.668799999999976,
+        "fanoutMs": 24.63900000000001
+      },
+      {
+        "bytes": 967.4024,
+        "dispatchMs": 54.622199999999964,
+        "churnMs": 16.74350000000004,
+        "fanoutMs": 24.605899999999963
+      },
+      {
+        "bytes": 967.396,
+        "dispatchMs": 54.97319999999996,
+        "churnMs": 16.901299999999992,
+        "fanoutMs": 24.574700000000007
+      },
+      {
+        "bytes": 967.0752,
+        "dispatchMs": 53.7482,
+        "churnMs": 16.7509,
+        "fanoutMs": 24.300999999999988
+      },
+      {
+        "bytes": 967.3952,
+        "dispatchMs": 56.59300000000002,
+        "churnMs": 16.9615,
+        "fanoutMs": 24.114800000000002
+      }
+    ],
+    "linked": [
+      {
+        "bytes": 508.9376,
+        "dispatchMs": 48.64369999999997,
+        "churnMs": 18.453399999999988,
+        "fanoutMs": 27.899999999999977
+      },
+      {
+        "bytes": 509.024,
+        "dispatchMs": 48.334599999999966,
+        "churnMs": 18.14360000000005,
+        "fanoutMs": 28.1259
+      },
+      {
+        "bytes": 509.032,
+        "dispatchMs": 48.3365,
+        "churnMs": 19.48199999999997,
+        "fanoutMs": 28.22429999999997
+      },
+      {
+        "bytes": 509.0656,
+        "dispatchMs": 47.504399999999976,
+        "churnMs": 18.672399999999982,
+        "fanoutMs": 28.281999999999982
+      },
+      {
+        "bytes": 509.0248,
+        "dispatchMs": 49.56709999999998,
+        "churnMs": 18.547699999999963,
+        "fanoutMs": 27.940699999999993
+      }
+    ]
+  },
+  "generatedAt": "2026-10-06T20:43:02.723Z",
+  "typescript": "5.9.3",
+  "cpu": "AMD Ryzen 7 7800X3D 8-Core Processor           "
+}

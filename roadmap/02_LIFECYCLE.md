@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T18:30:42.023Z"
-timestamp: 1791311442023
+iso date: "2026-10-06T21:00:50.351Z"
+timestamp: 1791320450351
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -14,8 +14,8 @@ LIFE-01/LIFE-02 in [the audit](AUDIT.md#detailed-findings).
 
 ## Global Channels First — Implementation Status
 
-The owner chose two separate steps. The current change retains all three global EventEmitterX channels and repairs
-callback ownership. Moving channels to instances/direct memory links waits for the owner's manual commit.
+The active implementation on `dev` retains all three global EventEmitterX channels with weak callback ownership.
+The instance-channel alternative was implemented and evaluated, then preserved separately instead of merged.
 
 - [x] Weak registrations for dependencies, subscribers, source events, triggers, AbortSignal and React component/RAF
   callbacks; live signals own original callbacks.
@@ -24,8 +24,27 @@ callback ownership. Moving channels to instances/direct memory links waits for t
 - [x] Constructor failures, already-aborted owners, cleanup-error aggregation and guards against resuming
   closed/destroyed subscriptions.
 - [x] Nine standalone GC scenarios, a live-owner control and an explicit-disposal fallback without native WeakRef.
-- [ ] After the owner's commit, move channels to instances/direct links, preserving eventName compatibility and
-  notification semantics.
+- [x] Implement and evaluate instance channels/direct links after the owner's phase 1 commit; preserve the experiment
+  separately with its tests, reasoning and measurements.
+- [ ] Reconsider adoption only if a concrete benefit outweighs the measured memory cost; adoption is deferred,
+  not a required next step.
+
+## Architecture Decision — 2026-10-06
+
+Keep phase 1 on `dev`. Both variants pass their GC checks, so phase 2 does not demonstrate an additional correction
+of the known retention problem. In the measured workload, active computed signals with subscribers need about
+12.7% more marginal heap in phase 2; full-graph update time ranges overlap. Local ownership is architecturally useful,
+but does not justify adoption by itself for the current implementation.
+
+The experiment is retained on `experiment/eventsignal-instance-channels`, commit
+`d17917f2518a7b3a0700131b2076a949fdb0ae89`, based on phase 1 commit
+`686c0d19603b447a8b31ead6552b705c60acafca`. It was not merged or cherry-picked into `dev`.
+[The comparison](verification/SIGNAL_CHANNEL_COMPARISON.md) and raw measurements remain available here;
+the implementation, benchmark script and extra GC tests belong to that branch.
+
+Revisit a compact per-instance channel or linked-list backend only with preserved subscription/mutation semantics
+and measured benefits in representative workloads. The linked-list prototype alone does not establish a better
+full EventSignal implementation. Runtime portability, dynamic cycles and source-destruction semantics remain stage 02 work.
 
 Run `pnpm test:signals:gc`; fallback: `node --expose-gc _dev/check_signal_lifecycle.cjs --without-weakref`. The GC
 regression fails on the original HEAD source and passes on the repair. All 114 EventSignal tests pass (one skipped);
