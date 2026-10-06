@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:33:25.756Z"
-timestamp: 1791236005756
+iso date: "2026-10-06T11:10:48.582Z"
+timestamp: 1791285048582
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "config/ai"
@@ -22,6 +22,14 @@ area: "config/ai"
   `show`, `blame`, and `shortlog`.
 - When generating dates or timestamps, try Node.js first, then Python on failure,
   then the current shell. Follow the date/time rules for formats and exceptions.
+
+## EventSignal Naming
+
+- When creating or modifying EventSignal code or tests, suffix identifiers that
+  hold signal instances with `$` (for example, `signal$`, `mapped$`, `computed$`).
+- Suffix functions that return signal instances with `$$`.
+- This naming rule applies whether or not the optional `eventsignal` skill is
+  loaded. Before finishing, check all new and modified signal identifiers.
 
 ## Documentation and Changelogs
 
