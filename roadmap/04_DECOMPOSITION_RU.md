@@ -14,9 +14,9 @@ area: "docs, api, types, deps, tests"
 
 ## Границы модулей
 
-- [ ] Вынести всю React-работу EventSignal в отдельный адаптер, например `EventSignalReact.ts`: initReact,
+- [x] Вынести всю React-работу EventSignal в отдельный адаптер, например `EventSignalReact.ts`: initReact,
   hooks/use/useListener, JSX element properties, component registration/context/error boundary и React scheduler.
-- [ ] Ядро EventSignal отвечает за значение, зависимости, scheduling вычислений, subscriptions и lifecycle. Связь с
+- [x] Ядро EventSignal отвечает за значение, зависимости, scheduling вычислений, subscriptions и lifecycle. Связь с
   React — узкий adapter interface; существующие методы временно делегируют, сохраняя API. Не устраивать runtime cycle
   core ↔ adapter.
 - [ ] Вынести реализацию `EventEmitterX.static once` в модуль **EventAwait**, например `EventAwait.ts`. Сохранить
@@ -28,6 +28,24 @@ area: "docs, api, types, deps, tests"
   без ясной ответственности.
 - [ ] Реэкспортировать модули через индекс и subpaths без изменения identity классов и singleton registries внутри одной
   сборки.
+
+## Завершённое выделение React
+
+Реализовано в dev от main 4e3b6c1. EventSignalReact.ts содержит hooks, initialization,
+JSX, component registry/context и rendering; EventSignalReactScheduler.ts содержит
+RAF pool. Ядро сохраняет state, computation, dependencies, writes/lifecycle и
+публичные delegating методы. Обратный импорт ядра в адаптере — только type-only.
+
+[Обоснование и проверка истории](../changelogs/reasons/EventSignal_REACT_DECOMPOSITION.md)
+фиксируют ветки, merge и девять проверенных исходных line commits. log --follow
+доходит до старой истории; для перемещённых React-блоков нужен blame -M -C -C.
+Rename-коммиты и multi-parent merge нельзя squash-ить.
+
+Проверка: 108 EventSignal tests passed, 1 skipped; пять новых React-тестов также
+проходят на исходнике main. Строгие fixtures и три режима деклараций проходят
+при тех же 36 library diagnostics. Полный набор: 391 passed, те же 14 ошибок
+events_spec, 1 skipped, 6 todo. Real React/SSR, самостоятельный consumer React
+entry point и последующее выделение таймеров/adapters остаются открытыми.
 
 ## Процедура сохранения истории
 
@@ -52,8 +70,8 @@ Git отслеживает snapshots, а rename/copy выводится эври
    merge ancestry; squash может уничтожить выбранную трассировку и допускается лишь после повторной проверки и явного
    изменения требования владельцем.
 
-Это план будущих commits, не разрешение коммитить сейчас. Точный сценарий выбирать по результату пробной истории, а не
-по ритуалу двух веток.
+Выделение React выше явно разрешено в dev. Последующие выделения требуют отдельного разрешения.
+Точный сценарий выбирать по результату пробной истории, а не по ритуалу двух веток.
 
 ## Завершение
 

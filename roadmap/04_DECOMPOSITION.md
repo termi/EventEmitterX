@@ -13,9 +13,9 @@ rewrite existing branch history or mix moves with behavior changes, formatting o
 
 ## Module Boundaries
 
-- [ ] Extract all React work from EventSignal into a separate adapter, for example EventSignalReact.ts: initReact,
+- [x] Extract all React work from EventSignal into a separate adapter, for example EventSignalReact.ts: initReact,
   hooks/use/useListener, JSX element properties, component registration/context/error boundary and the React scheduler.
-- [ ] EventSignal core owns values, dependencies, computation scheduling, subscriptions and lifecycle. Connect React
+- [x] EventSignal core owns values, dependencies, computation scheduling, subscriptions and lifecycle. Connect React
   through a narrow adapter interface; existing methods temporarily delegate to preserve API. Avoid a runtime cycle
   between core and adapter.
 - [ ] Extract the implementation of EventEmitterX.static once into **EventAwait**, for example EventAwait.ts. Keep
@@ -27,6 +27,24 @@ rewrite existing branch history or mix moves with behavior changes, formatting o
   without a clear responsibility.
 - [ ] Re-export modules through the index and subpaths without changing class identity or singleton registries within
   one build.
+
+## Completed React Extraction
+
+Implemented on dev from main 4e3b6c1. EventSignalReact.ts contains hooks, initialization,
+JSX, component registry/context and rendering; EventSignalReactScheduler.ts contains
+the RAF pool. Core keeps state, computation, dependencies, writes/lifecycle and
+public delegating methods. The adapter's reverse core import is type-only.
+
+[Reason and history verification](../changelogs/reasons/EventSignal_REACT_DECOMPOSITION.md)
+record branches, merge and nine verified original line commits. log --follow reaches
+the old history; moved React blocks require blame -M -C -C. Do not squash the
+rename commits or multi-parent merge.
+
+Validation: 108 EventSignal tests passed, 1 skipped; five new React tests also pass
+against the original main source. Strict fixtures and three declaration modes pass
+with the same 36 library diagnostics. Full suite: 391 passed, the same 14 events_spec
+failures, 1 skipped, 6 todo. Real React/SSR, a standalone consumer React entry point
+and subsequent timer/adapter extraction remain open.
 
 ## History Preservation Procedure
 
@@ -51,8 +69,8 @@ extracted fragment. Verify both file history and line provenance after a move.
    squash may destroy the chosen traceability and is allowed only after rechecking and an explicit change to the owner's
    requirement.
 
-This is a plan for future commits, not permission to commit now. Choose the exact procedure from the trial history
-rather than treating two branches as a ritual.
+The React extraction above was explicitly authorized on dev. Future extractions require their own authorization.
+Choose the exact procedure from trial history rather than treating two branches as a ritual.
 
 ## Completion
 

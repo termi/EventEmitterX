@@ -67,6 +67,73 @@ rename-only variant. Verify actual log --follow and blame on each extracted modu
 new glue lines belong to the extraction commit. Tests and type consumers must pass
 on the final tree; history preparation snapshots are not acceptance points.
 
+## Actual History Verification
+
+Base main: 4e3b6c1. Decision commit: a3817ac. Intermediate branches were created
+from dev: split/eventsignal-react-history (ae4e062) and
+split/eventsignal-react-scheduler-history (d1ec5e7). Their rename ancestry was
+joined by a50e785; 8efb126 contains the working extraction and tests.
+
+Both log --follow histories reach the old EventSignal.ts commits. Nine unchanged
+line samples match the original blame at the base revision:
+
+| Destination | Original EventSignal.ts line | Original commit |
+| --- | ---: | --- |
+| EventSignalReact.ts:209 | 3114 | 1b871b8 |
+| EventSignalReact.ts:515 | 2425 | 1b871b8 |
+| EventSignalReact.ts:607 | 2530 | 1b871b8 |
+| EventSignalReact.ts:224 | 3129 | abaff27 |
+| EventSignalReact.ts:389 | 3293 | 356c08a |
+| EventSignalReact.ts:1014 | 4075 | 4d817e2 |
+| EventSignalReactScheduler.ts:9 | 3959 | 532c4ff |
+| EventSignalReactScheduler.ts:26 | 3976 | 532c4ff |
+| EventSignal.ts:87 | 90 | 4e3b6c1 |
+
+Use git --no-pager blame -M -C -C -- modules/EventEmitterEx/EventSignalReact.ts
+and the same command for EventSignalReactScheduler.ts. Default blame follows
+RAF lines, but can attribute reordered React blocks to the extraction commit;
+-M follows moves within the file. New signatures, bridge accesses and renamed
+signal references appropriately belong to the extraction. This is verified line
+traceability, not a promise that every unconfigured history viewer follows moves.
+Preserve the rename commits and multi-parent merge; do not squash this history.
+
+## Existing Behavior Kept for Separate Work
+
+### [Warning] Repeated Subscription Cleanup
+
+File: modules/EventEmitterEx/EventSignal.ts, lines 2166–2172:
+
+```ts
+const unsubscribe = () => {
+    closed = true;
+    this._removeListener(ignoredEventName, listener, true);
+    listener = void 0;
+};
+```
+
+A second call can pass an undefined listener to removal and throw. The RAF adapter
+retains this existing behavior; the new test verifies one cleanup cancels queued
+callbacks and removes the registry listener. Recommendation: make subscription
+cleanup idempotent in lifecycle stage 02, with repeated unmount/unsubscribe tests,
+in a separate behavioral change.
+
+### [Info] React Version Switching
+
+File: modules/EventEmitterEx/EventSignalReact.ts, lines 184–201:
+
+```ts
+if (isReactGte19) {
+    Object.defineProperties(_EventSignal_prototype, {
+        $typeof: { configurable: true, value: Symbol.for("react.transitional.element") },
+    });
+}
+```
+
+The existing initializer updates the element marker for React 19 and does not reset
+it when reinitializing with React 18. Tests preserve that behavior rather than
+introducing a compatibility fix during extraction. Recommendation: define supported
+version-switch/reset semantics and test them separately with real React consumers.
+
 ---
 
 ## [RU] Проблема и решение
@@ -128,3 +195,70 @@ Merge полных копий — подготовительный снимок 
 для каждого выделенного модуля; новые соединяющие строки относятся к коммиту
 выделения. Тесты и type consumers должны проходить на итоговом дереве;
 подготовительные снимки истории не являются точками приёмки.
+
+## [RU] Фактическая проверка истории
+
+Исходная main: 4e3b6c1. Коммит решений: a3817ac. Промежуточные ветки созданы
+от dev: split/eventsignal-react-history (ae4e062) и
+split/eventsignal-react-scheduler-history (d1ec5e7). Rename-предки объединены
+коммитом a50e785; 8efb126 содержит рабочее выделение и тесты.
+
+Обе истории log --follow доходят до старых коммитов EventSignal.ts. Девять образцов
+неизменённых строк совпадают с исходным blame на базовой ревизии:
+
+| Целевой файл | Исходная строка EventSignal.ts | Исходный коммит |
+| --- | ---: | --- |
+| EventSignalReact.ts:209 | 3114 | 1b871b8 |
+| EventSignalReact.ts:515 | 2425 | 1b871b8 |
+| EventSignalReact.ts:607 | 2530 | 1b871b8 |
+| EventSignalReact.ts:224 | 3129 | abaff27 |
+| EventSignalReact.ts:389 | 3293 | 356c08a |
+| EventSignalReact.ts:1014 | 4075 | 4d817e2 |
+| EventSignalReactScheduler.ts:9 | 3959 | 532c4ff |
+| EventSignalReactScheduler.ts:26 | 3976 | 532c4ff |
+| EventSignal.ts:87 | 90 | 4e3b6c1 |
+
+Использовать git --no-pager blame -M -C -C -- modules/EventEmitterEx/EventSignalReact.ts
+и ту же команду для EventSignalReactScheduler.ts. Обычный blame прослеживает
+RAF-строки, но может приписать переупорядоченные React-блоки коммиту выделения;
+-M отслеживает перемещения внутри файла. Новые сигнатуры, обращения к bridge и
+переименованные ссылки на сигналы обоснованно относятся к выделению. Это проверенная
+прослеживаемость строк, а не обещание, что любой ненастроенный просмотрщик истории
+отслеживает перемещения. Сохранить rename-коммиты и multi-parent merge; не squash-ить историю.
+
+## [RU] Существующее поведение, оставленное для отдельной работы
+
+### [Warning] Повторная очистка подписки
+
+Файл: modules/EventEmitterEx/EventSignal.ts, строки 2166–2172:
+
+```ts
+const unsubscribe = () => {
+    closed = true;
+    this._removeListener(ignoredEventName, listener, true);
+    listener = void 0;
+};
+```
+
+Второй вызов может передать undefined listener в удаление и выбросить ошибку.
+RAF-адаптер сохраняет это поведение; новый тест проверяет, что однократная очистка
+отменяет ожидающие callbacks и удаляет listener регистра. Рекомендация: сделать
+очистку подписки идемпотентной в lifecycle-этапе 02 с проверками повторного
+unmount/unsubscribe отдельным изменением поведения.
+
+### [Info] Переключение версий React
+
+Файл: modules/EventEmitterEx/EventSignalReact.ts, строки 184–201:
+
+```ts
+if (isReactGte19) {
+    Object.defineProperties(_EventSignal_prototype, {
+        $$typeof: { configurable: true, value: Symbol.for("react.transitional.element") },
+    });
+}
+```
+
+Существующий initializer обновляет маркер элемента для React 19 и не сбрасывает
+его при повторной инициализации React 18. Тесты сохраняют это поведение вместо
+внесения compatibility fix во время выделения. Рекомендация: определить поддержанные
+правила переключения версий/reset и проверить их отдельно на настоящих React consumers.
