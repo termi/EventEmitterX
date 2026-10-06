@@ -19,6 +19,30 @@ A typed internal bridge supplies only private operations required by React; it d
 not expose private fields publicly. React imports the core only as a type; runtime
 initialization receives the constructor from its static block.
 
+## Examples and Verification
+
+Existing calls stay unchanged: signal$.use(value => String(value)),
+signal$.component({ sFC: component }), EventSignal.initReact(React), and
+EventSignal.registerReactComponentForComponentType(type, component). The class
+retains the original generic overloads and binds stable subscription/snapshot
+callbacks; those wrappers forward to the adapter. Private description, stored
+value, component descriptor, component version and subscription access are supplied
+by the bridge. Shallow equality remains in the core because computation also uses it;
+the bridge passes that existing comparator to component registration.
+
+Hook implementations now live in adapter-local slots rather than private prototype
+slots. Reinitialization replaces them; debug, JSX and context state remain scoped
+to the installed integration. This avoids inheritance and duplicated constructors.
+React uses a type-only core import, while core passes its constructor at runtime.
+
+Five focused React tests pass on both the original main implementation and the
+extracted implementation. They cover hook reinitialization, null prototype/class
+identity, JSX/context for React 18 and 19, registry/RAF cleanup and destroyed
+rendering. All 108 EventSignal tests pass, one is skipped. Strict source fixtures
+and emitted consumers pass in CommonJS, NodeNext and Bundler; the same 36 library
+diagnostics remain. Full suite: 391 passed, 14 existing events_spec failures,
+one skipped and six todo. Real React/SSR and packaging remain separate acceptance.
+
 ## Alternatives and Limits
 
 Inheritance was rejected because it changes the prototype contract. Runtime imports
@@ -55,6 +79,30 @@ EventSignalReact.ts владеет hooks, инициализацией, JSX-де
 Типизированный внутренний адаптер предоставляет только приватные операции,
 необходимые React; приватные поля не становятся публичными. React импортирует ядро
 только как тип; runtime-инициализация получает конструктор из его static block.
+
+## [RU] Примеры и проверка
+
+Существующие вызовы не меняются: signal$.use(value => String(value)),
+signal$.component({ sFC: component }), EventSignal.initReact(React) и
+EventSignal.registerReactComponentForComponentType(type, component). Класс сохраняет
+исходные generic overloads и привязанные стабильные callbacks подписки/snapshot;
+эти обёртки передают работу адаптеру. Доступ к приватным description, сохранённому
+value, descriptor компонента, версии компонента и подпискам предоставляет bridge.
+Shallow equality остаётся в ядре, поскольку используется и в computation;
+bridge передаёт существующий comparator регистрации компонентов.
+
+Реализации hooks теперь находятся в локальных слотах адаптера вместо приватных
+слотов прототипа. Повторная инициализация заменяет их; состояние debug, JSX и context
+остаётся в установленной интеграции. Это исключает наследование и дублирование
+конструкторов. React использует type-only импорт ядра, а ядро передаёт конструктор runtime.
+
+Пять точечных React-тестов проходят и на исходной реализации main, и после
+выделения. Они проверяют повторную инициализацию hooks, null-прототип/identity
+класса, JSX/context React 18 и 19, очистку registry/RAF и рендеринг уничтоженного
+сигнала. Проходят все 108 EventSignal-тестов, один пропущен. Строгие source fixtures
+и emitted consumers проходят для CommonJS, NodeNext и Bundler; остаются те же
+36 library diagnostics. Полный набор: 391 passed, 14 существующих ошибок events_spec,
+один skipped и шесть todo. Настоящие React/SSR и упаковка остаются отдельной приёмкой.
 
 ## [RU] Альтернативы и границы
 

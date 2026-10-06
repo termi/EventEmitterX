@@ -186,6 +186,21 @@ pending$.addListener(value => {
 });
 const reactLast = pending$.use();
 type ReactLast = Expect<Equal<typeof reactLast, number | undefined>>;
+const reducedReactValue = pending$.use(value => String(value));
+type ReducedReactValue = Expect<Equal<typeof reducedReactValue, string>>;
+const listenerReactValue = pending$.useListener(value => {
+    type ListenerReactValue = Expect<Equal<typeof value, number | undefined>>;
+});
+type ListenerReactReturn = Expect<Equal<typeof listenerReactValue, number | undefined>>;
+const reducedListenerReactValue = writable$.useReducedListener(
+    (value: number) => String(value),
+    value => { type ReducedListenerValue = Expect<Equal<typeof value, string>>; },
+);
+type ReducedListenerReactValue = Expect<Equal<typeof reducedListenerReactValue, string>>;
+const renderComponent = ({ current$ }: { current$: typeof writable$, label?: string }) => current$.get();
+writable$.setReactFC(renderComponent, { label: 'counter' });
+// @ts-expect-error React component props remain checked after delegation.
+writable$.setReactFC(renderComponent, { label: 1 });
 
 const hybrid$ = new EventSignal(0, (_prev, source) => source ? Promise.resolve(source) : 0, { initialSourceValue: 0 });
 const hybridResult = hybrid$.get();
