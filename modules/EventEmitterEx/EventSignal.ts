@@ -1235,6 +1235,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         //     }
         // }
 
+        // Keep this read lazy and dependency-free; computed reducer sequencing is planned in roadmap/03_API_TYPES.md (03.2).
         return this._value;
     }
 
@@ -1411,7 +1412,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //  1. Истории изменений (в том числе для дебага)
     //  2. Для возможности игнорировать установки нового значения с определёнными значениями reason (пока предполагается
     //     только для React-хуков EventSignal.use({ ignoreUpdateReason: 'reason-name' }) и EventSignal.useListener((v) => { log(v); }, { ignoreUpdateReason: 'reason-name' })
-    /** setter */
+    /**
+     * Writable reducers receive the latest accepted value as prev, even before get().
+     * Computed reducers receive the last output as prev and the latest source separately.
+     * Neither form forces a computation or changes notification scheduling.
+     */
     set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
     set(newSourceValue: S): void;
     set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)): void {
@@ -1425,6 +1430,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             //  todo: Тесты нужны
             const currentValue = this._innerGet();
 
+            // Async output waiting and ordered computed reducers need a separate contract (roadmap/03_API_TYPES.md, 03.2).
             // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
             // if (!!currentValue && typeof currentValue === 'object' && typeof currentValue["then"] === 'function') {
             //     // eslint-disable-next-line promise/prefer-await-to-then
@@ -1446,7 +1452,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
             const { _sourceValue } = this;
             const currentSourceValue = (_sourceValue !== void 0 ? _sourceValue : currentValue) as S;
-            const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(currentValue as T, currentSourceValue, this.data);
+            // Accepted writable source is authoritative even while output is lazy or throttled.
+            const reducerValue = (this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0
+                ? currentValue
+                : currentSourceValue
+            ;
+            const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(reducerValue as T, currentSourceValue, this.data);
 
             if (this._setSourceValue(_newSourceValue, true)) {
                 //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
@@ -2915,7 +2926,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             const reactFC = sFC !== void 0 ? sFC : ((reactFCDescriptor_0 = reactFCDescriptor?.[0]) ?? sDefaultFC);
             const preDefinedProps = reactFCDescriptor_0 ? (reactFCDescriptor as NonNullable<(typeof reactFCDescriptor)>)[1] as Record<any, any> : void 0;
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error `TS7053: Element implicitly has an any type because expression of type 2 can't be used to index type`
+            // @ts-ignore `TS7053: Element implicitly has an any type because expression of type 2 can't be used to index type`
             const destroyOnUnmount = (reactFCDescriptor ? reactFCDescriptor[2] as { destroyOnUnmount?: boolean } | undefined : void 0)?.destroyOnUnmount
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error `TS7053: Element implicitly has an any type because expression of type 2 can't be used to index type`

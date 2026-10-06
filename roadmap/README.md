@@ -16,18 +16,37 @@ and TypeScript sources, separately published dependencies, and a clear consumer 
 
 ## First Fix Candidates — Reducer Accumulation (P0)
 
-- [ ] Address this contract immediately after the reproducible baseline in [stage 01](01_BASELINE.md),
+- [x] Address this contract immediately after the reproducible baseline in [stage 01](01_BASELINE.md),
   as one of the first API fixes in [stage 03](03_API_TYPES.md). Do not wait for decomposition or release packaging.
+
+### Implementation Result — 2026-10-06
+
+Ordinary writable reducers now receive the latest accepted value as `prev`, without requiring `get()`.
+Computed reducers retain the last output as `prev` and the latest accepted source as `sourceValue`;
+setting source does not force computation. Throttle release and microtask notification scheduling are preserved.
+The implementation is in `modules/EventEmitterEx/EventSignal.ts`, lines 1421–1428.
+
+Twelve regression cases cover unobserved writes, reads, microtask boundaries, subscriptions and coalescing,
+literal/null/zero values, immutable objects and data, undefined and errors, synchronous/asynchronous computed
+output, mapped laziness, throttling and dependency isolation. All EventSignal tests pass. The full suite has
+364 passing tests, the same 14 pre-existing failures in `events_spec`, one skipped test and six todo cases.
+Library-only strict checking retains 36 diagnostics. This completes proposal item 01.3 (the writable reducer
+contract), not the third checkbox in stage 01 concerning runtime/type-check separation.
+
+Next: [task 03.1 — automatic signal type inference](03_API_TYPES.md#031--next-automatic-signal-type-inference).
+The simple async constructor already infers its types; factory and contextual self inference require coordinated repair.
+
+The following finding records the pre-fix evidence; the pinned Junction ORM copy is unchanged.
 
 #### 🟠 Warning — Consecutive reducers lose increments without intermediate reads
 
-**File:** `modules/EventEmitterEx/EventSignal.ts`, lines 1426 and 1447–1449 (current checkout).
+**File:** `modules/EventEmitterEx/EventSignal.ts`, lines 1426 and 1447–1449 (pre-fix snapshot).
 
 **Problem:** `set` obtains the reducer's first argument through `_innerGet()`, while its second argument uses
 `_sourceValue`. In the pinned Junction ORM integration (`junct.io` / `f3bb99e2b4c34152de74dc5b04885122e3880fde`), the first argument
 remains stale across consecutive unobserved writes. Consumer reads therefore change the outcome of a counter.
 The owner considers this behavior illogical and requests that it be among the first refactoring candidates.
-Reproduce against the current checkout before changing it; the experiment below was run against the pinned integration.
+The experiment below was run against the pinned integration; regression tests also reproduced it locally before the fix.
 
 ```ts
 const currentValue = this._innerGet();
@@ -103,5 +122,5 @@ plans: `../demo/eventSignals-test-app/_dev/todo/WEATHER_INTEGRATION_PLAN.md` and
 not modified.
 
 Update task status in the relevant stage: `[ ]` means incomplete, `[x]` means completed with evidence, and “deferred”
-needs a reason and target release. No implementation task in this set has been completed. English files are originals;
+needs a reason and target release. Completed work is recorded with evidence in the relevant documents. English files are originals;
 adjacent `_RU.md` files contain equivalent Russian translations.

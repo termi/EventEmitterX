@@ -57,6 +57,157 @@ describe('EventSignal', () => {
         return (num & 1) === 0;
     };
 
+    describe('reducer contract', () => {
+        it.each(['unobserved', 'reads', 'microtasks', 'subscribed'])('accumulates accepted writes: %s', async mode => {
+            using signal$ = new EventSignal(0);
+            const listener = jest.fn();
+
+            if (mode === 'subscribed') {
+                signal$.addListener(listener);
+                listener.mockClear();
+            }
+
+            for (let i = 1; i <= 3; i++) {
+                signal$.set(prev => prev + 1);
+                if (mode === 'reads') {
+                    expect(signal$.get()).toBe(i);
+                }
+                if (mode === 'microtasks') {
+                    await Promise.resolve();
+                }
+            }
+
+            if (mode === 'subscribed') {
+                expect(listener).not.toHaveBeenCalled();
+                await Promise.resolve();
+                expect(listener.mock.calls.map(([value]) => value)).toEqual([3]);
+            }
+            expect(signal$.get()).toBe(3);
+        });
+
+        it('uses literal writes, null and zero as the next reducer input', () => {
+            using signal$ = new EventSignal<number | null>(5);
+            signal$.set(10);
+            signal$.set(prev => prev! + 1);
+            expect(signal$.getSourceValue()).toBe(11);
+            signal$.set(null);
+            signal$.set((prev, source) => {
+                expect(prev).toBeNull();
+                expect(source).toBeNull();
+                return 0;
+            });
+            signal$.set(prev => prev! + 1);
+            expect(signal$.get()).toBe(1);
+        });
+
+        it('accumulates immutable objects and preserves the data argument', () => {
+            const data = { step: 2 };
+            using signal$ = new EventSignal({ count: 0 }, { data });
+            for (let i = 0; i < 3; i++) {
+                signal$.set((prev, source, reducerData) => {
+                    expect(prev).toBe(source);
+                    expect(reducerData).toBe(data);
+                    return { count: prev.count + reducerData.step };
+                });
+            }
+            expect(signal$.get()).toEqual({ count: 6 });
+        });
+
+        it('ignores undefined and leaves accepted state intact when a reducer throws', () => {
+            using signal$ = new EventSignal<number | undefined>(0);
+            const error = new Error('reducer failed');
+            signal$.set(prev => prev! + 1);
+            signal$.set(() => undefined);
+            expect(() => signal$.set(() => { throw error; })).toThrow(error);
+            signal$.set(prev => prev! + 1);
+            expect(signal$.get()).toBe(2);
+        });
+
+        it('keeps computed output distinct from accepted source without eager computation', async () => {
+            const computation = jest.fn((_prev: string, source: number) => `value:${source}`);
+            using signal$ = new EventSignal<string, number>('initial', computation, { initialSourceValue: 0 });
+            const listener = jest.fn();
+            expect(signal$.get()).toBe('value:0');
+            signal$.addListener(listener);
+            listener.mockClear();
+            computation.mockClear();
+            for (let i = 0; i < 3; i++) {
+                signal$.set((prev, source) => {
+                    expect(prev).toBe('value:0');
+                    expect(source).toBe(i);
+                    return source + 1;
+                });
+            }
+            expect(computation).not.toHaveBeenCalled();
+            expect(listener).not.toHaveBeenCalled();
+            await Promise.resolve();
+            expect(computation).toHaveBeenCalledTimes(1);
+            expect(listener.mock.calls.map(([value]) => value)).toEqual(['value:3']);
+            expect(signal$.get()).toBe('value:3');
+        });
+
+        it('keeps asynchronous computed output distinct from source', async () => {
+            using signal$ = new EventSignal('initial', async (_prev, source) => `async:${source}`, { initialSourceValue: 0 });
+            expect(await signal$.get()).toBe('async:0');
+            expect(signal$.computationsCount).toBe(1);
+            for (let i = 0; i < 3; i++) {
+                signal$.set((prev, source) => {
+                    expect(prev).toBe('async:0');
+                    expect(source).toBe(i);
+                    return source + 1;
+                });
+            }
+            expect(signal$.computationsCount).toBe(1);
+            expect(await signal$.get()).toBe('async:3');
+            expect(signal$.computationsCount).toBe(2);
+        });
+
+        it('accumulates throttled writes without releasing output before the trigger', () => {
+            const emitter = new EventEmitter();
+            {
+                using signal$ = new EventSignal(0, {
+                    throttle: { type: 'emitter', emitter, event: 'release', __proto__: null },
+                });
+                signal$.set(prev => prev + 1);
+                signal$.set(prev => prev + 1);
+                signal$.set(prev => prev + 1);
+                expect(signal$.getSourceValue()).toBe(3);
+                expect(signal$.get()).toBe(0);
+                emitter.emit('release');
+                expect(signal$.get()).toBe(3);
+            }
+            expect(getEventListeners(emitter, 'release')).toHaveLength(0);
+        });
+
+        it('keeps mapped signals lazy', () => {
+            using signal$ = new EventSignal(0);
+            const computation = jest.fn(value => `mapped:${value}`);
+            using mapped$ = signal$.map(computation);
+            expect(mapped$.get()).toBe('mapped:0');
+            computation.mockClear();
+            signal$.set(prev => prev + 1);
+            signal$.set(prev => prev + 1);
+            signal$.set(prev => prev + 1);
+            expect(computation).not.toHaveBeenCalled();
+            expect(mapped$.get()).toBe('mapped:3');
+            expect(computation).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not register a dependency when reducing another signal inside a computation', () => {
+            using signal$ = new EventSignal(0);
+            const computation = jest.fn(() => {
+                signal$.set(prev => prev + 1);
+                return 'result';
+            });
+            using computed$ = new EventSignal('', computation);
+            expect(computed$.get()).toBe('result');
+            signal$.set(prev => prev + 1);
+            expect(computed$.get()).toBe('result');
+            expect(computation).toHaveBeenCalledTimes(1);
+            expect(signal$.get()).toBe(2);
+        });
+    });
+
     describe('common cases', () => {
         it('basic case', async function() {
             const signal1$ = new EventSignal(0, {
@@ -2817,6 +2968,7 @@ describe('EventSignal', () => {
         });
 
         describe('only works with computation in triggered signal', function() {
+            // todo: Pending roadmap 03.2: the target reducer sequence currently produces 2 instead of 4.
             it('force update signal value every X milliseconds 1', async () => {
                 const ac = new AbortController();
                 const timerGroupId = Symbol();
@@ -2885,8 +3037,9 @@ describe('EventSignal', () => {
 
                 expect(fromTemplate$.get()).toBe('counter is 1 and time is "09:05:00"');
 
-                // fixme: [tag: SET_WITH_SETTER__QUEUES]
-                //  Тут "предыдущее значение" для каждого `signal.set(setter)` должно быть новым и актуальным.
+                // fixme: [tag: COMPUTED_REDUCER_OUTPUT_SEQUENCE] roadmap/03_API_TYPES.md, 03.2.
+                //  Целевое поведение: каждый reducer получает актуальный output после предыдущего изменения.
+                //  Вызовы ниже должны дать 4; сейчас дают 2.
                 //  counterValue$.set(v => ++v);
                 //  counterValue$.set(v => ++v);
                 //  counterValue$.set(v => ++v);
@@ -3343,12 +3496,9 @@ describe('EventSignal', () => {
 
                 expect(computed$.get()).toBe('is 0 and 555');
 
-                // fixme: [tag: SET_WITH_SETTER__QUEUES]
-                //  Тут "предыдущее значение" для каждого `signal.set(setter)` должно быть новым и актуальным.
-                //  throttledValue1$.set(v => ++v);
-                //  throttledValue1$.set(v => ++v);
-                //  throttledValue1$.set(v => ++v);
-                throttledValue1$.set(v => v + 3);
+                throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => ++v);
 
                 expect(throttledValue1$.get()).toBe(0);
                 expect(computed$.get()).toBe('is 0 and 555');
@@ -3387,10 +3537,8 @@ describe('EventSignal', () => {
                 throttledValue1$.set(v => ++v);
                 throttledValue1$.set(v => ++v);
 
-                // fixme: [tag: SET_WITH_SETTER__QUEUES]
-                //  Тут значение в throttledValue1$ должно быть 12 !
-                expect(computed$.get()).toBe('is 3 and 555');
-                expect(throttledValue1$.get()).toBe(3); //.toBe(12);
+                expect(computed$.get()).toBe('is 12 and 555');
+                expect(throttledValue1$.get()).toBe(12);
 
                 throttledValue1$.destructor();
                 throttledValue2$.destructor();
@@ -3507,11 +3655,8 @@ describe('EventSignal', () => {
                 expect(throttledValue1$.get()).toBe(1);
                 expect(throttledValue2$.get()).toBe(556);
 
-                // fixme: [tag: SET_WITH_SETTER__QUEUES]
-                //  Тут "предыдущее значение" (1) для каждого `signal.set(setter)` должно быть новым и актуальным.
-                //  throttledValue1$.set(v => ++v);
-                //  throttledValue1$.set(v => ++v);
-                throttledValue1$.set(v => v + 2);
+                throttledValue1$.set(v => ++v);
+                throttledValue1$.set(v => ++v);
                 throttledValue2$.set(v => ++v);
 
                 value2_ac.abort();
