@@ -43,6 +43,11 @@ area: "config/ai"
   rules; changelog-specific structure and commit rules take precedence.
 - Create one changelog per change set after AI code changes. Reason documents are
   separate: one bilingual file per problem. Read the changelog rules for other triggers.
+- For non-obvious or complex changes, create or update a reason document in
+  `changelogs/reasons/` before finishing. Explain the problem, chosen mechanism,
+  alternatives and tradeoffs, concrete examples, verification and limitations.
+  Use one bilingual file per problem and link it from the related changelog's
+  Meta and Reasons sections. This requirement applies regardless of skill use.
 - Include related changelog files in the related change-set commit. Never mention
   those files in the commit message or let them determine its type or scope.
 - In technical reviews, every issue needs severity, repository-relative file path,

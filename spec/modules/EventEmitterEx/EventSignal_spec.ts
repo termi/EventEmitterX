@@ -123,25 +123,24 @@ describe('EventSignal', () => {
             expect(signal$.get()).toBe(2);
         });
 
-        it('keeps computed output distinct from accepted source without eager computation', async () => {
-            const computation = jest.fn((_prev: string, source: number) => `value:${source}`);
-            using signal$ = new EventSignal<string, number>('initial', computation, { initialSourceValue: 0 });
+        it('keeps computed output distinct from accepted source with ordered intermediate computation', async () => {
+            using signal$ = new EventSignal('initial', (_prev, source) => `value:${source}`, { initialSourceValue: 0 });
             const listener = jest.fn();
             expect(signal$.get()).toBe('value:0');
             signal$.addListener(listener);
             listener.mockClear();
-            computation.mockClear();
+            expect(signal$.computationsCount).toBe(1);
             for (let i = 0; i < 3; i++) {
                 signal$.set((prev, source) => {
-                    expect(prev).toBe('value:0');
+                    expect(prev).toBe(`value:${i}`);
                     expect(source).toBe(i);
                     return source + 1;
                 });
             }
-            expect(computation).not.toHaveBeenCalled();
+            expect(signal$.computationsCount).toBe(3);
             expect(listener).not.toHaveBeenCalled();
             await Promise.resolve();
-            expect(computation).toHaveBeenCalledTimes(1);
+            expect(signal$.computationsCount).toBe(4);
             expect(listener.mock.calls.map(([value]) => value)).toEqual(['value:3']);
             expect(signal$.get()).toBe('value:3');
         });
@@ -152,14 +151,14 @@ describe('EventSignal', () => {
             expect(signal$.computationsCount).toBe(1);
             for (let i = 0; i < 3; i++) {
                 signal$.set((prev, source) => {
-                    expect(prev).toBe('async:0');
+                    expect(prev).toBe(`async:${i}`);
                     expect(source).toBe(i);
                     return source + 1;
                 });
             }
-            expect(signal$.computationsCount).toBe(1);
+            expect(signal$.getLast()).toBe('async:0');
             expect(await signal$.get()).toBe('async:3');
-            expect(signal$.computationsCount).toBe(2);
+            expect(signal$.computationsCount).toBe(4);
         });
 
         it('accumulates throttled writes without releasing output before the trigger', () => {
@@ -998,8 +997,22 @@ describe('EventSignal', () => {
                     title: `Счетчик`,
                 },
             });
-            // eslint-disable-next-line @typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore fixme: [TYPINGS / typings] Fix types for this case
+            // Infer data before the contextually typed computation callback: inline nested
+            // methods with default parameters currently leave D=undefined (TS2769).
+            // This preserves method argument types without casts or explicit generics;
+            // support for the original inline form remains pending. See roadmap §03.1.1:
+            // [Inline Data with Nested Methods](../../../roadmap/03_API_TYPES.md#0311--inline-data-with-nested-methods).
+            const computationData = {
+                title: `test`,
+                _: {
+                    increment(arg = 1) {
+                        counter$.set(v => v + arg);
+                    },
+                    decrement(arg = 1) {
+                        counter$.set(v => v - arg);
+                    },
+                },
+            };
             const computed1$ = new EventSignal('', (_prev, sourceValue, eventSignal) => {
                 if ((eventSignal.getStateFlags() & EventSignal.StateFlags.wasSourceSetting) !== 0) {
                     counter$.set(sourceValue);
@@ -1008,17 +1021,7 @@ describe('EventSignal', () => {
                 return `Значение = ${counter$.get()}`;
             }, {
                 initialSourceValue: counter$.get(),
-                data: {
-                    title: `test`,
-                    _: {
-                        increment(arg = 1) {
-                            counter$.set(v => v + arg);
-                        },
-                        decrement(arg = 1) {
-                            counter$.set(v => v - arg);
-                        },
-                    },
-                },
+                data: computationData,
             });
 
             expect(computed1$.get()).toBe(`Значение = 0`);
@@ -1031,8 +1034,6 @@ describe('EventSignal', () => {
             expect(counter$.data).toBeDefined();
             expect(counter$.data.title).toBeDefined();
             expect(computed1$.data).toBeDefined();
-            // eslint-disable-next-line @typescript-eslint/prefer-ts-expect-error
-            // @ts-ignore fixme: [TYPINGS / typings] Fix types for this case
             expect(computed1$.data.title).toBeDefined();
         });
 
@@ -1386,11 +1387,11 @@ describe('EventSignal', () => {
 
             const promise1 = async$.get();
 
-            async$.set((_, index) => ++index);
+            async$.set(1);
 
             const promise2 = async$.get();
 
-            async$.set((_, index) => ++index);
+            async$.set(2);
 
             // Тут происходит установка синхронного значение и синхронный резолв всех pending промисов.
             // Все промисы резолвятся со значением lastValue == 3.
@@ -1621,8 +1622,7 @@ describe('EventSignal', () => {
         it('async computed', async function() {
             const number$ = new EventSignal(0);
             const string$ = new EventSignal('');
-            // fixme: [TYPINGS / typings] remove ` as unknown as Promise<number>`
-            const asyncComputed1$ = new EventSignal(0 as unknown as Promise<number>, async (prev, source, eventSignal) => {
+            const asyncComputed1$ = new EventSignal(0, async (prev, source, eventSignal) => {
                 void prev;
                 void source;
                 void eventSignal;
@@ -1632,7 +1632,7 @@ describe('EventSignal', () => {
                 deps: [ string$ ],
             });
             const asyncComputed1$Value = asyncComputed1$.get();
-            const asyncComputedWithData1$ = new EventSignal(0 as unknown as Promise<number>, async (prev, source, eventSignal) => {
+            const asyncComputedWithData1$ = new EventSignal(0, async (prev, source, eventSignal) => {
                 void prev;
                 void source;
                 void eventSignal;
@@ -1743,9 +1743,8 @@ describe('EventSignal', () => {
             }, {
                 initialSourceValue: 0,
             });
-            const asyncComputed7$Value = asyncComputed5$.get();
-            // fixme: [TYPINGS / typings]: Если убрать ` as unknown as Promise<string>` то ломается типизация
-            const asyncComputed8$ = new EventSignal('' as unknown as Promise<string>, async (_v, num, eventSignal) => {
+            const asyncComputed7$Value = asyncComputed7$.get();
+            const asyncComputed8$ = new EventSignal('', async (_v, num, eventSignal) => {
                 void eventSignal;
 
                 const promise = new Promise<string>(resolve => {
@@ -1763,7 +1762,7 @@ describe('EventSignal', () => {
                     test: 123,
                 },
             });
-            const asyncComputed8$Value = asyncComputed5$.get();
+            const asyncComputed8$Value = asyncComputed8$.get();
 
             void [
                 asyncComputed1$,
@@ -1785,15 +1784,17 @@ describe('EventSignal', () => {
                 asyncComputed8$Value,
             ];
 
-            expect(typeof asyncComputed1$Value).toBe('object');
-            expect(typeof asyncComputed1$Value.then).toBe('function');
+            for (const value of [asyncComputed1$Value, asyncComputed5$Value, asyncComputed7$Value, asyncComputed8$Value]) {
+                expect(value).toBeInstanceOf(Promise);
+                if (!(value instanceof Promise)) {
+                    throw new Error('Expected an asynchronous computation read to return Promise');
+                }
+                expect(typeof value.then).toBe('function');
+            }
             expect(typeof await asyncComputed1$Value).toBe('number');
-            expect(typeof asyncComputed5$Value).toBe('object');
-            expect(typeof asyncComputed5$Value.then).toBe('function');
             expect(typeof await asyncComputed5$Value).toBe('string');
-            expect(typeof asyncComputed7$Value).toBe('object');
-            expect(typeof asyncComputed7$Value.then).toBe('function');
             expect(typeof await asyncComputed7$Value).toBe('string');
+            expect(typeof await asyncComputed8$Value).toBe('string');
         });
     });
 
@@ -3037,13 +3038,9 @@ describe('EventSignal', () => {
 
                 expect(fromTemplate$.get()).toBe('counter is 1 and time is "09:05:00"');
 
-                // fixme: [tag: COMPUTED_REDUCER_OUTPUT_SEQUENCE] roadmap/03_API_TYPES.md, 03.2.
-                //  Целевое поведение: каждый reducer получает актуальный output после предыдущего изменения.
-                //  Вызовы ниже должны дать 4; сейчас дают 2.
-                //  counterValue$.set(v => ++v);
-                //  counterValue$.set(v => ++v);
-                //  counterValue$.set(v => ++v);
-                counterValue$.set(v => v + 3);
+                counterValue$.set(v => ++v);
+                counterValue$.set(v => ++v);
+                counterValue$.set(v => ++v);
 
                 expect(counterValue$.get()).toBe(4);
                 expect(fromTemplate$.get()).toBe('counter is 4 and time is "09:05:00"');

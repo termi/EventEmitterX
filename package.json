@@ -14,7 +14,8 @@
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
     "build": "pnpm run build:cjs && pnpm run build:esm",
-    "build:parallel": "node _dev/build_parallel.cjs"
+    "build:parallel": "node _dev/build_parallel.cjs",
+    "typecheck:signals": "node _dev/check_signal_types.cjs"
   },
   "dependencies": {
     "~": "link:./",

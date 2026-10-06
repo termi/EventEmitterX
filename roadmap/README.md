@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:59:11.977Z"
-timestamp: 1791237551977
+iso date: "2026-10-06T12:42:03.527Z"
+timestamp: 1791290523527
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -13,6 +13,8 @@ audit. Documentation compliance update: 2026-10-06.
 
 Goal: an independently installable event and signal library with reliable lifecycle management, precise types, CJS/ESM
 and TypeScript sources, separately published dependencies, and a clear consumer contract.
+
+Current follow-up: the core of 03.1/03.2 is implemented; see [signal contract](03_SIGNAL_CONTRACT.md) for current verification and migration. The reducer result below is an earlier implementation snapshot.
 
 ## First Fix Candidates — Reducer Accumulation (P0)
 

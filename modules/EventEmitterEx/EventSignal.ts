@@ -52,7 +52,6 @@ let currentSignal: EventSignal<any, any, any> | null = null;
 // type InputMethods__<T> = MethodsMap<T> | undefined;
 
 // Вспомогательный тип для определения возвращаемого типа
-type ReturnTypeOrPromise<T> = T extends Promise<infer U> ? Promise<U> : T;
 type TryResult<T> = {
     ok: boolean,
     error: unknown | null,
@@ -60,7 +59,7 @@ type TryResult<T> = {
     result: T,
 };
 
-export class EventSignal<T, S=T, D=undefined, R=T> {
+export class EventSignal<T, S=Awaited<T>, D=undefined, R=T> {
     public readonly id = ++idIncrement;
     // noinspection JSUnusedGlobalSymbols
     public readonly isEventSignal = true;
@@ -88,8 +87,15 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     /** computationDeferredList */
     private _cDeferredList: ({ resolve: ((newValue: T) => void), reject: ((error: unknown) => void), promise: Promise<T> })[] | undefined;
     private _recalcPromise: Promise<void> | null | undefined;
-    // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
-    // private _setPromise: Promise<void> | null | undefined;
+    private _sourceEpoch = 0;
+    private _reducerOutput?: { value: T, epoch: number };
+    private _reducerOutputPromise?: Promise<T>;
+    private _queuedSets: {
+        input: S | ((prev: EventSignal.OutputValue<T, R>, source: S, data: D) => S),
+        resolve: () => void,
+        reject: (error: unknown) => void,
+    }[] = [];
+    private _setCompletion?: ReturnType<typeof Promise.withResolvers<void>>;
     private _promise: Promise<T> | undefined;
     private _reject: ((error: unknown) => void) | undefined;
     private _resolve: ((newValue: T) => void) | undefined;
@@ -99,6 +105,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     private readonly _abortSignal?: AbortSignal;
     // note: Можно не создавать пока не понадобиться
     private readonly _oneOfDepUpdated = (noEventSignalDepUpdate?: boolean) => {
+        this._sourceEpoch++;
         const stateFlags = this._stateFlags;
         const hasNoThrottle_or_wasThrottleTrigger = ((stateFlags & EventSignal.StateFlags.hasThrottle) === 0
             || (stateFlags & EventSignal.StateFlags.wasThrottleTrigger) !== 0
@@ -253,19 +260,22 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //    изменений в EventSignal для которого есть 2 и более зависимостей.
     constructor(initialValue: Awaited<T> | T);
     // constructor(initialValue: Awaited<T>, asyncComputation: EventSignal.AsyncComputationWithSource<T, S, D>);
-    constructor(initialValue: Awaited<T> | T, options: Omit<EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>, 'trigger'> | Omit<EventSignal.NewOptionsWithSource<ReturnTypeOrPromise<R>, S, D, R>, 'trigger'>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource2<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptionsWithInitialSourceValue<ReturnTypeOrPromise<R>, S, D, R>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptionsWithSource<ReturnTypeOrPromise<R>, S, D, R>);
-    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>, options: EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R> | EventSignal.NewOptionsWithInitialSourceValue<ReturnTypeOrPromise<R>, S, D, R>);
+    constructor(initialValue: Awaited<T> | T, options: Omit<EventSignal.NewOptions<T, S, D, NoInfer<R>>, 'trigger'> | Omit<EventSignal.NewOptionsWithSource<T, S, D, NoInfer<R>>, 'trigger'>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.InferredComputation<T, S, D, R>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.InferredComputationWithSource<T, S, D, R>, options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D, NoInfer<R>>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.InferredComputation<T, S, D, R>, options: EventSignal.NewOptionsWithSource<T, S, D, NoInfer<R>>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.InferredComputation<T, S, D, R>, options: EventSignal.NewOptions<T, S, D, NoInfer<R>> | EventSignal.NewOptionsWithInitialSourceValue<T, S, D, NoInfer<R>>);
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource<T, S, D, R> & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never));
+    constructor(initialValue: Awaited<T> | T, computation: EventSignal.ComputationWithSource2<T, S, D, R> & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never), options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D, R>);
     constructor(
         initialValue: Awaited<T>,
         computationOrOptions?:// eslint-disable-next-line callforce/sort-type-constituents
             // | EventSignal.AsyncComputationWithSource<T, S, D>
-            | EventSignal.ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>
-            | EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>
+            | EventSignal.InferredComputation<T, S, D, R>
+            | EventSignal.ComputationWithSource<T, S, D, R>
+            | EventSignal.NewOptions<T, S, D, NoInfer<R>>
         ,
-        options?: EventSignal.NewOptions<ReturnTypeOrPromise<R>, S, D, R>
+        options?: EventSignal.NewOptions<T, S, D, NoInfer<R>>
     ) {
         const isSecondParameterComputation = typeof computationOrOptions === 'function';
 
@@ -295,14 +305,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
         if (typeof computation === 'function') {
             stateFlags |= (EventSignal.StateFlags.hasComputation | EventSignal.StateFlags.isNeedToCalculateNewValue);
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error TS2322: Type ComputationWithSource<ReturnTypeOrPromise<R>, S, D, R>
-            //  is not assignable to type ComputationWithSource<T, S, D, R>
-            //  Types of parameters prevValue and prevValue are incompatible.
-            this._computation = computation;
+            // Contextual self retains the complete class API with an inference-independent result mode.
+            this._computation = computation as unknown as EventSignal.ComputationWithSource<T, S, D, R>;
             this.lastError = void 0;
 
             if ((computation as unknown as { [Symbol.toStringTag]?: string })[Symbol.toStringTag] === 'AsyncFunction') {
+                stateFlags |= EventSignal.StateFlags.alwaysReadAsPromise;
                 // force V8 to calculate finale shape
                 this._cDeferredList = void 0;
                 this._recalcPromise = void 0;
@@ -336,6 +344,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         this._value = typeof initialValue === 'function' ? void 0 as T : initialValue as T;
+        if (_checkIsPromise(this._value)) {
+            stateFlags |= EventSignal.StateFlags.initialValueWasPromise;
+        }
         this._sourceValue = (options as EventSignal.NewOptionsWithInitialSourceValue<T, S, D, R>)?.initialSourceValue ?? void 0;
 
         this.set = this.set.bind(this);
@@ -601,8 +612,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         const has_finaleValue = _finaleValue !== void 0;
         const has_finaleSourceValue = _finaleSourceValue !== void 0;
 
-        // this.isDestroyed = true;
+        // this.destroyed = true;
         this._stateFlags |= EventSignal.StateFlags.isDestroyed;
+        this._cancelQueuedSets(new Error('EventSignal object is destroyed'));
+        this._reducerOutput = void 0;
+        this._stateFlags &= ~EventSignal.StateFlags.hasAsyncReducerOutput;
+        this._reducerOutputPromise = void 0;
 
         //todo: Сейчас не работает
         // EventSignal._setComponentOnDestroy(this);
@@ -674,8 +689,6 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             // @ts-ignore ignore readonly attribute
             this._computation = _noop;
         }
-        // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
-        // this._setPromise = null;
 
         // // todo: Если будет реализован EventSignal._setComponentOnDestroy, то это нужно убрать
         // if (Object.hasOwn(this, 'type')) {
@@ -692,7 +705,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             this._abortSignal = void 0;
         }
 
-        // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.isDestroyed
+        // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.destroyed
         this._rejectPromiseIfDestroyed();
 
         if (this._cDeferredList) {
@@ -861,20 +874,32 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             return;
         }
 
-        this._value = await currentValue;
+        const value = await currentValue;
+        if (this.destroyed) {
+            throw new Error('EventSignal object is destroyed');
+        }
+        if (this._value === currentValue) {
+            this._value = value;
+        }
     }
 
     private _setStatus(newStatus = 'default', needToEmitStateChanges?: boolean) {
+        if (this.destroyed) {
+            return;
+        }
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore ignore `TS2540: Cannot assign to 'status' because it is a read-only property.`
         this.status = newStatus;
 
         if (needToEmitStateChanges !== false) {
-            subscribersEventsEmitter.emit(this._signalSymbol, this._value);
+            subscribersEventsEmitter.emit(this._signalSymbol, this.getLast());
         }
     }
 
     private _setErrorState(error: Error | string | unknown | null) {
+        if (this.destroyed) {
+            return;
+        }
         if (error == null) {
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
             // @ts-ignore ignore `TS2540: Cannot assign to 'lastError' because it is a read-only property.`
@@ -905,7 +930,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 this._setErrorState(null);
             }
 
-            const prevValue = this._value;
+            const cachedOutput = this._reducerOutput;
+            const publishedValue = this._value;
+            const prevValue = cachedOutput ? cachedOutput.value : this._value;
 
             if (_checkIsPromise(prevValue)) {
                 this._setStatus('pending');
@@ -955,10 +982,22 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             let nowInCalculatingNewValueAsync = false;
 
             try {
-                this._computationsCount++;
-
-                // Если в _computation нужны _updateFlags они должны быть прочитаны сразу, в синхронном коде.
-                const newValue = _computation(prevValue as unknown as Awaited<T>, _sourceValue, this) as unknown as T;
+                const reuseOutput = cachedOutput?.epoch === this._sourceEpoch;
+                if (!reuseOutput) {
+                    this._computationsCount++;
+                }
+                const cachedOutputIsAsync = (this._stateFlags & EventSignal.StateFlags.hasAsyncReducerOutput) !== 0;
+                this._reducerOutput = void 0;
+                this._stateFlags &= ~EventSignal.StateFlags.hasAsyncReducerOutput;
+                // Intermediate reducer output is computed once and published only through this path.
+                const newValue = (reuseOutput
+                    ? (cachedOutputIsAsync ? Promise.resolve(cachedOutput.value) : cachedOutput.value)
+                    : _computation(prevValue as unknown as Awaited<T>, _sourceValue, this)) as unknown as T
+                ;
+                this._stateFlags = _checkIsPromise(newValue)
+                    ? this._stateFlags | EventSignal.StateFlags.lastComputationWasPromise
+                    : this._stateFlags & ~EventSignal.StateFlags.lastComputationWasPromise
+                ;
 
                 currentSignal = prev_currentSignal;
 
@@ -1020,11 +1059,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                                     // nothing to do
                                 }
                                 else {
-                                    isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                                    isNeedToUpdate = !_shallowEqualObjects(publishedValue, newValue);
                                 }
                             }
                             else {
-                                isNeedToUpdate = !_is(prevValue, newValue);
+                                isNeedToUpdate = !_is(publishedValue, newValue);
                             }
                         }
 
@@ -1061,6 +1100,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                         }
                         // eslint-disable-next-line promise/prefer-await-to-then,promise/prefer-await-to-callbacks
                     }).catch(error => {
+                        if (this.destroyed) {
+                            return;
+                        }
                         if (_cDeferredList.at(-1) !== computationDeferred) {
                             // If current Promise/Deferred is not last in _cDeferredList, then error is outdated
                             console.error('EventSignal: async computation: error:', error);
@@ -1101,11 +1143,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                             // nothing to do
                         }
                         else {
-                            isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                            isNeedToUpdate = !_shallowEqualObjects(publishedValue, newValue);
                         }
                     }
                     else {
-                        isNeedToUpdate = !_is(prevValue, newValue);
+                        isNeedToUpdate = !_is(publishedValue, newValue);
                     }
                 }
 
@@ -1155,8 +1197,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             // this._isNeedToCompute = false;
             this._stateFlags &= ~(EventSignal.StateFlags.isNeedToCalculateNewValue | EventSignal.StateFlags.wasForceUpdateTrigger);
 
-            // note: If prevValue is Promise here, we really dont care
-            const prevValue = this._value;
+            // note: If publishedValue is Promise here, we really dont care
+            const publishedValue = this._value;
             let newValue: T | undefined;
 
             if (_sourceValue !== void 0) {
@@ -1177,11 +1219,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                             // nothing to do
                         }
                         else {
-                            isNeedToUpdate = !_shallowEqualObjects(prevValue, newValue);
+                            isNeedToUpdate = !_shallowEqualObjects(publishedValue, newValue);
                         }
                     }
                     else {
-                        isNeedToUpdate = !_is(prevValue, newValue);
+                        isNeedToUpdate = !_is(publishedValue, newValue);
                     }
                 }
 
@@ -1218,33 +1260,12 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
     };
 
-    private _innerGet() {
-        const stateFlags = this._stateFlags;
-
-        if ((stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
-            return this._value;
-        }
-
-        // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
-        // // note: Тут нельзя откладывать выполнение если поднят флаг EventSignal.StateFlags.hasThrottle
-        // if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
-        //     const maybePromise = this._calculateValue();
-        //
-        //     if (maybePromise) {
-        //         return maybePromise;
-        //     }
-        // }
-
-        // Keep this read lazy and dependency-free; computed reducer sequencing is planned in roadmap/03_API_TYPES.md (03.2).
-        return this._value;
-    }
-
     /** A getter version of {@link getSync} */
     get value() {
         return this.getSync();
     }
 
-    get = () => {
+    get = (): EventSignal.ReadResult<T, R> => {
         const stateFlags = this._stateFlags;
 
         if ((stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
@@ -1255,11 +1276,29 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             }
             */
 
-            return this._value as unknown as R;
+            const last = this.getLast();
+            return (
+                (stateFlags & (
+                    EventSignal.StateFlags.alwaysReadAsPromise
+                    | EventSignal.StateFlags.initialValueWasPromise
+                    | EventSignal.StateFlags.lastComputationWasPromise
+                    | EventSignal.StateFlags.wasLastAsyncComputation)
+                ) !== 0
+                    ? Promise.resolve(last)
+                    : last
+            ) as EventSignal.ReadResult<T, R>;
         }
 
         if (currentSignal && currentSignal !== this) {
             currentSignal._subscribeTo(this._signalSymbol);
+        }
+
+        if (this._setCompletion) {
+            if (currentSignal === this) {
+                throw new EventSignalError('Depends on own value', { eventSignal: this });
+            }
+
+            return this._setCompletion.promise.then(() => this.get()) as unknown as EventSignal.ReadResult<T, R>;
         }
 
         if ((stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0
@@ -1271,10 +1310,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             const maybePromise = this._calculateValue();
 
             if (maybePromise) {
-                // todo: Это только набросок поддержки async computation. Он не доделан.
-                //  Поэтому, НЕЛЬЗЯ у get() делать в типизации в качестве возвращаемого значения Promise.
-                //  Если и делать Promise у get() то только через generic или перегрузку.
-                return maybePromise as unknown as R;
+                // Асинхронный результат и синхронный fallback описаны раздельно в ReadResult.
+                return maybePromise as unknown as EventSignal.ReadResult<T, R>;
             }
         }
 
@@ -1285,18 +1322,18 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             const lastDeferred = this._cDeferredList.at(-1);
 
             if (lastDeferred) {
-                return lastDeferred.promise as unknown as R;
+                return lastDeferred.promise as unknown as EventSignal.ReadResult<T, R>;
             }
         }
 
-        if ((stateFlags & EventSignal.StateFlags.wasLastAsyncComputation) !== 0) {
-            return Promise.resolve(this._value) as unknown as R;
+        if ((stateFlags & (EventSignal.StateFlags.alwaysReadAsPromise | EventSignal.StateFlags.wasLastAsyncComputation)) !== 0) {
+            return Promise.resolve(this._value) as unknown as EventSignal.ReadResult<T, R>;
         }
 
-        return this._value as unknown as R;
+        return this._value as unknown as EventSignal.ReadResult<T, R>;
     };
 
-    getSafe = () => {
+    getSafe = (): EventSignal.ReadResult<T, R> | EventSignal.LastValue<T, R> => {
         try {
             const newValue = this.get();
 
@@ -1305,57 +1342,57 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 const newPromise = newValue.then((value) => value, () => {
                     // ignore error, return last value
                     // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
-                    return this._value;
+                    return this.getLast();
                 });
 
                 if ((newValue as typeof newValue & { "pendingValue": unknown })["pendingValue"] !== void 0) {
                     (newPromise as typeof newValue & { "pendingValue": unknown })["pendingValue"] = (newValue as typeof newValue & { "pendingValue": unknown })["pendingValue"];
                 }
 
-                return newPromise;
+                return newPromise as unknown as EventSignal.ReadResult<T, R>;
             }
         }
         catch {
             // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
         }
 
-        return this._value;
+        return this.getLast();
     };
 
-    getSyncSafe = () => {
+    getSyncSafe = (): EventSignal.LastValue<T, R> => {
         try {
             const newValue = this.get();
 
             if (_checkIsPromise(newValue)) {
                 // Возвращаем последнее значение. После резолва промиса, произойдёт обновление сигнала и пере-получение значения.
                 // В this._value также может быть значение "pendingValue".
-                return this._value as Awaited<T>;
+                return this.getLast();
             }
 
-            return newValue as Awaited<T>;
+            return newValue as EventSignal.LastValue<T, R>;
         }
         catch {
             // Ошибка игнорируется. Внутри get() она будет записана в this.lastError и должен быть выставлен status.
-            return this._value as Awaited<T>;
+            return this.getLast();
         }
     };
 
     /** Sync get last value of this signal */
-    getLast = (): Awaited<T> => {
-        return this._value as Awaited<T>;
+    getLast = (): EventSignal.LastValue<T, R> => {
+        return (_checkIsPromise(this._value) ? void 0 : this._value) as EventSignal.LastValue<T, R>;
     };
 
-    getSync = (): Awaited<T> => {
+    getSync = (): EventSignal.LastValue<T, R> => {
         const newValue = this.get();
 
         if (_checkIsPromise(newValue)) {
-            return this._value as Awaited<T>;
+            return this.getLast();
         }
 
-        return newValue as Awaited<T>;
+        return newValue as EventSignal.LastValue<T, R>;
     };
 
-    tryGet(): R extends Promise<any> ? Promise<TryResult<T>> : TryResult<T> {
+    tryGet(): EventSignal.TryReadResult<T, R> {
         try {
             const newValue = this.get();
 
@@ -1367,32 +1404,24 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
                     return { ok: true, error: null, result: value };
                 }, (error: unknown) => {// eslint-disable-line promise/prefer-await-to-callbacks
-                    return { ok: false, error, result: this._value };
+                    return { ok: false, error, result: this.getLast() };
                 });
 
                 if ((newValue as typeof newValue & { "pendingValue": unknown })["pendingValue"] !== void 0) {
                     (newPromise as typeof newValue & { "pendingValue": unknown })["pendingValue"] = (newValue as typeof newValue & { "pendingValue": unknown })["pendingValue"];
                 }
 
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                return newPromise;
+                return newPromise as unknown as EventSignal.TryReadResult<T, R>;
             }
 
             if (this.lastError) {
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-expect-error
-                return { ok: false, error: this.lastError, result: newValue };
+                return { ok: false, error: this.lastError, result: newValue as EventSignal.LastValue<T, R> };
             }
 
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            return { ok: true, error: null, result: newValue };
+            return { ok: true, error: null, result: newValue as EventSignal.LastValue<T, R> };
         }
         catch (error) {
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-expect-error
-            return { ok: false, error, result: this._value };
+            return { ok: false, error, result: this.getLast() };
         }
     }
 
@@ -1414,71 +1443,272 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //     только для React-хуков EventSignal.use({ ignoreUpdateReason: 'reason-name' }) и EventSignal.useListener((v) => { log(v); }, { ignoreUpdateReason: 'reason-name' })
     /**
      * Writable reducers receive the latest accepted value as prev, even before get().
-     * Computed reducers receive the last output as prev and the latest source separately.
-     * Neither form forces a computation or changes notification scheduling.
+     * Computed reducers prepare ordered working output as prev; source remains separate.
+     * Plain writes stay lazy; intermediate output does not release notifications.
      */
-    set(setter: (prev: Awaited<T>, sourceValue: S, data: D) => S): void;
-    set(newSourceValue: S): void;
-    set(newSourceValue: S | ((prev: Awaited<T>, sourceValue: S, data: D) => S)): void {
-        if ((this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
+    set(setter: (prev: EventSignal.OutputValue<T, R>, sourceValue: S, data: D) => S): void | Promise<void>;
+    set(newSourceValue: S): void | Promise<void>;
+    set(input: S | ((prev: EventSignal.OutputValue<T, R>, source: S, data: D) => S)): void | Promise<void> {
+        if ((this._stateFlags & EventSignal.StateFlags.isProjection) !== 0) {
+            throw new TypeError('Mapped signals are read-only');
+        }
+
+        if (this.destroyed) {
             return;
         }
 
-        if (typeof newSourceValue === 'function') {
-            // note: Вызывает тут _innerGet а не get, чтобы исключить ситуацию, когда при вызове .set сигнала B
-            //  в функции-обработчике изменения (или в computation) сигнала А, получается, что сигнал A подписывается на сигнал B.
-            //  todo: Тесты нужны
-            const currentValue = this._innerGet();
-
-            // Async output waiting and ordered computed reducers need a separate contract (roadmap/03_API_TYPES.md, 03.2).
-            // todo: [tag: SET_WITH_SETTER__QUEUES] Недоделанные наброски
-            // if (!!currentValue && typeof currentValue === 'object' && typeof currentValue["then"] === 'function') {
-            //     // eslint-disable-next-line promise/prefer-await-to-then
-            //     const setPromise = this._setPromise = (this._setPromise || Promise.resolve()).then(() => {
-            //         // eslint-disable-next-line promise/prefer-await-to-then,promise/no-nesting
-            //         return (currentValue as Promise<T>).then(() => {
-            //             return this.set(newSourceValue as ((prev: Awaited<T>, sourceValue: S, data: D) => S));
-            //         });
-            //         // eslint-disable-next-line promise/prefer-await-to-then
-            //     }).finally(() => {
-            //         if (this._setPromise === setPromise) {
-            //             this._setPromise = null;
-            //         }
-            //     });
-            //
-            //     // note: set может возвращать Promise только если сделать класс наследник AsyncEventSignal и создавать сигнал соответствующего класса из фабрики createSignal
-            //     return;
-            // }
-
-            const { _sourceValue } = this;
-            const currentSourceValue = (_sourceValue !== void 0 ? _sourceValue : currentValue) as S;
-            // Accepted writable source is authoritative even while output is lazy or throttled.
-            const reducerValue = (this._stateFlags & EventSignal.StateFlags.hasComputation) !== 0
-                ? currentValue
-                : currentSourceValue
-            ;
-            const _newSourceValue = (newSourceValue as ((prev: T, sourceValue: S, data: D) => S))(reducerValue as T, currentSourceValue, this.data);
-
-            if (this._setSourceValue(_newSourceValue, true)) {
-                //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
-                // this._updateReason = updateReason ?? 'set';
-                // this._stateFlags |= EventSignal.StateFlags.wasSetSourceSetting;
-                this._recalculateIfNeeded();
-            }
+        if (this._setCompletion) {
+            return this._enqueueSet(input);
         }
-        // todo: Рассмотреть возможность возвращать true если что-то изменилось
-        else if (this._setSourceValue(newSourceValue, true)) {
-            //todo: _updateReason должен применяться к EventSignal.updateReason только после установки нового фактического значения EventSignal.value
-            // this._updateReason = updateReason ?? 'set';
-            // this._stateFlags |= EventSignal.StateFlags.wasSetSourceSetting;
+
+        if (typeof input === 'function') {
+            const prev = this._prepareReducerValue();
+            if (_checkIsPromise(prev)) {
+                const completion = this._enqueueSet(input);
+
+                this._waitForSetValue(prev as Promise<T>);
+
+                return completion;
+            }
+            this._applySet(input, prev as T);
+        }
+        else {
+            this._applySet(input);
+        }
+    }
+
+    private _applySet(input: S | ((prev: EventSignal.OutputValue<T, R>, source: S, data: D) => S), prev?: T) {
+        if (this.destroyed) {
+            return;
+        }
+
+        const source = (this._sourceValue !== void 0 ? this._sourceValue : this._value) as S;
+        const next = typeof input === 'function'
+            ? (input as (prev: EventSignal.OutputValue<T, R>, source: S, data: D) => S)(prev as EventSignal.OutputValue<T, R>, source, this.data)
+            : input
+        ;
+
+        // Promise-returning reducers are a separate API, not implicit source values.
+        if (typeof input === 'function' && _checkIsPromise(next)) {
+            throw new TypeError('EventSignal reducers must return a synchronous source value');
+        }
+        if (this._setSourceValue(next, true)) {
             this._recalculateIfNeeded();
         }
     }
 
+    private _prepareReducerValue(): T | Promise<T> {
+        const pending = this._cDeferredList?.at(-1)?.promise;
+
+        if (pending) {
+            return pending;
+        }
+
+        if (this._reducerOutputPromise) {
+            return this._reducerOutputPromise;
+        }
+
+        if (_checkIsPromise(this._value)) {
+            const signalRef = new WeakRef(this);
+
+            return Promise.resolve(this._value).then(value => {
+                const signal$ = signalRef.deref();
+
+                if (!signal$ || signal$.destroyed) {
+                    throw new Error('EventSignal object is destroyed');
+                }
+
+                signal$._value = value as T;
+
+                return value as T;
+            });
+        }
+
+        if ((this._stateFlags & EventSignal.StateFlags.hasComputation) === 0) {
+            return (this._sourceValue !== void 0 ? this._sourceValue : this._value) as unknown as T;
+        }
+
+        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) === 0
+            || ((this._stateFlags & EventSignal.StateFlags.wasSourceSetting) === 0 && !this._reducerOutput)
+            || this._reducerOutput?.epoch === this._sourceEpoch
+        ) {
+            return this._reducerOutput ? this._reducerOutput.value : this._value;
+        }
+
+        if ((this._stateFlags & EventSignal.StateFlags.nowInCalculatingNewValue) !== 0) {
+            throw new EventSignalError('Cannot reduce a signal during its computation', { eventSignal: this });
+        }
+
+        const prev = this._reducerOutput ? this._reducerOutput.value : this._value;
+        const epoch = this._sourceEpoch;
+        const parent$ = currentSignal;
+
+        this._stateFlags |= EventSignal.StateFlags.nowInCalculatingNewValue;
+
+        currentSignal = this;
+
+        let result: T;
+
+        try {
+            this._computationsCount++;
+            result = this._computation!(prev as EventSignal.OutputValue<T, R>, this._sourceValue, this) as unknown as T;
+        }
+        finally {
+            currentSignal = parent$;
+            this._stateFlags &= ~EventSignal.StateFlags.nowInCalculatingNewValue;
+        }
+
+        this._stateFlags = _checkIsPromise(result)
+            ? this._stateFlags | EventSignal.StateFlags.lastComputationWasPromise
+            : this._stateFlags & ~EventSignal.StateFlags.lastComputationWasPromise
+        ;
+
+        if (_checkIsPromise(result)) {
+            const signalRef = new WeakRef(this);
+            const promise = Promise.resolve(result).then(value => {
+                const signal$ = signalRef.deref();
+
+                if (!signal$ || signal$.destroyed) {
+                    throw new Error('EventSignal object is destroyed');
+                }
+
+                const isCurrent = signal$._reducerOutputPromise === promise;
+
+                if (isCurrent) {
+                    signal$._reducerOutputPromise = void 0;
+                }
+
+                if (isCurrent && signal$._sourceEpoch === epoch) {
+                    signal$._reducerOutput = { value: (value === void 0 ? prev : value) as T, epoch };
+                    signal$._stateFlags |= EventSignal.StateFlags.hasAsyncReducerOutput;
+                }
+
+                return (value === void 0 ? prev : value) as T;
+            });
+
+            this._reducerOutputPromise = promise;
+
+            return promise;
+        }
+
+        this._reducerOutput = { value: result === void 0 ? prev : result, epoch };
+        this._stateFlags &= ~EventSignal.StateFlags.hasAsyncReducerOutput;
+
+        return this._reducerOutput.value;
+    }
+
+    private _enqueueSet(input: S | ((prev: EventSignal.OutputValue<T, R>, source: S, data: D) => S)): Promise<void> {
+        this._setCompletion ??= Promise.withResolvers<void>();
+
+        // Preserve fire-and-forget set callers; await still observes rejection on the original Promise.
+        void this._setCompletion.promise.catch(_noop);
+
+        const job = Promise.withResolvers<void>();
+
+        void job.promise.catch(_noop);
+
+        this._queuedSets.push({ input, resolve: () => job.resolve(), reject: job.reject });
+
+        return job.promise;
+    }
+
+    private _waitForSetValue(promise: Promise<T>) {
+        const signalRef = new WeakRef(this);
+        const completion = this._setCompletion;
+        const waitsForPublishedOutput = this._cDeferredList?.some(item => item.promise === promise);
+
+        void promise.then(() => {
+            const signal$ = signalRef.deref();
+
+            if (signal$?._setCompletion === completion) {
+                if (signal$ && waitsForPublishedOutput && signal$.status === 'error') {
+                    signal$._cancelQueuedSets(signal$.lastError);
+                }
+                else {
+                    signal$?._drainQueuedSets();
+                }
+            }
+        }, error => {
+            const signal$ = signalRef.deref();
+
+            if (signal$ && !signal$.destroyed && signal$._setCompletion === completion) {
+                signal$._reducerOutputPromise = void 0;
+                signal$._cancelQueuedSets(error);
+                signal$._setErrorState(error);
+            }
+        });
+    }
+
+    private _drainQueuedSets() {
+        if (this.destroyed) {
+            return;
+        }
+
+        try {
+            while (this._queuedSets.length) {
+                const job = this._queuedSets[0]!;
+                const prev = typeof job.input === 'function' ? this._prepareReducerValue() : void 0;
+
+                if (_checkIsPromise(prev)) {
+                    this._waitForSetValue(prev as Promise<T>);
+
+                    return;
+                }
+
+                this._applySet(job.input, prev as T);
+                this._queuedSets.shift();
+
+                job.resolve();
+            }
+
+            const completion = this._setCompletion;
+
+            this._setCompletion = void 0;
+
+            completion?.resolve();
+
+            this._recalculateIfNeeded();
+        }
+        catch (error) {
+            this._cancelQueuedSets(error);
+            this._setErrorState(error);
+        }
+    }
+
+    private _cancelQueuedSets(error: unknown) {
+        this._sourceEpoch++;
+        this._reducerOutputPromise = void 0;
+
+        const jobs = this._queuedSets.splice(0);
+        const completion = this._setCompletion;
+
+        this._setCompletion = void 0;
+
+        for (const job of jobs) {
+            job.reject(error);
+        }
+
+        completion?.reject(error);
+    }
+
     // todo: mutate(mutation: (value) => boolean)) - Внутри коллбека mutation происходит мутация value, а возвращаемое значение говорит о том, изменилось ли значение или нет.
-    mutate<PROPS=Partial<Awaited<S>>>(props: PROPS) {
+    mutate<PROPS extends EventSignal.Mutation<Awaited<S>>>(
+        props: PROPS & (Awaited<S> extends object ? Record<Exclude<keyof PROPS, keyof Awaited<S>>, never> : unknown),
+    ) {
+        if ((this._stateFlags & EventSignal.StateFlags.isProjection) !== 0) {
+            throw new TypeError('Mapped signals are read-only');
+        }
+
+        if (this._setCompletion) {
+            throw new TypeError('Cannot mutate while reducer writes are pending; await set completion first');
+        }
+
         if (props == null || (this._stateFlags & EventSignal.StateFlags.isDestroyed) !== 0) {
             return false;
+        }
+
+        if (this._sourceValue === void 0 && _checkIsPromise(this._value)) {
+            throw new TypeError('Cannot mutate before the initial value resolves; await get first');
         }
 
         if (typeof props !== 'object') {
@@ -1562,7 +1792,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         checkValueIsSame = false,
         ignoreUndefinedNewSourceValue = false,
     ) {
-        const _sourceValue = this._sourceValue ?? this._value;
+        const _sourceValue = this._sourceValue !== void 0 ? this._sourceValue : this._value;
         let isNeedToUpdate = newSourceValue !== void 0 || ignoreUndefinedNewSourceValue;
 
         if (isNeedToUpdate) {
@@ -1592,6 +1822,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
 
         if (isNeedToUpdate) {
+            this._sourceEpoch++;
             this._stateFlags |= EventSignal.StateFlags.wasSourceSetting;
             this._sourceValue = newSourceValue;
 
@@ -1637,6 +1868,10 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     private _recalculateIfNeeded() {
+        if (this._setCompletion || this.destroyed) {
+            return;
+        }
+
         if (this._checkPendingState() && (this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
             if (!this._recalcPromise) {
                 // call recalculation in microtask
@@ -1645,7 +1880,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     .then(async () => {
                         this._recalcPromise = null;
 
-                        if ((this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
+                        if (!this._setCompletion && !this.destroyed && (this._stateFlags & EventSignal.StateFlags.isNeedToCalculateNewValue) !== 0) {
                             // call new recalculation value:
                             //  1. resolving pending promises
                             //  2. trigger new changes event to subscribers
@@ -1755,9 +1990,9 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         }
     }
 
-    toPromise(): Promise<T>;
-    toPromise(onFulfilled?: (result: T) => void, onRejected?: (error: unknown) => void): Promise<T> | Promise<void>;
-    toPromise(onFulfilled?: (result: T) => void, onRejected?: (error: unknown) => void) {
+    toPromise(): Promise<EventSignal.LastValue<T, R>>;
+    toPromise(onFulfilled?: (result: EventSignal.LastValue<T, R>) => void, onRejected?: (error: unknown) => void): Promise<EventSignal.LastValue<T, R>> | Promise<void>;
+    toPromise(onFulfilled?: (result: EventSignal.LastValue<T, R>) => void, onRejected?: (error: unknown) => void) {
         let currentPromise: typeof this._promise;
 
         if (this._promise) {
@@ -1774,15 +2009,15 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
             currentPromise = promise;
         }
 
-        // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.isDestroyed
+        // todo: Рассмотреть возможность вызывать Promise.resolve() с finaleValue если this.destroyed
         this._rejectPromiseIfDestroyed();
 
         if (!onFulfilled && !onRejected) {
-            return currentPromise;
+            return currentPromise as unknown as Promise<EventSignal.LastValue<T, R>>;
         }
 
         // eslint-disable-next-line promise/prefer-await-to-then
-        return currentPromise.then(onFulfilled, onRejected);
+        return (currentPromise as unknown as Promise<EventSignal.LastValue<T, R>>).then(onFulfilled, onRejected);
     }
 
     /*
@@ -1791,7 +2026,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //  на вполне безобидный код, который возвращает `this: EventSignal`:
     //  Object.defineProperty(signal, 'type', { configurable: true, value: EventSignalDestroyedComponent });
     // eslint-disable-next-line unicorn/no-thenable
-    then(onFulfilled?: (result: T) => void, onRejected?: (error: unknown) => void) {
+    then(onFulfilled?: (result: EventSignal.LastValue<T, R>) => void, onRejected?: (error: unknown) => void) {
         return this.toPromise(onFulfilled, onRejected);
     }
     */
@@ -1854,18 +2089,18 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     //    каждый раз, когда для зависимости (AsyncEventSignal или EventSignal) выполднен `get` (который может быть асинхронным).
     // - произвольное событие, которое может быть порождено методом `createEvent(eventName: string, computation): (input: INPUT) => void`.
     protected _addListener(
-        listener: ((newValue: T) => void) | undefined,
+        listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         _ignore?: undefined,
         subscriptionFlags?: number,
     ): EventSignal.Subscription;
     protected _addListener(
-        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
-        listener: ((newValue: T) => void) | undefined,
+        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
+        listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         subscriptionFlags?: number,
     ): EventSignal.Subscription | EventSignal<T, S, D, R>;
     protected _addListener(
-        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
-        listener: ((newValue: T) => void) | undefined,
+        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
+        listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         subscriptionFlags = 0,
     ): EventSignal.Subscription | EventSignal<T, S, D, R> {
         let shouldReturnThis = false;
@@ -1892,7 +2127,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         const makeItEasyAndFastAndUseSubscription = (subscriptionFlags & 1 << 3) !== 0;
 
         if (!makeItEasyAndFastAndUseSubscription) {
-            _checkListener<(newValue: T) => void>(listener);
+            _checkListener<(newValue: EventSignal.LastValue<T, R>) => void>(listener);
             _checkEventSignalEventName(ignoredEventName);
 
             if (ignoredEventName === 'error') {
@@ -1993,8 +2228,8 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     }
 
     protected _removeListener(
-        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void) | undefined,
-        listener: ((newValue: T) => void) | undefined,
+        ignoredEventName: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
+        listener: ((newValue: EventSignal.LastValue<T, R>) => void) | undefined,
         makeItEasyAndFastAndUseSubscription?: boolean,
     ): EventSignal<T, S, D, R> | undefined {
         let shouldReturnThis = false;
@@ -2008,7 +2243,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 shouldReturnThis = true;
             }
 
-            _checkListener<(newValue: T) => void>(listener);
+            _checkListener<(newValue: EventSignal.LastValue<T, R>) => void>(listener);
             _checkEventSignalEventName(ignoredEventName);
 
             if (ignoredEventName === 'error') {
@@ -2027,45 +2262,45 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         return;
     }
 
-    once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    once(callbackFn: (newValue: T) => void): EventSignal.Subscription;
-    once(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    once(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    once(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
+    once(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._addListener(arg1, arg2, 1 << 1);
     }
 
-    on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    on(callbackFn: (newValue: T) => void): EventSignal.Subscription;
-    on(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    on(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    on(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
+    on(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._addListener(arg1, arg2);
     }
 
-    addListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    addListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
-    addListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    addListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    addListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
+    addListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._addListener(arg1, arg2);
     }
 
-    prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    prependListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
-    prependListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    prependListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    prependListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
+    prependListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._addListener(arg1, arg2, 1 << 2);
     }
 
-    prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    prependOnceListener(callbackFn: (newValue: T) => void): EventSignal.Subscription;
-    prependOnceListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    prependOnceListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    prependOnceListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal.Subscription;
+    prependOnceListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._addListener(arg1, arg2, (1 << 1) | (1 << 2));
     }
 
-    off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    off(callbackFn: (newValue: T) => void): void;
-    off(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    off(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    off(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): void;
+    off(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._removeListener(arg1, arg2);
     }
 
-    removeListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: T) => void): EventSignal<T, S, D, R>;
-    removeListener(callbackFn: (newValue: T) => void): void;
-    removeListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: T) => void), arg2?: (newValue: T) => void) {
+    removeListener(ignoredEventName: EventSignal.IgnoredEventNameForListeners, callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): EventSignal<T, S, D, R>;
+    removeListener(callbackFn: (newValue: EventSignal.LastValue<T, R>) => void): void;
+    removeListener(arg1: EventSignal.IgnoredEventNameForListeners | ((newValue: EventSignal.LastValue<T, R>) => void), arg2?: (newValue: EventSignal.LastValue<T, R>) => void) {
         return this._removeListener(arg1, arg2);
     }
 
@@ -2133,7 +2368,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
      *
      * Use it in React as implementation of `useSignal` custom hook.
      */
-    use(): Awaited<T>;
+    use(): EventSignal.LastValue<T, R>;
     /**
      * todo: options.ignoreUpdateReason
      *
@@ -2142,11 +2377,11 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
      *
      * Use it in React as implementation of `useSignal` custom hook.
      */
-    use<REDUCE_VALUE>(reducer: (value: Awaited<T>) => REDUCE_VALUE, areReducedValuesEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): REDUCE_VALUE;
+    use<REDUCE_VALUE>(reducer: (value: EventSignal.LastValue<T, R>) => REDUCE_VALUE, areReducedValuesEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): REDUCE_VALUE;
     /**
      * todo: options.ignoreUpdateReason
      */
-    use<REDUCE_VALUE>(reducer?: (value: Awaited<T>) => REDUCE_VALUE, areReducedValuesEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): Awaited<T> | REDUCE_VALUE {
+    use<REDUCE_VALUE>(reducer?: (value: EventSignal.LastValue<T, R>) => REDUCE_VALUE, areReducedValuesEqual?: (prevValue: REDUCE_VALUE, newValue: REDUCE_VALUE) => boolean): EventSignal.LastValue<T, R> | REDUCE_VALUE {
         const { _useSyncExternalStore } = this;
 
         if (_useSyncExternalStore) {
@@ -2264,14 +2499,14 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
      *  3. Add options.noCall - do not call listener in useLayoutEffect
      *  4. Add options.ignoreUpdateReason
      */
-    useListener<__RR=T>(
+    useListener<__RR=EventSignal.LastValue<T, R>>(
         listener: (newValue: __RR) => void,
         options?: {
             areValuesEqual?: (prevValue: __RR | undefined, newValue: __RR) => boolean,
             deps?: any[],
             // suspend?: boolean, noChanges?: boolean
         }
-    ): T {
+    ): EventSignal.LastValue<T, R> {
         const { _useLayoutEffect } = this;
 
         if (_useLayoutEffect) {
@@ -2308,7 +2543,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     // if (noSub) return noop;
 
                     // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
-                    return this._addListener(actualListener as unknown as (newValue: T) => void, void 0, 1 << 3).unsubscribe;
+                    return this._addListener(actualListener as unknown as (newValue: EventSignal.LastValue<T, R>) => void, void 0, 1 << 3).unsubscribe;
                 }, actualDeps);
             }
             else {
@@ -2321,7 +2556,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                     // if (noSub) return noop;
 
                     // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
-                    return this._addListener(listener as unknown as (newValue: T) => void, void 0, 1 << 3).unsubscribe;
+                    return this._addListener(listener as unknown as (newValue: EventSignal.LastValue<T, R>) => void, void 0, 1 << 3).unsubscribe;
                 }, actualDeps);
             }
         }
@@ -2397,7 +2632,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
                 // if (noSub) return noop;
 
                 // Calling `_addListener` with `makeItEasyAndFastAndUseSubscription` flag.
-                return this._addListener(actualListener as unknown as (newValue: T) => void, void 0, 1 << 3).unsubscribe;
+                return this._addListener(actualListener as unknown as (newValue: EventSignal.LastValue<T, R>) => void, void 0, 1 << 3).unsubscribe;
             }, actualDeps);
         }
         else {
@@ -2445,7 +2680,7 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 
     private _subscribeOnNextAnimationFrame(subscribeToComponentTypeUpdate: boolean, func: () => void/*, subscribeOptions?: {
         signal?: AbortSignal,
-        reducer?: (value: Awaited<T>, prevValue: any) => any,
+        reducer?: (value: EventSignal.LastValue<T, R>, prevValue: any) => any,
     }*/) {
         if (typeof requestAnimationFrame !== 'function') {
             throw new TypeError('"requestAnimationFrame" is not supported in this JS Agent.');
@@ -2528,16 +2763,16 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     // }
 
     // note: Другое возможное название: createAction
-    createMethod<INPUT=void>(computation: (currentValue: T, input: INPUT extends void ? undefined : INPUT, currentSourceValue: S, eventSignal: EventSignal<T, S, D, R>) => S) {
-        return (input: INPUT) => {
-            const currentValue = this._value;
-            const { _sourceValue } = this;
-            const currentSourceValue = _sourceValue !== void 0 ? _sourceValue : (currentValue as unknown as S);
-            const newSourceValue = computation(currentValue, input as (INPUT extends void ? undefined : INPUT), currentSourceValue, this);
-
-            if (newSourceValue !== void 0) {
-                this.set(newSourceValue);
-            }
+    createMethod<INPUT = void>(computation: (
+        currentValue: EventSignal.OutputValue<T, R>,
+        input: INPUT extends void ? undefined : INPUT,
+        currentSourceValue: S,
+        eventSignal: EventSignal<T, S, D, R>,
+    ) => S) {
+        return (input: INPUT): void | Promise<void> => {
+            return this.set((prev, source) => {
+                return computation(prev, input as (INPUT extends void ? undefined : INPUT), source, this);
+            });
         };
     }
 
@@ -2545,17 +2780,32 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
     // todo: Неправильно, что у constructor~computation, createMethod~computation и map~computation разные сигнатуры
     // todo: Нужно доработать map и возвращать новый EventSignal который обратно связан с текущим EventSignal.
     //  "обратно связан" - результат работы нового EventSignal будет устанавливаться в качестве значения в текущий EventSignal.
-    map<CR>(computation: (currentSourceValue: T) => CR) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-        // @ts-ignore ignore `TS2769: No overload matches this call.
-        //   Overload 1 of 5, '(initialValue: CR | Awaited<CR>, options: NewOptions<CR, S, undefined> | NewOptionsWithSource<CR, S, undefined>): EventSignal<...>', gave the following error.
-        //     Argument of type '() => CR' is not assignable to parameter of type 'NewOptions<CR, S, undefined> | NewOptionsWithSource<CR, S, undefined>'.
-        //     Overload 2 of 5, '(initialValue: CR | Awaited<CR>, computation: ComputationWithSource<CR, S, undefined>): EventSignal<CR, S, undefined>', gave the following error.
-        //       Argument of type '() => CR' is not assignable to parameter of type 'ComputationWithSource<CR, S, undefined>'.
-        // `
-        return new EventSignal<CR, S>(void 0 as CR, () => {
-            return computation(this.get() as unknown as T);
-        });
+    map<CR>(computation: (currentValue: EventSignal.OutputValue<T, R>) => CR): EventSignal<Awaited<CR> | undefined, never, undefined, EventSignal.MappedResult<T, R, CR>> {
+        const project = () => {
+            const value = this.get();
+
+            return _checkIsPromise(value)
+                ? Promise.resolve(value)
+                    .then(result => {
+                        return computation(result as EventSignal.OutputValue<T, R>);
+                    })
+                : computation(value as EventSignal.OutputValue<T, R>)
+            ;
+        };
+        // The conditional result models Promise lifting; projection has no initial output or writable source.
+        const mapped$ = new EventSignal<Awaited<CR> | undefined, never, undefined, EventSignal.MappedResult<T, R, CR>>(
+            void 0,
+            project as EventSignal.InferredComputation<
+                Awaited<CR> | undefined,
+                never,
+                undefined,
+                EventSignal.MappedResult<T, R, CR>
+            >,
+        );
+
+        mapped$._stateFlags |= EventSignal.StateFlags.isProjection;
+
+        return mapped$;
     }
 
     setReactFC<FC extends EventSignal.NewOptions<T, S, D, R>["reactFC"] | false>(reactFC?: FC, preDefinedProps?: FC extends (...args: any) => any ? Partial<Parameters<FC>[0]> : never | undefined) {
@@ -2627,14 +2877,17 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
         },
     });
 
-    static createSignal<T>(initialValue: T): EventSignal<T, T>;
-    static createSignal<T, S, D, R = T>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D, T>, options?: EventSignal.NewOptions<T, S, D, R> | EventSignal.NewOptionsWithSource<T, S, D, R>): EventSignal<T, S, D, R>;
-    static createSignal<T, S, D, R = T>(initialValue: T, options: EventSignal.NewOptionsWithSource<T, S, D, R>): EventSignal<T, S, D, R>;
-    static createSignal<T, S, D, R>(initialValue: T, options: EventSignal.NewOptions<T, S, D, R>): EventSignal<T, T>;
-    static createSignal<T, S, D, R = T>(
+    static createSignal<T>(initialValue: T): EventSignal<T, Awaited<T>>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(initialValue: T, computation: EventSignal.InferredComputationWithSource<T, S, D, R>, options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D, NoInfer<R>>): EventSignal<T, S, D, R>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(initialValue: T, computation: EventSignal.InferredComputation<T, S, D, R>, options?: EventSignal.NewOptions<T, S, D, NoInfer<R>> | EventSignal.NewOptionsWithSource<T, S, D, NoInfer<R>>): EventSignal<T, S, D, R>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(initialValue: T, computation: EventSignal.ComputationWithSource2<T, S, D, R> & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never), options: EventSignal.NewOptionsWithInitialSourceValue<T, S, D, R>): EventSignal<T, S, D, R>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(initialValue: T, computation: EventSignal.ComputationWithSource<T, S, D, R> & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never), options?: EventSignal.NewOptions<T, S, D, R> | EventSignal.NewOptionsWithSource<T, S, D, R>): EventSignal<T, S, D, R>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(initialValue: T, options: EventSignal.NewOptionsWithSource<T, S, D, NoInfer<R>>): EventSignal<T, S, D, R>;
+    static createSignal<T, D=undefined>(initialValue: T, options: EventSignal.NewOptions<T, Awaited<T>, D, T>): EventSignal<T, Awaited<T>, D>;
+    static createSignal<T, S=Awaited<T>, D=undefined, R = T>(
         initialValue: T,
-        computationOrOptions?: EventSignal.ComputationWithSource<T, S, D, R> | EventSignal.NewOptions<T, S, D, R> | EventSignal.NewOptionsWithSource<T, S, D, R>,
-        options?: EventSignal.NewOptions<T, S, D, R>,
+        computationOrOptions?: EventSignal.InferredComputation<T, S, D, R> | EventSignal.ComputationWithSource<T, S, D, R> | EventSignal.ComputationWithSource2<T, S, D, R> | EventSignal.NewOptions<T, S, D, NoInfer<R>> | EventSignal.NewOptionsWithSource<T, S, D, NoInfer<R>>,
+        options?: EventSignal.NewOptions<T, S, D, NoInfer<R>>,
     ): EventSignal<T, S, D, R> {
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
         // @ts-ignore
@@ -3230,14 +3483,32 @@ export class EventSignal<T, S=T, D=undefined, R=T> {
 }
 
 export namespace EventSignal {
+    export type ValueDomain<T> = T extends string ? string : T extends number ? number : T extends boolean ? boolean : T;
+    export type Mutation<S> = S extends object ? Partial<S> : S;
+    export type MappedResult<T, R, CR> = CR | ((T | R) extends infer P ? P extends PromiseLike<unknown> ? Promise<Awaited<CR>> : never : never);
+    export type OutputValue<T, R=T> = Awaited<T> | Awaited<R>;
+    export type LastValue<T, R=T> = OutputValue<T, R> | (T extends PromiseLike<unknown> ? undefined : never);
+    export type ReadResult<T, R> = LastValue<T, R> | ((T | R) extends infer P ? P extends PromiseLike<unknown> ? Promise<OutputValue<T, R>> : never : never);
+    export type TryReadResult<T, R> = TryResult<LastValue<T, R>> | ((T | R) extends infer P ? P extends PromiseLike<unknown> ? Promise<TryResult<LastValue<T, R>>> : never : never);
     // export type AsyncComputationWithSource<T, S, D> = {
     //     async (prevValue: T, sourceValue: R | undefined, data: D): T | undefined,
     // } | void;
+    /** T supplies the initial value, R the raw computation result; reads include both resolved domains. */
     export type ComputationWithSource<T, S, D, R> =
-        (prevValue: Awaited<T>, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D, R>) => (R | undefined)
+        (prevValue: OutputValue<T, R>, sourceValue: S | undefined, eventSignal: EventSignal<T, S, D, R>) => R | undefined
     ;
     export type ComputationWithSource2<T, S, D, R> =
-        (prevValue: Awaited<T>, sourceValue: S, eventSignal: EventSignal<T, S, D, R>) => (R | undefined)
+        (prevValue: OutputValue<T, R>, sourceValue: S, eventSignal: EventSignal<T, S, D, R>) => R | undefined
+    ;
+
+    /** Infer R from output; full self uses a conservative result mode to avoid recursive inference. */
+    export type InferredComputation<T, S, D, R> =
+        ((prevValue: ValueDomain<Awaited<T>>, sourceValue: S | undefined, self$: EventSignal<ValueDomain<T>, S, D, ValueDomain<T> | Promise<Awaited<ValueDomain<T>>>>) => R | undefined)
+        & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never)
+    ;
+    export type InferredComputationWithSource<T, S, D, R> =
+        ((prevValue: ValueDomain<Awaited<T>>, sourceValue: S, self$: EventSignal<ValueDomain<T>, S, D, ValueDomain<T> | Promise<Awaited<ValueDomain<T>>>>) => R | undefined)
+        & (Awaited<R> extends EventSignal.ValueDomain<Awaited<T>> ? unknown : never)
     ;
 
     export type TriggerDescriptionTimerGroupId = number | string | symbol;
@@ -3291,7 +3562,7 @@ export namespace EventSignal {
         /** @deprecated use {@link current$} */
         eventSignal?: EventSignal<T, S, D, R>,
         current$: EventSignal<T, S, D, R>,
-        current$Value: Awaited<T>,
+        current$Value: LastValue<T, R>,
         current$Version: number,
         current$SnapshotVersion: string,
         // todo: rename to 'current$Version'?
@@ -3399,6 +3670,14 @@ export namespace EventSignal {
 
         nextValueShouldBeForceSettled = 1 << 20,
         valuesAsObjectShouldBeForceSettled = 1 << 21,
+
+        /** Native async computations retain Promise fallback reads. */
+        alwaysReadAsPromise = 1 << 22,
+        initialValueWasPromise = 1 << 23,
+        /** Includes intermediate reducer computations before publication. */
+        lastComputationWasPromise = 1 << 24,
+        isProjection = 1 << 25,
+        hasAsyncReducerOutput = 1 << 26,
 
         isDestroyed = 1 << 30,
     }
