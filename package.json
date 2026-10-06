@@ -9,11 +9,12 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "postinstall": "node _dev/postinstall/index.cjs",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest --config jest.config.js",
+    "typecheck": "tsc -p tsconfig.library.json --noEmit",
     "build:cjs": "tsc -p tsconfig.cjs.json",
     "build:esm": "tsc -p tsconfig.esm.json",
-    "build": "npm run build:cjs && npm run build:esm",
-    "build:parallel": "npm run build:cjs & npm run build:esm"
+    "build": "pnpm run build:cjs && pnpm run build:esm",
+    "build:parallel": "node _dev/build_parallel.cjs"
   },
   "dependencies": {
     "~": "link:./",
@@ -43,10 +44,12 @@
   "devEngines": {
     "runtime": {
       "name": "node",
+      "version": "*",
       "onFail": "error"
     },
     "packageManager": {
       "name": "pnpm",
+      "version": "*",
       "onFail": "error"
     }
   }

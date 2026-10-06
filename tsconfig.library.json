@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "allowJs": false,
+    "types": ["node"],
+    "noEmitOnError": true
+  },
+  "include": [
+    "modules/**/*.ts",
+    "utils/**/*.ts"
+  ],
+  "exclude": [
+    "demo",
+    "spec",
+    "spec_utils",
+    "packages",
+    "_dev",
+    "node_modules",
+    "build",
+    "build_cache",
+    "build_ts",
+    "dist"
+  ]
+}
