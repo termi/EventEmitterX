@@ -2,8 +2,8 @@
   "extends": "./tsconfig.library.json",
   "compilerOptions": {
     "types": ["node", "jest"],
-    "skipLibCheck": true,
-    "paths": { "~/*": ["./*"], "signal-under-test": ["./modules/EventEmitterEx/EventSignal"] }
+    "skipLibCheck": false,
+    "paths": { "~/*": ["./*"], "signal-under-test": ["./modules/EventEmitterEx/EventSignal"], "emitter-under-test": ["./modules/events"] }
   },
   "include": ["modules/**/*.ts", "utils/**/*.ts", "spec/types/**/*.ts"],
   "exclude": ["node_modules", "build_cache", "build_ts", "demo", "packages"]

@@ -746,7 +746,7 @@ function _isEventTargetCompatible(maybeDOMEventTarget: EventTarget | Object): ma
 
 const kEventTargetSupportSymbolAsType = Symbol('kEventTargetSupportSymbolAsType');
 
-function _isDOMEventTargetSupportSymbolAsType(eventTarget: EventTarget) {
+function _isDOMEventTargetSupportSymbolAsType(eventTarget: EventTarget & { [kEventTargetSupportSymbolAsType]?: boolean }) {
     if (eventTarget[kEventTargetSupportSymbolAsType] !== void 0) {
         return eventTarget[kEventTargetSupportSymbolAsType];
     }

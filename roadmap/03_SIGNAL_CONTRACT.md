@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T13:19:38.639Z"
-timestamp: 1791292778639
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "logic, api, types, tests, docs, scripts"
@@ -169,8 +169,8 @@ rejected by the compile fixtures.
 Disposal and AbortSignal destruction clear queued callbacks and previews, reject
 pending writes/reads, and invalidate continuation identity. New wait continuations
 use WeakRef; late completions cannot resurrect a disposed signal or notify its
-subscribers. This establishes explicit cleanup, not a fix for the global
-retention problem documented in [stage 02](02_LIFECYCLE.md). Native weak references
+subscribers. Queue cancellation establishes explicit cleanup; the separate global
+notification retention repair is documented in [stage 02](02_LIFECYCLE.md). Native weak references
 are required for weak retention; a strong-reference polyfill cannot provide it.
 
 There is no arbitrary queue-length cap: dropping accepted writes would violate
@@ -182,24 +182,21 @@ collection.
 
 ## Verification and Remaining Work
 
-Run `pnpm typecheck:signals` (or `node _dev/check_signal_types.cjs`). It checks
-strict source fixtures, emits declarations to ignored `build_cache`, then checks
-the same positive/negative contract under CommonJS, NodeNext and Bundler resolution.
-Declaration consumers use skipLibCheck to isolate their use of the public API;
-this does not certify the complete emitted library. The source check compares
-an explicit ledger of 36 existing diagnostics, prints their retained count and
-saves full details. Added or removed diagnostics fail the command until reviewed;
-the regular `typecheck` command still fails on the unresolved library baseline.
+Run `pnpm typecheck:contracts` (the `typecheck:signals` alias remains available) or `node _dev/check_signal_types.cjs`.
+Strict EventSignal and EventEmitterX source fixtures, library sources and emitted-declaration consumers now require
+zero diagnostics. CommonJS, NodeNext and Bundler consumers use `skipLibCheck: false`.
+The former 36-diagnostic ledger was removed after repairing its causes. `pnpm verify` also checks both builds,
+their actual declarations, CJS execution and native/fallback lifecycle.
 
-Verified: Node 26.8.1, TypeScript 5.9.3; 103 EventSignal tests pass, one existing
-skip. Full suite: 386 pass, 14 existing events_spec failures, one skip, six todo.
-No additional Jest skip or failure was introduced. The existing ts-jest 27 peer
-warning remains; runtime tests are not used as a substitute for strict typing.
+Verified: Node 26.8.1, TypeScript 5.9.3; 114 EventSignal tests pass, one existing skip.
+Full suite: 429 pass, zero failures, one skip, six todo. No new skip/todo cases were introduced.
+The existing ts-jest 27 peer warning remains; runtime tests do not replace strict typing.
+See [baseline verification](verification/BASELINE_VERIFICATION.md) for details and ownership of pending cases.
 
-Remaining acceptance: test additional supported TypeScript/runtime versions,
-real React/SSR consumers, published package resolution, lifecycle/global registry
-repair and dependency tracking across async boundaries. Review the documented
-contextual result mode, map and mutate behavior as migration choices before release.
+Remaining acceptance: additional supported TypeScript/runtime versions, real React/SSR consumers,
+published package resolution and dependency tracking across async boundaries.
+Stage 02 weak notification ownership is implemented; broader lifecycle contracts remain open.
+Review the documented contextual result mode, map and mutate behavior as migration choices before release.
 
 ## Migration Checklist
 

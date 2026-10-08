@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T08:35:29.727Z"
-timestamp: 1791275729727
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -14,22 +14,39 @@ Priority P0. Goal: separate the library, demos, development tools and representa
 
 - [x] Provide working test/typecheck/build scripts; create a library tsconfig that includes library files and excludes
   demo/spec/build.
-- [ ] Preserve the complete existing specification suite. Investigate the 14 failures, starting with perf_hooks/global
+- [x] Preserve the complete existing specification suite. Investigate the 14 failures, starting with perf_hooks/global
   performance and isolation of the deferred EventTarget error. Do not disable tests to obtain a green report.
-- [ ] Run runtime tests separately from strict tsc; do not treat disabled strict checking in ts-jest as evidence of type
+- [x] Run runtime tests separately from strict tsc; do not treat disabled strict checking in ts-jest as evidence of type
   correctness.
-- [ ] Separate Node and DOM environments, fake and real timers; test real React in a separate project. Check
-  Symbol.dispose, WeakRef, Promise.withResolvers and other recent APIs.
+- [x] Add explicit Node and DOM contract suites and check Symbol.dispose, WeakRef, Promise.withResolvers and native
+  User Timing in the current runtime.
+- [ ] Extend runtime/fake/real timer coverage and test real React in a separate project.
 - [ ] Pin TypeScript/pnpm versions and the lockfile. Replace latest/no-frozen-lockfile in the reproducible pipeline;
   move root postinstall patches into an explicit development setup or replace them with supported tooling.
 - [ ] Add library CI for tests, type checks, builds and consumer smoke tests; the existing gh-pages pipeline serves the
   website/demo.
-- [ ] Classify skipped/todo cases and assign a scenario owner and target stage.
+- [x] Classify skipped/todo cases and assign a responsible module and target stage.
+
+## Implemented Baseline Repair — 2026-10-07
+
+`pnpm verify` now runs strict library checks, source/declaration contracts, the complete Node/DOM test suite,
+both development builds, built-output consumers/runtime smoke and native/fallback GC as separate steps.
+The 14 failures and 36 library diagnostics are resolved without disabling tests or strict settings.
+
+- Library/source contracts: zero diagnostics; emitted consumers pass CommonJS, NodeNext and Bundler without skipLibCheck.
+- Runtime: 429 pass, zero failures, one original skip and six original todo; 14 new focused Node/DOM tests.
+- CJS/ESM builds include authored `.d.ts`; both sequential and parallel commands pass. Actual CJS runtime smoke passes.
+- Signal GC and explicit-disposal fallback pass; global weak-callback channels remain active.
+
+[Commands, observed results and pending-scenario ownership](verification/BASELINE_VERIFICATION.md).
+[Timing decisions](../changelogs/reasons/EventEmitterX_TIMING_CAPABILITIES.md) and
+[strict declaration/build decisions](../changelogs/reasons/LIBRARY_STRICT_DECLARATION_PIPELINE.md) document tradeoffs.
+This completes the local baseline repair, not clean-install CI, toolchain pinning, real React or native ESM packaging.
 
 ## 01.1 — Implemented Command Infrastructure
 
-The command entry points and compiler scope are implemented; this does not mean the existing tests or types pass.
-The owner will commit this change set manually before work proceeds to 01.3. The remaining tasks stay open.
+The following table preserves the historical 01.1 snapshot. Its failures are superseded by the repair above.
+The compiler scope remains library-only; the remaining stage tasks stay open.
 
 | Command                      | Purpose                                              | Observed result                                  |
 |------------------------------|------------------------------------------------------|--------------------------------------------------|

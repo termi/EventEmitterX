@@ -11,11 +11,14 @@
     "postinstall": "node _dev/postinstall/index.cjs",
     "test": "jest --config jest.config.js",
     "typecheck": "tsc -p tsconfig.library.json --noEmit",
-    "build:cjs": "tsc -p tsconfig.cjs.json",
-    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:cjs": "node _dev/build_library.cjs tsconfig.cjs.json",
+    "build:esm": "node _dev/build_library.cjs tsconfig.esm.json",
     "build": "pnpm run build:cjs && pnpm run build:esm",
     "build:parallel": "node _dev/build_parallel.cjs",
     "typecheck:signals": "node _dev/check_signal_types.cjs",
+    "typecheck:contracts": "node _dev/check_signal_types.cjs",
+    "test:build": "node _dev/check_build_output.cjs",
+    "verify": "node _dev/verify.cjs",
     "test:signals:gc": "node --expose-gc _dev/check_signal_lifecycle.cjs"
   },
   "dependencies": {

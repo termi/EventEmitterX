@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:00:50.351Z"
-timestamp: 1791320450351
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -56,3 +56,8 @@ Its benchmark script exists only in that branch. No experimental code was merged
 and [the architecture decision](../02_LIFECYCLE.md#architecture-decision--2026-10-06) explain why phase 1 remains active:
 phase 2 uses about 12.7% more marginal heap for active computed owners in the measured workload, without a reliable
 full-graph speed benefit. The linked-list prototype is also retained in the experimental branch for future evaluation.
+
+## Current Baseline Verification — 2026-10-07
+
+[Passing baseline and reproduction](BASELINE_VERIFICATION.md): 429 passing tests, zero failures, zero strict
+diagnostics, both builds and GC. Sections above retain historical audit and architecture-comparison results.

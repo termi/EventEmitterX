@@ -6,7 +6,7 @@ function fold(hash, text) {
     if (text.length === 0) {
         return hash;
     }
-    for (let i = 0, len = text.length; i < len; i++) {
+    for (let i = 0, len = text.length ; i < len ; i++) {
         // eslint-disable-next-line unicorn/prefer-code-point
         const chr = text.charCodeAt(i);
 
@@ -20,6 +20,7 @@ function fold(hash, text) {
 
 function foldObject(hash, o, seen, ignoreUndefinedValues) {
     return Object.keys(o).sort().reduce(foldKey, hash);
+
     function foldKey(hash, key) {
         const value = o[key];
 
@@ -80,6 +81,7 @@ function _errMessage(err) {
 
     return String(err || '') || '';
 }
+
 /**
  * @param o - any value
  * @param ignoreUndefinedValues - ignore undefined values in objects

@@ -4,11 +4,11 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 
 const repositoryRoot = path.resolve(__dirname, '..');
-const compiler = require.resolve('typescript/bin/tsc');
-const configurations = ['tsconfig.cjs.json', 'tsconfig.esm.json'];
+const compiler = path.join(__dirname, 'build_library.cjs');
+const configurations = [ 'tsconfig.cjs.json', 'tsconfig.esm.json' ];
 
 Promise.all(configurations.map(configuration => new Promise(resolve => {
-    const child = spawn(process.execPath, [compiler, '-p', configuration], {
+    const child = spawn(process.execPath, [ compiler, configuration ], {
         cwd: repositoryRoot,
         stdio: 'inherit',
     });

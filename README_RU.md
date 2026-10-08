@@ -1,3 +1,11 @@
+---
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
+ai_model: "GPT6"
+git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
+area: "docs"
+---
+
 # EventEmitterX
 
 Кроссплатформенная реализация `EventEmitter` для Node.js и браузеров с продвинутой реактивной системой сигналов (**EventSignal**), глубоко интегрированной с React.
@@ -7,7 +15,7 @@
 ## Ключевые возможности
 
 ### EventEmitterX
-- ✅ Полная совместимость с API Node.js `EventEmitter`
+- ✅ API в стиле Node.js `EventEmitter` — [проверенные контракты и оставшиеся границы](docs/EVENT_COMPATIBILITY_RU.md)
 - 🌐 Работает в браузерах без полифилов
 - 🔒 `listenerOncePerEventType` — предотвращение дублирования слушателей на событие
 - 📊 `emitCounter` — подсчёт вызовов emit для мониторинга
@@ -26,6 +34,15 @@
 - 🎯 `createMethod` — типизированные экшены, привязанные к сигналам
 - 📦 Объекты `Subscription` с `suspend()`/`resume()`
 - 🔮 Promise API и асинхронная итерация (`for await...of`)
+
+## Проверки разработки
+
+Запускайте `pnpm verify` с существующими development-зависимостями. Команда отдельно проверяет строгие типы библиотеки,
+source/emitted-контракты, Node/DOM runtime-тесты, development-сборки CJS/ESM, поведение собранного CJS и GC сигналов.
+Текущий локальный результат: 429 тестов проходят, ноль падений и строгих диагностик; остаются один исходный skip и шесть todo.
+[Команды, доказательства и ограничения](roadmap/verification/BASELINE_VERIFICATION_RU.md).
+
+Проверки пока не доказывают нативную загрузку ESM-пакета, чистую установку или диапазон поддерживаемых runtime.
 
 ## Быстрый старт
 

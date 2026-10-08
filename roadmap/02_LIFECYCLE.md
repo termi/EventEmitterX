@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:00:50.351Z"
-timestamp: 1791320450351
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -48,7 +48,8 @@ full EventSignal implementation. Runtime portability, dynamic cycles and source-
 
 Run `pnpm test:signals:gc`; fallback: `node --expose-gc _dev/check_signal_lifecycle.cjs --without-weakref`. The GC
 regression fails on the original HEAD source and passes on the repair. All 114 EventSignal tests pass (one skipped);
-strict source and three declaration-consumer modes add no diagnostics beyond the existing 36.
+strict library checks and three declaration-consumer modes now require zero diagnostics.
+See [current baseline verification](verification/BASELINE_VERIFICATION.md).
 
 [Design, alternatives and guarantees](../changelogs/reasons/EventSignal_WEAK_NOTIFICATION_OWNERSHIP.md).
 

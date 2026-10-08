@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:00:50.351Z"
-timestamp: 1791320450351
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -48,8 +48,8 @@ MEM-02 и LIFE-01/LIFE-02 в [аудите](AUDIT_RU.md#подробные-за�
 
 Запуск: `pnpm test:signals:gc`; fallback: `node --expose-gc _dev/check_signal_lifecycle.cjs --without-weakref`.
 GC-регрессия падает на исходниках первоначального HEAD и проходит после исправления. Все 114 тестов EventSignal
-проходят (один пропущен); строгие проверки исходников и трёх режимов потребителей declarations не добавляют диагностик к
-существующим 36.
+проходят (один пропущен); строгие проверки библиотеки и трёх режимов потребителей declarations теперь требуют ноль диагностик.
+См. [актуальную проверку базы](verification/BASELINE_VERIFICATION_RU.md).
 
 [Решение, альтернативы и гарантии](../changelogs/reasons/EventSignal_WEAK_NOTIFICATION_OWNERSHIP.md).
 

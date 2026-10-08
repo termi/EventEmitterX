@@ -1,3 +1,11 @@
+---
+iso date: "2026-10-06T21:36:58.824Z"
+timestamp: 1791322618824
+ai_model: "GPT6"
+git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
+area: "docs"
+---
+
 # EventEmitterX
 
 A cross-platform `EventEmitter` implementation for Node.js and browsers, with an advanced reactive signals system (**EventSignal**) deeply integrated with React.
@@ -7,7 +15,7 @@ A cross-platform `EventEmitter` implementation for Node.js and browsers, with an
 ## Key Features
 
 ### EventEmitterX
-- ✅ Full Node.js `EventEmitter` API compatibility
+- ✅ Node.js-style `EventEmitter` API — [verified contracts and remaining boundaries](docs/EVENT_COMPATIBILITY.md)
 - 🌐 Works in browsers without polyfills
 - 🔒 `listenerOncePerEventType` — prevent duplicate listeners per event
 - 📊 `emitCounter` — count emit calls for monitoring
@@ -26,6 +34,15 @@ A cross-platform `EventEmitter` implementation for Node.js and browsers, with an
 - 🎯 `createMethod` — typed action methods bound to signals
 - 📦 `Subscription` objects with `suspend()`/`resume()`
 - 🔮 Promise API and async iteration (`for await...of`)
+
+## Development Verification
+
+Run `pnpm verify` with the existing development dependencies. It separately checks strict library types,
+source/emitted contracts, Node/DOM runtime tests, CJS/ESM development outputs, built CJS behavior and signal GC.
+Current local result: 429 tests pass, zero failures and zero strict diagnostics; one existing skip and six todo remain.
+[Commands, evidence and limits](roadmap/verification/BASELINE_VERIFICATION.md).
+
+These checks do not yet establish native ESM package loading, clean installation or a supported runtime range.
 
 ## Quick Start
 

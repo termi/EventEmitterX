@@ -13,7 +13,6 @@
 
 // also see: https://github.com/jonathanong/ee-first
 
-import type ServerTiming from 'termi@ServerTiming';
 import type {
     // default as TAbortController,
     AbortControllersGroup as TAbortControllersGroup,
@@ -66,7 +65,13 @@ export interface IMinimumCompatibleEmitter {
 }
 
 // type NodeEventEmitter = EventEmitter;
-export declare type Listener = (this: EventEmitterX | undefined, ...args: any[]) => Promise<any> | undefined | void;
+interface ListenerMetadata {
+    [kOnceListenerWrappedHandler]?: Listener;
+    /** Original callback on a once wrapper, compatible with Node rawListeners(). */
+    listener?: Listener;
+    __debugTrace?: string[];
+}
+export declare type Listener = ((this: EventEmitterX | undefined, ...args: any[]) => Promise<any> | undefined | void) & ListenerMetadata;
 /* todo: add handleEvent support
 export interface EventListenerObject<EventMap, EventKey> {
     handleEvent(...args: Parameters<EventMap[EventKey]>): Promise<any> | undefined;
@@ -123,6 +128,13 @@ interface _ConstructorOptions {
 
 // interface TEST<EventMap extends DefaultEventMap = DefaultEventMap, EventKey extends keyof EventMap = EventName> { }
 
+/** Structural timing protocol consumed by static once; no concrete timing package is required. */
+export interface IEventTiming {
+    time(eventNames: EventName | EventName[]): void;
+    timeEnd(eventNames: EventName | EventName[], omitNotExisted?: boolean): void;
+    timeClear?(eventNames: EventName | EventName[], omitNotExisted?: boolean): void;
+}
+
 interface StaticOnceOptionsDefault {
     /** Add listener in the beginning of listeners list */
     prepend?: boolean;
@@ -137,7 +149,7 @@ interface StaticOnceOptionsDefault {
      */
     abortControllers?: (AbortController | undefined)[];
     // todo: Подумать о переименовании в timings (так в NoSQL)
-    timing?: ServerTiming;
+    timing?: IEventTiming;
     /** the timeout in ms for resolving the promise before it is rejected with an
      * error [TimeoutError]{@link TimeoutError}: {name: 'TimeoutError', message: 'timeout', code: 'ETIMEDOUT'} */
     timeout?: number;
@@ -233,10 +245,10 @@ const isNodeJS = (function() {
         if (typeof window !== 'undefined') {
             // (jsdom is used automatically)[https://github.com/facebook/jest/issues/3692#issuecomment-304945928]
             // workaround for jest+JSDOM
-            return !!window["__fake__"];
+            return !!(window as Window & { __fake__?: boolean }).__fake__;
         }
         else {
-            return !process["browser"];
+            return !(process as NodeJS.Process & { browser?: boolean }).browser;
         }
     }
 
@@ -249,7 +261,7 @@ const {
      * Installing a listener using this symbol does not change the behavior once an 'error' event is emitted, therefore the process will still crash if no regular 'error' listener is installed.
      */
     errorMonitor,
-    captureRejectionSymbol,
+    captureRejectionSymbol: nodeCaptureRejectionSymbol,
 
     getEventListeners: nodejs_events_getEventListeners,
 }: {
@@ -295,6 +307,7 @@ const {
     };
 })();
 const has_nodejs_events_getEventListeners = typeof nodejs_events_getEventListeners === 'function';
+const captureRejectionSymbol: typeof import('node:events').captureRejectionSymbol = nodeCaptureRejectionSymbol as typeof import('node:events').captureRejectionSymbol;
 
 // todo: copy errorMonitor as EventEmitterLifecycle.errorEvent
 // todo: rename to EventEmitterLifecycle.destroyingEvent
@@ -393,6 +406,8 @@ const EventEmitterX_Flags_destroyed = 1 << 30;
 
 /** Implemented event emitter */
 export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> implements IEventEmitter<EventMap> {
+    declare [Symbol.toStringTag]: string;
+    declare [captureRejectionSymbol]?: (error: unknown, eventName: EventName, ...args: any[]) => void;
     /** @deprecated use {@link isEventEmitterX} */
     public readonly isEventEmitterEx = true;
     // noinspection JSUnusedGlobalSymbols
@@ -822,10 +837,10 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                 }
             }
             else {
-                const listeners = (handler as Function[]);
+                const listeners = (handler as Listener[]);
 
                 for (let i = listeners.length ; i-- > 0 ;) {
-                    const handler = listeners[i] as Function;
+                    const handler = listeners[i] as Listener;
 
                     if (handler === listener) {
                         isListenerAlreadyExisted = true;
@@ -1080,7 +1095,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
 
         if (has_removeListener_listener) {
             if (listener[kOnceListenerWrappedHandler] !== void 0) {
-                listener = listener[kOnceListenerWrappedHandler] || listener;
+                listener = (listener[kOnceListenerWrappedHandler] || listener) as EMD<EventMap>[EventKey];
             }
 
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1294,14 +1309,14 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         }
 
         if (!hasAnyOnceListener) {
-            for (const _handler of (handler as Function[])) {
+            for (const _handler of (handler as Listener[])) {
                 if (listenerToCheck === _handler) {
                     return true;
                 }
             }
         }
         else {
-            for (const _handler of (handler as Function[])) {
+            for (const _handler of (handler as Listener[])) {
                 const onceListener = _handler[kOnceListenerWrappedHandler] as unknown as (EMD<EventMap>[EventKey] | undefined);
 
                 if (onceListener !== void 0) {
@@ -1381,11 +1396,14 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         return [ ...(handler as _TEventMap[EventKey][]) ];
     }
 
+    /**
+     * todo: make another method for:
+     *  1. return number key as number
+     *  2. return Symbol's keys: `[ ...Object.keys(this._events), ...Object.getOwnPropertySymbols(this._events) ]`
+     */
     eventNames(): NodeEventName[] {
-        // todo:
-        //  1. return number key as number
-        //  2. return Symbol's keys: `[ ...Object.keys(this._events), ...Object.getOwnPropertySymbols(this._events) ]`
-        return Object.keys(this._events);
+        // Numeric event names use object-key coercion, matching native Node emitters.
+        return Reflect.ownKeys(this._events);
     }
 
     listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): number {
@@ -1433,14 +1451,12 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                 if (isNodeJS) {
                     // if emitter is compatible, but not native node EventEmitter, node getEventListeners will throw a error:
                     //  `The "emitter" argument must be an instance of EventEmitter or EventTarget. Received an instance of {tag of emitter}`
-                    return nodejs_events_getEventListeners(emitter, eventName as string | symbol);
+                    return nodejs_events_getEventListeners(emitter, eventName as string);
                 }
                 else {
                     // Most likely, events module and events.getEventListeners function was polyfilled.
                     const errorMessage = 'EventEmitterX.getEventListeners: (node=false)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter or EventTarget. This EventTarget is unsupported';
-                    const error = new TypeError(errorMessage);
-
-                    error["code"] = 'ERR_INVALID_ARG_TYPE';
+                    const error = Object.assign(new TypeError(errorMessage), { code: 'ERR_INVALID_ARG_TYPE' });
 
                     throw error;
                 }
@@ -1451,9 +1467,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
             ? 'EventEmitterX.getEventListeners: (node=true)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter or EventTarget'
             : 'EventEmitterX.getEventListeners: (node=false)[UNSUPPORTED_EMITTER] The "emitter" argument must be an instance of EventEmitter'
         ;
-        const error = new TypeError(errorMessage);
-
-        error["code"] = 'ERR_INVALID_ARG_TYPE';
+        const error = Object.assign(new TypeError(errorMessage), { code: 'ERR_INVALID_ARG_TYPE' });
 
         throw error;
     }
@@ -2196,7 +2210,7 @@ function _sanitizeErrorStack(error: Error, autoRemoveErrorMessageFromStach = fal
         return error;
     }
 
-    if (!error["originalStack"]) {
+    if (!(error as Error & { originalStack?: string }).originalStack) {
         Object.defineProperty(error, "originalStack", Object.setPrototypeOf({
             value: stack,
             configurable: true,
@@ -2935,6 +2949,7 @@ export const { once, on, getEventListeners } = EventEmitterX;
  * @private
  */
 class EventsTypeError extends TypeError {
+    declare [Symbol.toStringTag]: string;
     code: string | undefined;
 
     constructor(message = '', code?: string) {
@@ -2980,6 +2995,7 @@ if (EventsTypeError.constructor.name !== tagEventsTypeError) {
 
 // see: https://github.com/bjyoungblood/es6-error/blob/master/src/index.js
 export class TimeoutError extends Error {
+    declare [Symbol.toStringTag]: string;
     name = 'TimeoutError';
     code = 'ETIMEDOUT';
 
@@ -3098,7 +3114,7 @@ function _eventTargetRemoveListener(
 const kEventTargetSupportSymbolAsType = Symbol('kEventTargetSupportSymbolAsType');
 
 /** @private */
-function _isDOMEventTargetSupportSymbolAsType(eventTarget: DOMEventTarget) {
+function _isDOMEventTargetSupportSymbolAsType(eventTarget: DOMEventTarget & { [kEventTargetSupportSymbolAsType]?: boolean }) {
     if (eventTarget[kEventTargetSupportSymbolAsType] !== void 0) {
         return eventTarget[kEventTargetSupportSymbolAsType];
     }
@@ -3163,7 +3179,7 @@ export function isEventEmitterX<EventMap extends DefaultEventMap = DefaultEventM
         return false;
     }
 
-    if (emitter[kIsEventEmitterX] === true) {
+    if ((emitter as { [kIsEventEmitterX]?: boolean })[kIsEventEmitterX] === true) {
         // this is EventEmitterX from this context/environment
         return true;
     }
@@ -3227,7 +3243,7 @@ function _eventTargetHasSignalSupport(eventTarget: EventTarget) {
  * @param eventTarget
  * @private
  */
-function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget) {
+function _eventTargetHasSignalSupport_inner(eventTarget: EventTarget & { [_kEventTargetSignalSupport]?: boolean }) {
     const preValue = eventTarget[_kEventTargetSignalSupport] as boolean | undefined;
 
     if (preValue !== void 0) {
@@ -3401,7 +3417,8 @@ function _onceWrap<EventMap extends DefaultEventMap = DefaultEventMap, EventKey 
     state.wrapped = wrapped;
     target.__onceWrappers.add(wrapped);
 
-    wrapped[kOnceListenerWrappedHandler] = listener;
+    (wrapped as Listener)[kOnceListenerWrappedHandler] = listener as Listener;
+    (wrapped as Listener).listener = listener as Listener;
 
     return wrapped as EMD<EventMap>[EventKey];
 }

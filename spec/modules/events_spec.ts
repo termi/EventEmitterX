@@ -44,6 +44,7 @@ import {
     EventEmitter as NodeEventEmitter,
 } from 'node:events';
 import { runInNewContext } from 'node:vm';
+import { performance as nodePerformance } from 'node:perf_hooks';
 import events, {
     EventEmitterX,
     // EventEmitterEx is deprecated
@@ -2757,13 +2758,12 @@ describe('events', function() {
     const _EventEmitterX_once = once;
 
     // tags: EventEmitter.once, EventEmitterX.once, static once
-    describe('events.once', function _EventEmitter_once() {
+    describe('events.once', function _EventEmitter_once(eventEmitterConstructor?: Function) {
         let EventEmitter = EventEmitterX;
         let once = _EventEmitterX_once;
 
         {
             // eslint-disable-next-line prefer-rest-params
-            const eventEmitterConstructor = arguments[0] as Function;
 
             if (!eventEmitterConstructor) {
                 describe('EventEmitter.once with NodeJS.EventEmitter', _EventEmitter_once.bind(null, NodeEventEmitter));
@@ -4004,7 +4004,7 @@ describe('events', function() {
             });
 
             it('with AbortSignal and ServerTiming', function() {
-                const st = new ServerTiming();
+                const st = new ServerTiming({ customPerformance: nodePerformance });
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
@@ -4037,7 +4037,7 @@ describe('events', function() {
             });
 
             it('with AbortSignal and ServerTiming and multi-names', function() {
-                const st = new ServerTiming();
+                const st = new ServerTiming({ customPerformance: nodePerformance });
                 let error: DOMException|void = void 0;
                 let counter = 0;
                 const ac = new AbortController();
@@ -4358,7 +4358,7 @@ describe('events', function() {
             compatibleEventEmitter_from_EventTarget(ee);
 
             {
-                const st = new ServerTiming();
+                const st = new ServerTiming({ customPerformance: nodePerformance });
 
                 setImmediate(() => {
                     ee.emit('test8', 1);
@@ -4374,7 +4374,7 @@ describe('events', function() {
                 expect(ee.listenerCount('test8')).toBe(0);
             }
             {
-                const st = new ServerTiming();
+                const st = new ServerTiming({ customPerformance: nodePerformance });
 
                 setImmediate(() => {
                     ee.emit('error', err);
@@ -4398,7 +4398,7 @@ describe('events', function() {
 
         it('with ServerTiming and few events (async/await)', async function() {
             const ee = new EventEmitter();
-            const st = new ServerTiming();
+            const st = new ServerTiming({ customPerformance: nodePerformance });
             let error: Error|void = void 0;
 
             compatibleEventEmitter_from_EventTarget(ee);
