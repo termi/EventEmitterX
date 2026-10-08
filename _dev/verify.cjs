@@ -12,6 +12,7 @@ const steps = [
     ],
     [ 'CJS and ESM development builds', [ '_dev/build_library.cjs', 'tsconfig.cjs.json', 'tsconfig.esm.json' ] ],
     [ 'built output', [ '_dev/check_build_output.cjs' ] ],
+    [ 'emitter entry-point identity and import order', [ '_dev/check_emitter_entry_points.cjs' ] ],
     [ 'weak lifecycle', [ '--expose-gc', '_dev/check_signal_lifecycle.cjs' ] ],
     [ 'explicit disposal fallback', [ '--expose-gc', '_dev/check_signal_lifecycle.cjs', '--without-weakref' ] ],
 ];

@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:59:11.977Z"
-timestamp: 1791237551977
+iso date: "2026-10-08T22:45:04.362Z"
+timestamp: 1791499504362
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -23,8 +23,8 @@ rewrite existing branch history or mix moves with behavior changes, formatting o
   EventEmitterX at runtime merely for basic event awaiting.
 - [ ] Subsequently extract subscription/trigger/cleanup primitives and shared emitter/EventTarget helpers where measured
   coupling justifies it.
-- [ ] Evaluate proxy classes in events.ts and the async iterator as separate public modules; avoid splitting files
-  without a clear responsibility.
+- [x] Extract both proxy classes and the emitter core into separate implementation modules, preserving the legacy entry.
+- [ ] Evaluate the async iterator as a separate public module; avoid splitting files without a clear responsibility.
 - [ ] Re-export modules through the index and subpaths without changing class identity or singleton registries within
   one build.
 
@@ -45,6 +45,14 @@ against the original main source. Strict fixtures and three declaration modes pa
 with the same 36 library diagnostics. Full suite: 391 passed, the same 14 events_spec
 failures, 1 skipped, 6 todo. Real React/SSR, a standalone consumer React entry point
 and subsequent timer/adapter extraction remain open.
+
+## Completed Emitter/Proxy Extraction — 2026-10-09
+
+The base implementation and both proxy classes now have separate modules under `modules/EventEmitterEx`.
+`modules/events.ts` is a compatibility re-export entry; implementation ancestry is retained in the new files.
+All 429 existing tests, strict contracts, both builds and GC pass. Twenty-four fresh-process entry orders preserve
+constructor/symbol identity and forwarding. [Design and nine verified history samples](../changelogs/reasons/EventEmitterX_PROXY_DECOMPOSITION.md).
+Proxy behavior repairs and iterator/EventAwait extraction remain separate work. Preserve the rename commits and four-parent merge.
 
 ## History Preservation Procedure
 

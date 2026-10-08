@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-05T21:59:11.977Z"
-timestamp: 1791237551977
+iso date: "2026-10-08T22:45:04.362Z"
+timestamp: 1791499504362
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -24,7 +24,8 @@ area: "docs, api, types, deps, tests"
   runtime только ради базового ожидания.
 - [ ] Следующим шагом выделить subscription/trigger/cleanup primitives и общие emitter/EventTarget helpers, если
   измеренное сцепление это оправдывает.
-- [ ] Оценить proxy classes events.ts и async iterator как отдельные публичные модули; избегать раздробления на файлы
+- [x] Вынести оба proxy-класса и emitter core в отдельные модули реализации с сохранением прежней точки входа.
+- [ ] Оценить async iterator как отдельный публичный модуль; избегать раздробления на файлы
   без ясной ответственности.
 - [ ] Реэкспортировать модули через индекс и subpaths без изменения identity классов и singleton registries внутри одной
   сборки.
@@ -46,6 +47,14 @@ Rename-коммиты и multi-parent merge нельзя squash-ить.
 при тех же 36 library diagnostics. Полный набор: 391 passed, те же 14 ошибок
 events_spec, 1 skipped, 6 todo. Real React/SSR, самостоятельный consumer React
 entry point и последующее выделение таймеров/adapters остаются открытыми.
+
+## Завершённый перенос emitter/proxy — 2026-10-09
+
+Базовая реализация и оба proxy-класса теперь находятся в отдельных модулях `modules/EventEmitterEx`.
+`modules/events.ts` — совместимая точка реэкспорта; история реализации сохранена в новых файлах.
+Проходят все 429 существующих тестов, строгие контракты, обе сборки и GC. Двадцать четыре порядка загрузки в отдельных процессах сохраняют
+identity конструкторов/символов и пересылку. [Решение и девять проверенных образцов истории](../changelogs/reasons/EventEmitterX_PROXY_DECOMPOSITION.md).
+Исправления поведения proxy и перенос iterator/EventAwait остаются отдельной работой. Сохранить rename-коммиты и merge с четырьмя родителями.
 
 ## Процедура сохранения истории
 
