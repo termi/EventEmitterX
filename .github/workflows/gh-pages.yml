@@ -31,7 +31,8 @@ jobs:
       - name: Setup pnpm (for demo app)
         uses: pnpm/action-setup@v4
         with:
-          version: latest
+          # Transitional compatibility for legacy termi@... link aliases; see changelogs/reasons/PAGES_PNPM_COMPATIBILITY.md.
+          version: '10.28.2'
 
       - name: Install root dependencies
         run: pnpm install --no-frozen-lockfile
