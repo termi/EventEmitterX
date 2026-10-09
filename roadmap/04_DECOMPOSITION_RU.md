@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:45:04.362Z"
-timestamp: 1791499504362
+iso date: "2026-10-09T12:01:13.018Z"
+timestamp: 1791547273018
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "docs, api, types, deps, tests"
+area: "tests, docs"
 ---
 
 # 04 — Декомпозиция с сохранением git-истории
@@ -88,3 +88,11 @@ Git отслеживает snapshots, а rename/copy выводится эври
 до/после. Node-only импорт не требует React init; прямой импорт React adapter работает; old entry points делегируют. Нет
 случайного двойного registries/constructors из циклических imports. Изменение file layout не становится незаявленным
 breaking API.
+
+## Завершённое выделение спецификаций emitter — 2026-10-09
+
+`spec/modules/EventEmitterEx/` теперь содержит `EventEmitterX_spec.ts`, `EventEmitterSimpleProxy_spec.ts` и
+`EventEmitterProxy_spec.ts`. Старый `events_spec.ts` удалён. Core сохраняет `static once` и итераторы.
+Имена/статусы всех 436 случаев сохранены: 429 pass, один skip, шесть todo; одиннадцать наборов. Полная проверка проходит.
+[Процедура сохранения истории и девять образцов исходных строк](../changelogs/reasons/EventEmitterX_SPEC_DECOMPOSITION.md).
+Текущие исправления сохранены и восстанавливаются отдельно без коммита. Сохранить rename-ветки и merge с четырьмя родителями.

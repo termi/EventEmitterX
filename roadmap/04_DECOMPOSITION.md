@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:45:04.362Z"
-timestamp: 1791499504362
+iso date: "2026-10-09T12:01:13.018Z"
+timestamp: 1791547273018
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "docs, api, types, deps, tests"
+area: "tests, docs"
 ---
 
 # 04 — Decomposition with Git History Preservation
@@ -86,3 +86,11 @@ Moved lines can be traced to pre-refactor commits through the listed commands. R
 before/after. A Node-only import does not require React initialization; direct React-adapter imports work; old entry
 points delegate. There are no accidental duplicated registries/constructors caused by cyclic imports. File layout
 changes do not become undeclared breaking API changes.
+
+## Completed Emitter Specification Extraction — 2026-10-09
+
+`spec/modules/EventEmitterEx/` now contains `EventEmitterX_spec.ts`, `EventEmitterSimpleProxy_spec.ts` and
+`EventEmitterProxy_spec.ts`. The old `events_spec.ts` is removed. Core retains `static once` and iterators.
+All 436 cases preserve names/statuses: 429 pass, one skip, six todo; eleven suites. Full verification passes.
+[History procedure and nine original-line samples](../changelogs/reasons/EventEmitterX_SPEC_DECOMPOSITION.md).
+Pending fixes are backed up and restored separately without a commit. Preserve rename branches and the four-parent merge.
