@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "types, scripts, tests, docs"
@@ -85,3 +85,13 @@ The pipeline is reproducible with this installed toolchain; clean dependency ins
 broader Node/TypeScript matrices remain stage 01 work. Real React/SSR remains separate. ESM output still uses `.js`
 under the development tree; native `.mjs` packaging, export maps, clean tarballs and isolated installed consumers
 remain stage 06. This run does not establish release readiness or a universal performance claim.
+
+## Emitter Contract Continuation — 2026-10-09
+
+The earlier result/table above records the 2026-10-07 baseline. Current `pnpm verify`: 11 passing suites,
+480 passing tests, zero failures/todo and one existing EventSignal error-propagation skip. The six proxy todo cases
+are replaced by executable ownership tests in `spec/modules/EventEmitterEx/EventEmitterSimpleProxy_spec.ts` and
+`spec/modules/EventEmitterEx/EventEmitterProxy_spec.ts`, sharing `spec_utils/proxySubscriptionOwnership.ts`.
+Source and emitted contracts have zero diagnostics; both builds, actual CJS output, 24 fresh-process emitter entry
+orders and native/fallback GC pass. Node 26.8.1, TypeScript 5.9.3, Windows x64; the existing ts-jest peer warning remains.
+[Compatibility and migration](../../docs/EVENT_COMPATIBILITY.md), [proxy ownership](../../docs/PROXY_SUBSCRIPTIONS.md).

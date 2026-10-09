@@ -187,13 +187,14 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             this._antiLoopingInfoMap[event] = antiLoopingInfo;
         }
 
-        const targetEmitResult = targetEmitter.emit(event as NodeEventName, ...args);
-
-        if (has_sourceEmitter_subscription) {
-            delete this._antiLoopingInfoMap[event];
+        try {
+            return targetEmitter.emit(event as NodeEventName, ...args);
         }
-
-        return targetEmitResult;
+        finally {
+            if (has_sourceEmitter_subscription) {
+                delete this._antiLoopingInfoMap[event];
+            }
+        }
     }
 
     private _onEventEmitterEvent(sourceEmitter: ICompatibleEmitter, event: EventName, ...args: unknown[]) {
@@ -289,8 +290,9 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
         const {
             _knownSubscriptions,
         } = this;
+        const eventKey = typeof event === 'number' ? String(event) : event;
         const knownSubscription = this._knownSubscriptions.find(([ eventType, eventsEmitter ]) => {
-            return event === eventType
+            return eventKey === (typeof eventType === 'number' ? String(eventType) : eventType)
                 && eventsEmitter === sourceEmitter
             ;
         });
@@ -309,21 +311,13 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
         _assertIsDefined(eventProxyHandler);
 
+        // The bridge belongs to the local listener group, not to the most recently added listener.
+        // Local once wrappers remove themselves; removeListener detaches the bridge when the group is empty.
         if (prepend) {
-            if (once) {
-                (sourceEmitter as EventEmitterX).prependOnceListener(event as NodeEventName, eventProxyHandler);
-            }
-            else {
-                (sourceEmitter as EventEmitterX).prependListener(event as NodeEventName, eventProxyHandler);
-            }
+            (sourceEmitter as EventEmitterX).prependListener(event as NodeEventName, eventProxyHandler);
         }
         else {
-            if (once) {
-                (sourceEmitter as EventEmitterX).once(event as NodeEventName, eventProxyHandler);
-            }
-            else {
-                (sourceEmitter as EventEmitterX).on(event as NodeEventName, eventProxyHandler);
-            }
+            (sourceEmitter as EventEmitterX).on(event as NodeEventName, eventProxyHandler);
         }
 
         if (!knownSubscription) {
@@ -341,6 +335,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
 
     private _removeListenerFromTargets(event: EventName | undefined, targetEmitter: ICompatibleEmitter | undefined) {
         const has_event = event !== void 0;
+        const eventKey = typeof event === 'number' ? String(event) : event;
         const has_targetEmitter = targetEmitter !== void 0;
         const subscriptionsCounters: Record<EventName, number> = Object.create(null);
         const {
@@ -356,7 +351,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             } = knownSubscription;
             let counter = (subscriptionsCounters[eventType] || 0) + 1;
 
-            if ((has_event ? eventType === event : true)
+            if ((has_event ? (typeof eventType === 'number' ? String(eventType) : eventType) === eventKey : true)
                 && (has_targetEmitter ? targetEmitter === eventEmitter : true)
             ) {
                 counter--;
@@ -376,7 +371,7 @@ export class EventEmitterProxy<EventMap extends DefaultEventMap = DefaultEventMa
             subscriptionsCounters[eventType] = counter;
         }
 
-        for (const eventType of Object.keys(subscriptionsCounters)) {
+        for (const eventType of Reflect.ownKeys(subscriptionsCounters)) {
             const counter = subscriptionsCounters[eventType];
 
             if (counter === 0) {

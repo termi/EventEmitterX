@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "logic, api, types, tests, docs, scripts"
@@ -196,7 +196,7 @@ Disposal и уничтожение через AbortSignal очищают callbac
 их реальные декларации, выполнение CJS и нативный/fallback lifecycle.
 
 Проверены Node 26.8.1, TypeScript 5.9.3; проходят 114 EventSignal-тестов, один существующий skip.
-Полный набор: 429 pass, ноль ошибок, один skip, шесть todo. Новых skip/todo нет.
+Полный набор: 480 pass, ноль ошибок, один skip, нет todo. Новых skip/todo нет.
 Существующее предупреждение ts-jest 27 о peer версии сохраняется; runtime-тесты не заменяют строгие типы.
 Подробности и владельцы незавершённых случаев: [проверка базы](verification/BASELINE_VERIFICATION_RU.md).
 

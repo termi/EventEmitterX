@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -99,6 +99,21 @@ links that matrix instead of claiming full compatibility. The complete different
 helper coverage and additional runtimes remain open.
 
 Official reference: [Node events](https://nodejs.org/api/events.html).
+
+## Implemented Emitter Contracts — 2026-10-09
+
+- [x] Complete both proxy ownership/cleanup groups and replace six todo placeholders with 28 executable cases.
+- [x] Repair mixed on/once bridges, symbolic/falsy/coerced keys, recorded routing ownership and target-exception recovery.
+- [x] Compare errorMonitor before unhandled errors and monitor handler mutations with native Node.
+- [x] Return once results through captureRejections and preserve rejection-hook this.
+- [x] Compare native addAbortListener behavior and explicitly test/document the DOM fallback limits.
+- [x] Add positive/negative source and emitted-declaration fixtures for generic proxies.
+
+Verification on Node 26.8.1 / TypeScript 5.9.3: 480 pass, zero fail/todo, one existing EventSignal skip; strict types,
+both builds, all 24 CJS entry orders and GC pass. [Proxy contracts](../docs/PROXY_SUBSCRIPTIONS.md) and
+[updated compatibility/migration](../docs/EVENT_COMPATIBILITY.md) describe the boundaries.
+The full differential/static helper matrix, maxListeners, readonly tuples and additional runtimes remain open.
+Proxy extraction is separately committed as `adaa15d`; its history merge/rename commits must not be squashed.
 
 ## Completion
 

@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -100,6 +100,21 @@ README теперь ссылается на неё вместо утвержде
 покрытие статических helpers и дополнительные runtimes остаются открытыми.
 
 Официальный эталон: [Node events](https://nodejs.org/api/events.html).
+
+## Реализованные контракты emitter — 2026-10-09
+
+- [x] Завершить обе группы владения/очистки proxy и заменить шесть todo на 28 исполняемых случаев.
+- [x] Исправить mixed on/once bridges, символьные/falsy/coerced ключи, владение записанным routing и восстановление после исключения получателя.
+- [x] Сравнить errorMonitor до необработанной ошибки и изменения handlers монитором с нативным Node.
+- [x] Возвращать once results в captureRejections и сохранять this rejection hook.
+- [x] Сравнить нативный addAbortListener и явно проверить/описать границы DOM fallback.
+- [x] Добавить положительные/отрицательные fixtures generic proxy для исходников и сгенерированных деклараций.
+
+Проверка Node 26.8.1 / TypeScript 5.9.3: 480 pass, ноль fail/todo, один прежний skip EventSignal; строгие типы,
+обе сборки, все 24 порядка загрузки CJS и GC проходят. [Контракты proxy](../docs/PROXY_SUBSCRIPTIONS_RU.md) и
+[обновлённая совместимость/миграция](../docs/EVENT_COMPATIBILITY_RU.md) описывают границы.
+Полная differential/static helper матрица, maxListeners, readonly tuples и дополнительные runtimes остаются открытыми.
+Перенос proxy отдельно закоммичен как `adaa15d`; его history merge/rename коммиты нельзя squash-ить.
 
 ## Завершение
 

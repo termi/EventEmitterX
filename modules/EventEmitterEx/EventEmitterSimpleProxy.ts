@@ -151,21 +151,13 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
 
         _assertIsDefined(eventProxy);
 
+        // The bridge belongs to the local listener group, not to the most recently added listener.
+        // Local once wrappers remove themselves; removeListener detaches the bridge when the group is empty.
         if (prepend) {
-            if (once) {
-                (_eventEmitter as EventEmitterX).prependOnceListener(event as NodeEventName, eventProxy);
-            }
-            else {
-                (_eventEmitter as EventEmitterX).prependListener(event as NodeEventName, eventProxy);
-            }
+            (_eventEmitter as EventEmitterX).prependListener(event as NodeEventName, eventProxy);
         }
         else {
-            if (once) {
-                (_eventEmitter as EventEmitterX).once(event as NodeEventName, eventProxy);
-            }
-            else {
-                (_eventEmitter as EventEmitterX).on(event as NodeEventName, eventProxy);
-            }
+            (_eventEmitter as EventEmitterX).on(event as NodeEventName, eventProxy);
         }
 
         return result;
@@ -208,8 +200,8 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
             _proxyHandlers,
         } = this;
 
-        for (const type of Object.keys(_proxyHandlers)) {
-            if (event && event !== type) {
+        for (const type of Reflect.ownKeys(_proxyHandlers)) {
+            if (event !== void 0 && (typeof event === 'number' ? String(event) : event) !== type) {
                 continue;
             }
 
@@ -230,7 +222,7 @@ export class EventEmitterSimpleProxy<EventMap extends DefaultEventMap = DefaultE
             }
         }
 
-        if (!event) {
+        if (event === void 0) {
             this._proxyHandlers = Object.create(null);
         }
 

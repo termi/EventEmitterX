@@ -7,10 +7,11 @@ import {
     once as nodeOnce,
     on as nodeOn,
     captureRejectionSymbol as nodeRejectionSymbol,
+    addAbortListener as nodeAddAbortListener,
 } from 'node:events';
 import { performance } from 'node:perf_hooks';
 import { runInThisContext } from 'node:vm';
-import { EventEmitterX, once, on, captureRejectionSymbol } from '../../modules/events';
+import { EventEmitterX, once, on, captureRejectionSymbol, errorMonitor, addAbortListener } from '../../modules/events';
 
 type Factory = () => EventEmitter;
 const nativeFactory: Factory = () => new EventEmitter();
@@ -18,6 +19,138 @@ const customFactory: Factory = () => new EventEmitterX();
 const factories: [ string, Factory ][] = [ [ 'Node', nativeFactory ], [ 'EventEmitterX', customFactory ] ];
 
 describe('native Node emitter contracts', () => {
+    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s abort listener survives stopped propagation and removes itself', (_name, subscribe) => {
+        const owner = new AbortController();
+        owner.signal.addEventListener('abort', event => { event.stopImmediatePropagation(); });
+        const callback = jest.fn();
+        using registration = subscribe(owner.signal, callback);
+        owner.abort();
+        owner.abort();
+        expect(callback).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s abort listener disposal prevents later delivery', (_name, subscribe) => {
+        const owner = new AbortController();
+        const callback = jest.fn();
+        const registration = subscribe(owner.signal, callback);
+        registration[Symbol.dispose]();
+        registration[Symbol.dispose]();
+        owner.abort();
+        expect(callback).not.toHaveBeenCalled();
+    });
+
+    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s pre-aborted subscription delivers asynchronously even after disposal', async (_name, subscribe) => {
+        const owner = new AbortController();
+        owner.abort();
+        const callback = jest.fn();
+        const registration = subscribe(owner.signal, callback);
+        registration[Symbol.dispose]();
+        expect(callback).not.toHaveBeenCalled();
+        await Promise.resolve();
+        expect(callback).toHaveBeenCalledTimes(1);
+    });
+    it.each([0, 1, 2, 3, 5])('delivers errorMonitor before unhandled errors with %p extra arguments', count => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            // Native Node checks Error against its host realm, outside Jest's VM.
+            const failure = make === nativeFactory
+                ? runInThisContext('new Error("unhandled")') as Error
+                : new Error('unhandled');
+            const args = Array.from({ length: count }, (_, index) => index);
+            const observed: unknown[][] = [];
+            emitter.on(errorMonitor, (...payload) => { observed.push(payload); });
+            expect(() => emitter.emit('error', failure, ...args)).toThrow(failure);
+            expect(observed).toEqual([[failure, ...args]]);
+            return observed.map(payload => payload.slice(1));
+        }
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it.each([true, false])('uses error listeners as modified by the monitor (add=%p)', add => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            const failure = make === nativeFactory
+                ? runInThisContext('new Error("monitor mutation")') as Error
+                : new Error('monitor mutation');
+            const output: string[] = [];
+            const handler = () => { output.push('handled'); };
+            if (!add) emitter.on('error', handler);
+            emitter.on(errorMonitor, () => {
+                output.push('monitor');
+                if (add) emitter.on('error', handler);
+                else emitter.removeListener('error', handler);
+            });
+            try { emitter.emit('error', failure); }
+            catch (error) { expect(error).toBe(failure); output.push('thrown'); }
+            return output;
+        }
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it('removes symbols with removeListener lifecycle delivery in reverse order', () => {
+        const symbol = Symbol('remove');
+        function sequence(make: Factory) {
+            const emitter = make();
+            const first = () => {};
+            const second = () => {};
+            const output: unknown[][] = [];
+            emitter.on('removeListener', (event, listener) => {
+                output.push([event, listener === first ? 'first' : 'second']);
+            });
+            emitter.on(symbol, first);
+            emitter.once(symbol, second);
+            emitter.removeAllListeners();
+            return { output, names: emitter.eventNames(), raw: emitter.rawListeners(symbol) };
+        }
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it('ignores removal of an absent event while other once wrappers exist', () => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            emitter.on('removeListener', () => {});
+            emitter.once('present', () => {});
+            emitter.removeAllListeners('absent');
+            emitter.emit('present');
+            emitter.removeAllListeners('absent');
+            return emitter.eventNames();
+        }
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it('returns an uncaptured once callback Promise to the caller of its raw wrapper', async () => {
+        for (const [_name, make] of factories) {
+            const emitter = make();
+            const failure = new Error('uncaptured once');
+            emitter.once('data', async () => { throw failure; });
+            const raw = emitter.rawListeners('data')[0];
+            expect(raw).toBeDefined();
+            await expect(raw?.()).rejects.toBe(failure);
+            expect(emitter.listenerCount('data')).toBe(0);
+        }
+    });
+
+    it.each([false, true])('captures async once rejection through the configured path (hook=%p)', hook => {
+        async function sequence(native: boolean) {
+            const emitter: EventEmitter = native ? new EventEmitter({ captureRejections: true }) : new EventEmitterX({ captureRejections: true });
+            const failure = new Error('once rejection');
+            const received = new Promise<unknown[]>(resolve => {
+                if (hook) emitter[captureRejectionSymbol] = function(error, event, ...args) {
+                    expect(this).toBe(emitter);
+                    resolve([error === failure, event, ...args]);
+                };
+                else emitter.on('error', error => { resolve([error === failure]); });
+            });
+            emitter.once('data', async () => { throw failure; });
+            emitter.emit('data', 42);
+            // Use a bounded assertion so a missing rejection delivery fails rather than hanging the suite.
+            const limit = Promise.withResolvers<never>();
+            using deadline = setTimeout(() => { limit.reject(new Error('rejection was not delivered')); }, 1000);
+            using cleanup = { [Symbol.dispose]() { emitter.removeAllListeners(); } };
+            return await Promise.race([received, limit.promise]);
+        }
+        return Promise.all([sequence(false), sequence(true)]).then(([custom, native]) => { expect(custom).toEqual(native); });
+    });
     it('preserves synchronous ordering, this and duplicate listeners', () => {
         function sequence(make: Factory) {
             const emitter = make();

@@ -1,5 +1,5 @@
 // Compile-only source and emitted-declaration fixtures; never execute this file.
-import { EventEmitterX, getEventListeners, isEventEmitterX, TimeoutError, captureRejectionSymbol } from 'emitter-under-test';
+import { EventEmitterX, EventEmitterSimpleProxy, EventEmitterProxy, getEventListeners, isEventEmitterX, TimeoutError, captureRejectionSymbol } from 'emitter-under-test';
 import type { Listener, ICompatibleEmitter, IEventTiming } from 'emitter-under-test';
 import type { EventEmitter } from 'node:events';
 
@@ -43,3 +43,23 @@ if (isEventEmitterX(object)) object.emit('data', 1);
 const invalid = emitter[Symbol('unrelated')];
 
 void [nodeCompatible, compatible, names, original, tag, timeoutTag, captureRejectionSymbol];
+
+const simpleProxy = new EventEmitterSimpleProxy<Events>({ emitter });
+const routedProxy = new EventEmitterProxy<Events>({
+    sourceEmitter: emitter,
+    getSourceEmitter: (_default, event) => event === symbolEvent ? emitter : null,
+    getTargetEmitter: (_default, _event, args) => args ? emitter : undefined,
+    allowDirectEmitToTarget: true,
+});
+simpleProxy.on('data', (value, label) => { value.toFixed(); label.toUpperCase(); });
+routedProxy.once(symbolEvent, enabled => { const value: boolean = enabled; });
+routedProxy.emit('data', 1, 'forwarded');
+// @ts-expect-error Proxy events retain the declared payload tuple.
+simpleProxy.emit('data', false);
+// @ts-expect-error Routed proxy symbols retain their payload domain.
+routedProxy.emit(symbolEvent, 1);
+// @ts-expect-error Source routing must return a compatible emitter, null or undefined.
+new EventEmitterProxy({ getSourceEmitter: () => ({ invalid: true }) });
+const simpleCompatible: EventEmitter = simpleProxy;
+const routedCompatible: EventEmitter = routedProxy;
+void [simpleCompatible, routedCompatible];

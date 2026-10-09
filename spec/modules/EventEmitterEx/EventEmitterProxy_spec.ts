@@ -3,10 +3,20 @@
 
 require('termi@polyfills');
 
-import { EventEmitterX, EventEmitterProxy, getEventListeners, kDestroyingEvent, isEventEmitterX } from '../../../modules/events';
+import { EventEmitter as NativeEmitter } from 'node:events';
 
-describe('events', function() {
-    describe('EventEmitterProxy', function() {
+import {
+    EventEmitterX,
+    EventEmitterProxy,
+    getEventListeners,
+    kDestroyingEvent,
+    isEventEmitterX,
+} from '../../../modules/events';
+
+import { checkProxySubscriptionOwnership } from './EventEmitterProxy/test__proxySubscriptionOwnership';
+
+describe('EventEmitterProxy', function() {
+    describe('common usage', function() {
         it('instanceof', function() {
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterProxy);
             expect(new EventEmitterProxy()).toBeInstanceOf(EventEmitterX);
@@ -161,9 +171,71 @@ describe('events', function() {
             expect(counter1).toBe(2);
             expect(counter2).toBe(2);
         });
+    });
 
-        it.todo('#removeAllListeners(void 0)');
-        it.todo('#removeAllListeners(eventName)');
-        it.todo('#removeAllListeners() with _proxyHook');
+    // Subscription ownership regression coverage.
+    describe('routed proxy subscription ownership', () => {
+        checkProxySubscriptionOwnership(source => {
+            return new EventEmitterProxy({ sourceEmitter: source });
+        });
+    });
+
+    describe('routed proxy hooks and target failures', () => {
+        it('cleans recorded sources without recomputing a changed hook', () => {
+            using first = new EventEmitterX();
+            using second = new EventEmitterX();
+            let selected = first;
+            const hook = jest.fn(() => selected);
+            using proxy = new EventEmitterProxy({ getSourceEmitter: hook });
+            const key = Symbol('routed');
+            proxy.on(key, () => {});
+            selected = second;
+            proxy.on(key, () => {});
+            expect(first.listenerCount(key)).toBe(1);
+            expect(second.listenerCount(key)).toBe(1);
+            const calls = hook.mock.calls.length;
+            proxy.removeAllListeners();
+            expect(hook).toHaveBeenCalledTimes(calls);
+            expect(first.listenerCount(key)).toBe(0);
+            expect(second.listenerCount(key)).toBe(0);
+            proxy.on(key, () => {});
+            expect(second.listenerCount(key)).toBe(1);
+        });
+
+        it('restores anti-loop state after a target listener throws', () => {
+            using source = new EventEmitterX();
+            using proxy = new EventEmitterProxy({ sourceEmitter: source, targetEmitter: source, allowDirectEmitToTarget: true });
+            const failure = new Error('target failed');
+            const throwing = () => { throw failure; };
+            const received = jest.fn();
+            proxy.on('data', received);
+            source.on('data', throwing);
+            expect(() => proxy.emit('data', 1)).toThrow(failure);
+            source.removeListener('data', throwing);
+            source.emit('data', 2);
+            proxy.emit('data', 3);
+            expect(received.mock.calls).toEqual([[2], [3]]);
+        });
+
+        it('does not attach a source selected by a hook after destruction', () => {
+            using source = new EventEmitterX();
+            using proxy = new EventEmitterProxy({ getSourceEmitter: () => source });
+            proxy.destructor();
+            proxy.setGetSourceEmitter(() => source);
+            proxy.on('data', () => {});
+            expect(proxy.listenerCount('data')).toBe(0);
+            expect(source.listenerCount('data')).toBe(0);
+        });
+
+        it('cleans symbol bridges on a native Node source', () => {
+            const source = new NativeEmitter();
+            using proxy = new EventEmitterProxy({ sourceEmitter: source });
+            const key = Symbol('native');
+            const external = () => {};
+            source.on(key, external);
+            proxy.on(key, () => {});
+            proxy.removeAllListeners(key);
+            expect(source.listeners(key)).toEqual([external]);
+        });
     });
 });

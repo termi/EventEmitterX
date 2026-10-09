@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "logic, api, types, tests, docs, scripts"
@@ -189,7 +189,7 @@ The former 36-diagnostic ledger was removed after repairing its causes. `pnpm ve
 their actual declarations, CJS execution and native/fallback lifecycle.
 
 Verified: Node 26.8.1, TypeScript 5.9.3; 114 EventSignal tests pass, one existing skip.
-Full suite: 429 pass, zero failures, one skip, six todo. No new skip/todo cases were introduced.
+Full suite: 480 pass, zero failures, one skip, no todo. No new skip/todo cases were introduced.
 The existing ts-jest 27 peer warning remains; runtime tests do not replace strict typing.
 See [baseline verification](verification/BASELINE_VERIFICATION.md) for details and ownership of pending cases.
 

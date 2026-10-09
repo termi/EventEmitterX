@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "types, scripts, tests, docs"
@@ -85,3 +85,13 @@ Pipeline воспроизводим с этим установленным toolc
 матрицы Node/TypeScript остаются работой этапа 01. Реальные React/SSR — отдельная работа. ESM output по-прежнему имеет
 `.js` в development-дереве; нативный `.mjs`-пакет, export maps, чистые tarballs и изолированные установленные потребители
 остаются этапом 06. Запуск не доказывает готовность релиза или универсальные показатели производительности.
+
+## Продолжение контрактов emitter — 2026-10-09
+
+Предыдущие результат/таблица выше сохраняют базу 2026-10-07. Текущий `pnpm verify`: 11 успешных наборов,
+480 успешных тестов, ноль ошибок/todo и один прежний skip распространения ошибок EventSignal. Шесть proxy todo
+заменены исполняемыми ownership-тестами в `spec/modules/EventEmitterEx/EventEmitterSimpleProxy_spec.ts` и
+`spec/modules/EventEmitterEx/EventEmitterProxy_spec.ts` с общим `spec_utils/proxySubscriptionOwnership.ts`.
+Контракты исходников/деклараций дают ноль диагностик; обе сборки, реальный CJS output, 24 порядка загрузки emitter
+в отдельных процессах и native/fallback GC проходят. Node 26.8.1, TypeScript 5.9.3, Windows x64; прежнее ts-jest peer предупреждение сохраняется.
+[Совместимость и миграция](../../docs/EVENT_COMPATIBILITY_RU.md), [владение proxy](../../docs/PROXY_SUBSCRIPTIONS_RU.md).

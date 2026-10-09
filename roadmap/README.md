@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs, api, types, deps, tests"
@@ -14,7 +14,7 @@ audit. Documentation compliance update: 2026-10-06.
 Goal: an independently installable event and signal library with reliable lifecycle management, precise types, CJS/ESM
 and TypeScript sources, separately published dependencies, and a clear consumer contract.
 
-Current status: the core of 03.1/03.2 is implemented and library checks pass: 429 tests and zero strict diagnostics.
+Current status: the core of 03.1/03.2 is implemented and library checks pass: 480 tests and zero strict diagnostics.
 See [baseline verification](verification/BASELINE_VERIFICATION.md) and [signal contract](03_SIGNAL_CONTRACT.md). Stage
 02 retains global channels with weak callbacks. The reducer result below is a historical snapshot of the earlier
 implementation.
@@ -38,7 +38,7 @@ output, mapped laziness, throttling and dependency isolation. All EventSignal te
 Library-only strict checking retains 36 diagnostics. This completes proposal item 01.3 (the writable reducer
 contract), not the third checkbox in stage 01 concerning runtime/type-check separation.
 
-Next: remaining [stage 03 contracts](03_API_TYPES.md) — proxy cleanup, the complete Node matrix and inline data with
+Next: remaining [stage 03 contracts](03_API_TYPES.md) — the complete Node matrix and inline data with
 nested methods (03.1.1); expand the stage 01 runtime/CI matrix.
 
 The following finding records the pre-fix evidence; the pinned Junction ORM copy is unchanged.

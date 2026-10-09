@@ -1999,8 +1999,7 @@ describe('events', function() {
             });
 
             describe(`without 'error' listener`, function() {
-                // todo: На данный момент НЕ вызываем событие errorMonitor, если НЕТ подписок на событие 'error'.
-                //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
+                // Monitoring observes the error without consuming it; emit still throws.
 
                 it(`single listener`, function() {
                     const theErr = new Error('MyError');
@@ -2027,8 +2026,7 @@ describe('events', function() {
                     {// main tests
                         expect(err).toBe(theErr);
 
-                        expect(monitorListener1).not.toHaveBeenCalled();
-                        // expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup
@@ -2064,11 +2062,9 @@ describe('events', function() {
                     {// main tests
                         expect(err).toBe(theErr);
 
-                        expect(monitorListener1).not.toHaveBeenCalled();
-                        // expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(monitorListener1.mock.calls).toEqual([ [ theErr ] ]);
 
-                        expect(monitorListener2).not.toHaveBeenCalled();
-                        // expect(monitorListener2.mock.calls).toEqual([ [ theErr ] ]);
+                        expect(monitorListener2.mock.calls).toEqual([ [ theErr ] ]);
                     }
 
                     {// cleanup

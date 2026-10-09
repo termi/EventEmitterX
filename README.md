@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T21:36:58.824Z"
-timestamp: 1791322618824
+iso date: "2026-10-08T22:55:40.798Z"
+timestamp: 1791500140798
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "docs"
@@ -39,7 +39,7 @@ A cross-platform `EventEmitter` implementation for Node.js and browsers, with an
 
 Run `pnpm verify` with the existing development dependencies. It separately checks strict library types,
 source/emitted contracts, Node/DOM runtime tests, CJS/ESM development outputs, built CJS behavior and signal GC.
-Current local result: 429 tests pass, zero failures and zero strict diagnostics; one existing skip and six todo remain.
+Current local result: 480 tests pass, zero failures/todo and zero strict diagnostics; one existing skip remains.
 [Commands, evidence and limits](roadmap/verification/BASELINE_VERIFICATION.md).
 
 These checks do not yet establish native ESM package loading, clean installation or a supported runtime range.

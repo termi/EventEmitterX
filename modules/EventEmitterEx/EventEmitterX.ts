@@ -542,55 +542,53 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         const argumentsLength = arguments.length;
         let hasEnyListener = false;
 
-        // todo: Вопрос: Если (isErrorEvent == true) нужно ли вызывать событие errorMonitor, если НЕТ подписок на событие 'error'.
-        //  В текущей версии nodejs#v15.5.0, если нет подписки на 'error', то и errorMonitor НЕ вызывается, даже если подписка на errorMonitor есть.
+        if (isErrorEvent && _checkBit(this._f, EventEmitterX_Flags_has_errorMonitor_listener)) {
+            switch (argumentsLength) {
+                case 1:
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this.emit(errorMonitor);
+
+                    break;
+                case 2:
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this.emit(errorMonitor, a1);
+
+                    break;
+                case 3:
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this.emit(errorMonitor, a1, a2);
+
+                    break;
+                case 4:
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this.emit(errorMonitor, a1, a2, a3);
+
+                    break;
+                // slower
+                default: {
+                    const args = _argumentsClone2(arguments, 0);// eslint-disable-line prefer-rest-params
+
+                    args[0] = errorMonitor;
+
+                    // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
+                    // @ts-ignore
+                    this.emit.apply(this, args);// eslint-disable-line prefer-spread,unicorn/consistent-destructuring
+                }
+            }
+
+            // errorMonitor listeners may add/remove error handlers during their notification.
+            handler = this._events[event];
+        }
+
         if (handler) {
             const { _f } = this;
             // const has_error_listener = _checkBit(_flags, EventEmitterX_Flags_has_error_listener);
             const captureRejections = _checkBit(_f, EventEmitterX_Flags_captureRejections);
             const listenerWithoutThis = _checkBit(_f, EventEmitterX_Flags_listenerWithoutThis);
-
-            if (isErrorEvent) {
-                // eslint-disable-next-line unicorn/no-lonely-if
-                if (_checkBit(_f, EventEmitterX_Flags_has_errorMonitor_listener)) {
-                    switch (argumentsLength) {
-                        case 1:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore
-                            this.emit(errorMonitor);
-
-                            break;
-                        case 2:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore
-                            this.emit(errorMonitor, a1);
-
-                            break;
-                        case 3:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore
-                            this.emit(errorMonitor, a1, a2);
-
-                            break;
-                        case 4:
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore
-                            this.emit(errorMonitor, a1, a2, a3);
-
-                            break;
-                        // slower
-                        default: {
-                            const args = _argumentsClone2(arguments, 0);// eslint-disable-line prefer-rest-params
-
-                            args[0] = errorMonitor;
-
-                            // eslint-disable-next-line @typescript-eslint/ban-ts-comment,@typescript-eslint/prefer-ts-expect-error
-                            // @ts-ignore
-                            this.emit.apply(this, args);// eslint-disable-line prefer-spread,unicorn/consistent-destructuring
-                        }
-                    }
-                }
-            }
 
             let isFn = typeof handler === 'function';
             let context = listenerWithoutThis ? void 0 : this;
@@ -1154,7 +1152,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         if (has_removeListener_listener && event !== 'removeListener') {
             if (!removeSpecificEvent) {
                 // Emit removeListener for all listeners on all events
-                for (const key of Object.keys(_events)) {
+                for (const key of Reflect.ownKeys(_events)) {
                     if (key === 'removeListener') {
                         continue;
                     }
@@ -1168,6 +1166,8 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                 const hasOnceListeners = __onceWrappers.size > 0;
                 // current handler(s)
                 const handler = _events[event];
+
+                if (!handler) return this;
 
                 // first remove current handler(s)
                 delete _events[event];
@@ -1204,6 +1204,8 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
             if (removeSpecificEvent) {
                 if (__onceWrappers.size > 0) {
                     const handler = _events[event];
+
+                    if (!handler) return this;
 
                     if (typeof handler === 'function') {
                         if (handler[kOnceListenerWrappedHandler] !== void 0) {
@@ -2169,6 +2171,9 @@ export {
 
 /**
  * Listens once to the abort event on the provided signal.
+ * Uses native Node protection against stopImmediatePropagation when available.
+ * The browser/non-native fallback is once-only and disposable but cannot bypass stopped propagation.
+ * Already-aborted signals schedule a callback; disposing that registration does not cancel queued delivery.
  *
  * Listening to the abort event on abort signals is unsafe and may lead to resource leaks since another third party with the signal can call e.stopImmediatePropagation(). Unfortunately Node.js cannot change this since it would violate the web standard. Additionally, the original API makes it easy to forget to remove listeners.
  *
@@ -2194,11 +2199,25 @@ export {
  * @see [events.default.addAbortListener](https://bun.com/reference/node/events/default/addAbortListener)
  */
 export function addAbortListener(signal: AbortSignal, resource: (event: Event) => void): Disposable {
-    if (!signal || signal.aborted) {
+    // Native Node supports abort delivery even after stopImmediatePropagation.
+    const nativeAddAbortListener = isNodeJS ? require('events').addAbortListener : void 0;
+    if (typeof nativeAddAbortListener === 'function') {
+        return nativeAddAbortListener(signal, resource);
+    }
+    if (!isAbortSignal(signal)) {
+        throw new EventsTypeError('The "signal" argument must be an AbortSignal.', ERR_INVALID_ARG_TYPE);
+    }
+    if (typeof resource !== 'function') {
+        throw new EventsTypeError('The "resource" argument must be a function.', ERR_INVALID_ARG_TYPE);
+    }
+    if (signal.aborted) {
+        // Disposal does not cancel this already scheduled notification.
+        queueMicrotask(() => { resource(new Event('abort')); });
         return Object.setPrototypeOf({ [Symbol.dispose]: _noop }, null);
     }
 
-    signal.addEventListener('abort', resource);
+    // Browser fallback cannot bypass stopImmediatePropagation.
+    signal.addEventListener('abort', resource, { once: true });
 
     return Object.setPrototypeOf({ [Symbol.dispose]: signal.removeEventListener.bind(signal, 'abort', resource) }, null);
 }
@@ -2724,17 +2743,8 @@ function _onceWrapper(this: OnceListenerState, ...args: unknown[]) {
     if (!this.fired) {
         this.fired = true;
 
-        const maybePromise = this.listener.apply(this.target, args);
-
-        // eslint-disable-next-line promise/prefer-await-to-then
-        if (!!maybePromise && typeof maybePromise.catch === 'function') {
-            // eslint-disable-next-line promise/prefer-await-to-callbacks,promise/prefer-await-to-then
-            maybePromise.catch((error: Error | unknown) => {
-                // todo: Передавать эту ошибку в специальный обработчик для асинхронных ошибок eventHandler'ов
-                //  Сюда _emitUnhandledRejectionOrErr ?
-                console.error(error);
-            });
-        }
+        // Return the result to emit's captureRejections path, exactly as an ordinary listener does.
+        return this.listener.apply(this.target, args);
     }
 }
 
@@ -2932,7 +2942,7 @@ function _emitUnhandledRejectionOrErr(ee: EventEmitterX, err: Error | unknown, t
     const captureRejectionHandler = ee[captureRejectionSymbol];
 
     if (typeof captureRejectionHandler === 'function') {
-        captureRejectionHandler(err, type, ...args);
+        captureRejectionHandler.call(ee, err, type, ...args);
     }
     else {
         // We have to disable the capture rejections mechanism, otherwise

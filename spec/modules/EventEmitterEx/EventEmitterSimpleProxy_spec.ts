@@ -5,8 +5,10 @@ require('termi@polyfills');
 
 import { EventEmitterX, EventEmitterSimpleProxy, getEventListeners, kDestroyingEvent, isEventEmitterX } from '../../../modules/events';
 
-describe('events', function() {
-    describe('EventEmitterSimpleProxy', function() {
+import { checkProxySubscriptionOwnership } from './EventEmitterProxy/test__proxySubscriptionOwnership';
+
+describe('EventEmitterSimpleProxy', function() {
+    describe('common usage', function() {
         it('instanceof', function() {
             const emitter = new EventEmitterX();
 
@@ -121,9 +123,12 @@ describe('events', function() {
             expect(counter1).toBe(2);
             expect(counter2).toBe(2);
         });
+    });
 
-        it.todo('#removeAllListeners(void 0)');
-        it.todo('#removeAllListeners(eventName)');
-        it.todo('#removeAllListeners() with _proxyHook');
+    // Subscription ownership regression coverage.
+    describe('simple proxy subscription ownership', () => {
+        checkProxySubscriptionOwnership(source => {
+            return new EventEmitterSimpleProxy({ emitter: source });
+        });
     });
 });
