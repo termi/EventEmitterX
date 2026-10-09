@@ -1,6 +1,6 @@
 ---
-iso date: "2026-10-06T11:10:48.582Z"
-timestamp: 1791285048582
+iso date: "2026-10-09T12:05:52.513Z"
+timestamp: 1791547552513
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
 area: "config/ai"
@@ -76,20 +76,27 @@ implies permission to commit them.
 ## Optional Project Skills
 
 Project skills are discoverable under `.agents/skills/`. They provide module
-knowledge and focused workflows; they are not mandatory rules. Do not load both
-skills for every task. Select one when the task benefits from that module's
-knowledge, or when the user explicitly invokes it; read only relevant references.
+knowledge and focused workflows; they are not mandatory rules. Do not load all
+skills for every task. Select module skills when their knowledge helps; read only
+relevant references. Explicit-only workflow skills require a direct user request.
 
 | Skill           | Entry point                                                                    | When useful                                                                                    |
 |-----------------|--------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
 | `eventemitterx` | [.agents/skills/eventemitterx/SKILL.md](.agents/skills/eventemitterx/SKILL.md) | Emitter behavior, Node compatibility, event awaiting, async iteration, proxies and their tests |
 | `eventsignal`   | [.agents/skills/eventsignal/SKILL.md](.agents/skills/eventsignal/SKILL.md)     | Signal computation, dependency tracking, subscriptions, lifecycle, types and React integration |
+| `split-preserving-history` | [.agents/skills/split-preserving-history/SKILL.md](.agents/skills/split-preserving-history/SKILL.md) | Explicit invocation only: split source and matching specifications while preserving Git line ancestry |
 
 Use `$eventemitterx` or `$eventsignal` in clients supporting repository skill
 discovery. In other clients, explicitly read the linked SKILL.md when useful.
 No global installation or copying to a user profile is required. Loading a skill
 does not authorize commits, publication or changes outside the requested scope.
 Mandatory rules above apply regardless of whether a skill is loaded.
+
+Invoke `$split-preserving-history` explicitly to use the history-preserving split workflow;
+otherwise do not load it automatically. Its `agents/openai.yaml` also disables implicit invocation.
+When active, it proposes splitting related tests into the same domains and does so by default
+if the user does not answer the optional proposal. This default never authorizes missing commits.
+The skill and its registration are a separate AI-instruction change set from implementation changes.
 
 ## Instruction Migration Decisions
 
