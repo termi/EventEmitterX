@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:55:40.798Z"
-timestamp: 1791500140798
+iso date: "2026-10-09T12:36:23.600Z"
+timestamp: 1791549383600
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "docs, api, types, deps, tests"
+area: "api, types, tests, docs"
 ---
 
 # 03 — Публичные контракты и точные типы
@@ -81,14 +81,14 @@ area: "docs, api, types, deps, tests"
 Эталон — `node:events` (имя `node:event` из обсуждения уточняется до реального built-in). Алиас экспортирует тот же
 конструктор, не wrapper и не другую реализацию.
 
-- [ ] Differential suite сравнивает default configuration с нативным EventEmitter: порядок, sync emit, this, повторные
+- [x] Differential suite сравнивает default configuration с нативным EventEmitter: порядок, sync emit, this, повторные
   listeners, once wrappers/rawListeners, prepend, removeListener/removeAllListeners, listeners/eventNames/listenerCount,
   новые/удалённые слушатели во время emit, newListener/removeListener, error/errorMonitor, captureRejections,
   maxListeners.
 - [x] Включить символы в eventNames; сравнить перечисление строковых, символьных и числовых ключей с нативным Node.
-- [ ] Для static once/on/addAbortListener/getEventListeners и options составить отдельную матрицу: реализовано,
+- [x] Для static once/on/addAbortListener/getEventListeners и options составить отдельную матрицу: реализовано,
   расширено, отличается, отсутствует. Не обещать весь модуль node:events на основании совместимого класса.
-- [ ] Проверить типы event maps, tuples/readonly tuples, symbol keys, this, перегрузки и structural compatibility с Node
+- [x] Проверить типы event maps, tuples/readonly tuples через EventMapFromTuples, symbol keys, this, перегрузки и structural compatibility с Node
   EventEmitter.
 - [ ] Сравнить AbortSignal/stopImmediatePropagation, cleanup once при success/error/abort/timeout, и EventTarget
   semantics отдельно от Node.
@@ -96,8 +96,8 @@ area: "docs, api, types, deps, tests"
 Начальный differential/DOM-набор содержит 14 успешных тестов на Node 26.8.1. Закрытые event maps, символьные payloads,
 identity слушателей, типизация rejection hook и структурное присваивание Node проверяются строгими
 fixtures. [Матрица совместимости](../docs/EVENT_COMPATIBILITY_RU.md) фиксирует покрытые контракты и открытые границы;
-README теперь ссылается на неё вместо утверждения полной совместимости. Полный differential-набор, readonly tuples,
-покрытие статических helpers и дополнительные runtimes остаются открытыми.
+README теперь ссылается на неё вместо утверждения полной совместимости. Дополнительное покрытие static helpers/options и дополнительные runtimes остаются открытыми;
+заданные лимиты и tuple-адаптеры покрыты продолжением ниже.
 
 Официальный эталон: [Node events](https://nodejs.org/api/events.html).
 
@@ -113,7 +113,8 @@ README теперь ссылается на неё вместо утвержде
 Проверка Node 26.8.1 / TypeScript 5.9.3: 480 pass, ноль fail/todo, один прежний skip EventSignal; строгие типы,
 обе сборки, все 24 порядка загрузки CJS и GC проходят. [Контракты proxy](../docs/PROXY_SUBSCRIPTIONS_RU.md) и
 [обновлённая совместимость/миграция](../docs/EVENT_COMPATIBILITY_RU.md) описывают границы.
-Полная differential/static helper матрица, maxListeners, readonly tuples и дополнительные runtimes остаются открытыми.
+Продолжение ниже покрывает лимиты, матрицу границ static helpers и tuple-адаптеры;
+дополнительная helper/options parity и версии runtime остаются открытыми.
 Перенос proxy отдельно закоммичен как `adaa15d`; его history merge/rename коммиты нельзя squash-ить.
 
 ## Завершение
@@ -121,3 +122,22 @@ README теперь ссылается на неё вместо утвержде
 Каждая публичная форма имеет точный runtime/type пример, отрицательные type checks, документированный cleanup и
 async-контракт. Потребителю Junct не нужен урезанный интерфейс, wrapper StateSignal или принудительное чтение после set.
 Breaking changes получают миграционные примеры.
+
+## Продолжение матрицы контрактов слушателей — 2026-10-09
+
+- [x] Заданные лимиты: валидация, строгий порог, отключение zero/Infinity, структурированные warning-каналы,
+  жизнь группы при prepend/removal/сокращении/пересоздании, once и смене лимита. Прежний unlimited default сохранён.
+- [x] Reentrant newListener вставка/замена/очистка; актуальные лимит/дедупликация и disposal во время регистрации.
+- [x] Удаление последнего дубликата и optional callback-specific listenerCount с original/raw once identity.
+- [x] Независимые снимки getEventListeners для native/custom emitters и native EventTarget.
+- [x] Mutable/readonly tuple-адаптер EventMapFromTuples, optional/rest/empty/symbol keys, оба proxy, this и строгие
+  IEventEmitter payload в исходниках и emitted contracts.
+- [ ] Рассматривать прямые tuple/heterogeneous generics класса только с отдельным проектом миграции; текущий API — адаптер.
+- [ ] Уточнить вывод payload static once/on и закрыть непроверенные границы Node helpers/options и матрицы версий.
+
+[Совместимость и матрица static helpers](../docs/EVENT_COMPATIBILITY_RU.md) фиксирует implemented/extended/different/absent
+контракты. [Лимиты](../changelogs/reasons/EventEmitterX_LISTENER_LIMITS.md),
+[reentrancy](../changelogs/reasons/EventEmitterX_REENTRANT_SUBSCRIPTIONS.md) и
+[tuple-адаптер](../changelogs/reasons/EventEmitterX_TUPLE_MAP_ADAPTER.md) описывают решения, миграцию и альтернативы.
+519 pass, ноль fail/todo, один прежний skip; строгие исходники/declarations, обе сборки, 24 порядка импорта и GC проходят.
+Только Node 26.8.1 / TypeScript 5.9.3. Другие defaults/runtime versions и перенос EventAwait остаются отдельной работой.

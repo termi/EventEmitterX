@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:55:40.798Z"
-timestamp: 1791500140798
+iso date: "2026-10-09T12:36:23.600Z"
+timestamp: 1791549383600
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "types, scripts, tests, docs"
+area: "api, types, tests, docs"
 ---
 
 # Baseline repair verification — 2026-10-07
@@ -88,10 +88,20 @@ remain stage 06. This run does not establish release readiness or a universal pe
 
 ## Emitter Contract Continuation — 2026-10-09
 
-The earlier result/table above records the 2026-10-07 baseline. Current `pnpm verify`: 11 passing suites,
+The earlier result/table above records the 2026-10-07 baseline. Previous emitter-contract checkpoint: 11 passing suites,
 480 passing tests, zero failures/todo and one existing EventSignal error-propagation skip. The six proxy todo cases
 are replaced by executable ownership tests in `spec/modules/EventEmitterEx/EventEmitterSimpleProxy_spec.ts` and
 `spec/modules/EventEmitterEx/EventEmitterProxy_spec.ts`, sharing `spec_utils/proxySubscriptionOwnership.ts`.
 Source and emitted contracts have zero diagnostics; both builds, actual CJS output, 24 fresh-process emitter entry
 orders and native/fallback GC pass. Node 26.8.1, TypeScript 5.9.3, Windows x64; the existing ts-jest peer warning remains.
 [Compatibility and migration](../../docs/EVENT_COMPATIBILITY.md), [proxy ownership](../../docs/PROXY_SUBSCRIPTIONS.md).
+
+## Listener Contract Verification — 2026-10-09
+
+Current full `_dev/verify.cjs`: 519 pass, one existing EventSignal skip, zero failures/todo; eleven suites.
+39 additional runtime cases cover listener limits, reentrancy, callback identity, static inspection and browser
+warning/lifecycle behavior. The initial expanded Node run reproduced 23 failures; all are repaired. Strict library
+and source/emitted tuple/proxy/interface fixtures report zero diagnostics in CommonJS, NodeNext and Bundler.
+Both builds, built CJS execution, 24 import orders and native/fallback GC pass. No new ts-jest TS diagnostics remain;
+the pre-existing TypeScript peer warning and EventSignal console output remain. Toolchain: Node 26.8.1 / TS 5.9.3,
+Windows x64. [Contracts and limits](../../docs/EVENT_COMPATIBILITY.md); additional versions/CI remain stage 01.

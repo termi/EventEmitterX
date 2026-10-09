@@ -8,10 +8,19 @@ import {
     on as nodeOn,
     captureRejectionSymbol as nodeRejectionSymbol,
     addAbortListener as nodeAddAbortListener,
+    getEventListeners as nodeGetEventListeners,
 } from 'node:events';
 import { performance } from 'node:perf_hooks';
 import { runInThisContext } from 'node:vm';
-import { EventEmitterX, once, on, captureRejectionSymbol, errorMonitor, addAbortListener } from '../../modules/events';
+import {
+    EventEmitterX,
+    once,
+    on,
+    captureRejectionSymbol,
+    errorMonitor,
+    addAbortListener,
+    getEventListeners,
+} from '../../modules/events';
 
 type Factory = () => EventEmitter;
 const nativeFactory: Factory = () => new EventEmitter();
@@ -19,9 +28,13 @@ const customFactory: Factory = () => new EventEmitterX();
 const factories: [ string, Factory ][] = [ [ 'Node', nativeFactory ], [ 'EventEmitterX', customFactory ] ];
 
 describe('native Node emitter contracts', () => {
-    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s abort listener survives stopped propagation and removes itself', (_name, subscribe) => {
+    it.each([
+        [ 'Node', nodeAddAbortListener ], [ 'EventEmitterX', addAbortListener ],
+    ] as const)('%s abort listener survives stopped propagation and removes itself', (_name, subscribe) => {
         const owner = new AbortController();
-        owner.signal.addEventListener('abort', event => { event.stopImmediatePropagation(); });
+        owner.signal.addEventListener('abort', event => {
+            event.stopImmediatePropagation();
+        });
         const callback = jest.fn();
         using registration = subscribe(owner.signal, callback);
         owner.abort();
@@ -29,7 +42,9 @@ describe('native Node emitter contracts', () => {
         expect(callback).toHaveBeenCalledTimes(1);
     });
 
-    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s abort listener disposal prevents later delivery', (_name, subscribe) => {
+    it.each([
+        [ 'Node', nodeAddAbortListener ], [ 'EventEmitterX', addAbortListener ],
+    ] as const)('%s abort listener disposal prevents later delivery', (_name, subscribe) => {
         const owner = new AbortController();
         const callback = jest.fn();
         const registration = subscribe(owner.signal, callback);
@@ -39,7 +54,9 @@ describe('native Node emitter contracts', () => {
         expect(callback).not.toHaveBeenCalled();
     });
 
-    it.each([['Node', nodeAddAbortListener], ['EventEmitterX', addAbortListener]] as const)('%s pre-aborted subscription delivers asynchronously even after disposal', async (_name, subscribe) => {
+    it.each([
+        [ 'Node', nodeAddAbortListener ], [ 'EventEmitterX', addAbortListener ],
+    ] as const)('%s pre-aborted subscription delivers asynchronously even after disposal', async (_name, subscribe) => {
         const owner = new AbortController();
         owner.abort();
         const callback = jest.fn();
@@ -49,7 +66,7 @@ describe('native Node emitter contracts', () => {
         await Promise.resolve();
         expect(callback).toHaveBeenCalledTimes(1);
     });
-    it.each([0, 1, 2, 3, 5])('delivers errorMonitor before unhandled errors with %p extra arguments', count => {
+    it.each([ 0, 1, 2, 3, 5 ])('delivers errorMonitor before unhandled errors with %p extra arguments', count => {
         function sequence(make: Factory) {
             const emitter = make();
             // Native Node checks Error against its host realm, outside Jest's VM.
@@ -58,71 +75,97 @@ describe('native Node emitter contracts', () => {
                 : new Error('unhandled');
             const args = Array.from({ length: count }, (_, index) => index);
             const observed: unknown[][] = [];
-            emitter.on(errorMonitor, (...payload) => { observed.push(payload); });
+            emitter.on(errorMonitor, (...payload) => {
+                observed.push(payload);
+            });
             expect(() => emitter.emit('error', failure, ...args)).toThrow(failure);
-            expect(observed).toEqual([[failure, ...args]]);
+            expect(observed).toEqual([ [ failure, ...args ] ]);
             return observed.map(payload => payload.slice(1));
         }
+
         expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
     });
 
-    it.each([true, false])('uses error listeners as modified by the monitor (add=%p)', add => {
+    it.each([ true, false ])('uses error listeners as modified by the monitor (add=%p)', add => {
         function sequence(make: Factory) {
             const emitter = make();
             const failure = make === nativeFactory
                 ? runInThisContext('new Error("monitor mutation")') as Error
                 : new Error('monitor mutation');
             const output: string[] = [];
-            const handler = () => { output.push('handled'); };
-            if (!add) emitter.on('error', handler);
+            const handler = () => {
+                output.push('handled');
+            };
+            if (!add) {
+                emitter.on('error', handler);
+            }
             emitter.on(errorMonitor, () => {
                 output.push('monitor');
-                if (add) emitter.on('error', handler);
-                else emitter.removeListener('error', handler);
+                if (add) {
+                    emitter.on('error', handler);
+                }
+                else {
+                    emitter.removeListener('error', handler);
+                }
             });
-            try { emitter.emit('error', failure); }
-            catch (error) { expect(error).toBe(failure); output.push('thrown'); }
+            try {
+                emitter.emit('error', failure);
+            }
+            catch (error) {
+                expect(error).toBe(failure);
+                output.push('thrown');
+            }
             return output;
         }
+
         expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
     });
 
     it('removes symbols with removeListener lifecycle delivery in reverse order', () => {
         const symbol = Symbol('remove');
+
         function sequence(make: Factory) {
             const emitter = make();
-            const first = () => {};
-            const second = () => {};
+            const first = () => {
+            };
+            const second = () => {
+            };
             const output: unknown[][] = [];
             emitter.on('removeListener', (event, listener) => {
-                output.push([event, listener === first ? 'first' : 'second']);
+                output.push([ event, listener === first ? 'first' : 'second' ]);
             });
             emitter.on(symbol, first);
             emitter.once(symbol, second);
             emitter.removeAllListeners();
             return { output, names: emitter.eventNames(), raw: emitter.rawListeners(symbol) };
         }
+
         expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
     });
 
     it('ignores removal of an absent event while other once wrappers exist', () => {
         function sequence(make: Factory) {
             const emitter = make();
-            emitter.on('removeListener', () => {});
-            emitter.once('present', () => {});
+            emitter.on('removeListener', () => {
+            });
+            emitter.once('present', () => {
+            });
             emitter.removeAllListeners('absent');
             emitter.emit('present');
             emitter.removeAllListeners('absent');
             return emitter.eventNames();
         }
+
         expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
     });
 
     it('returns an uncaptured once callback Promise to the caller of its raw wrapper', async () => {
-        for (const [_name, make] of factories) {
+        for (const [ _name, make ] of factories) {
             const emitter = make();
             const failure = new Error('uncaptured once');
-            emitter.once('data', async () => { throw failure; });
+            emitter.once('data', async () => {
+                throw failure;
+            });
             const raw = emitter.rawListeners('data')[0];
             expect(raw).toBeDefined();
             await expect(raw?.()).rejects.toBe(failure);
@@ -130,26 +173,45 @@ describe('native Node emitter contracts', () => {
         }
     });
 
-    it.each([false, true])('captures async once rejection through the configured path (hook=%p)', hook => {
+    it.each([ false, true ])('captures async once rejection through the configured path (hook=%p)', hook => {
         async function sequence(native: boolean) {
-            const emitter: EventEmitter = native ? new EventEmitter({ captureRejections: true }) : new EventEmitterX({ captureRejections: true });
+            const emitter: EventEmitter = native
+                ? new EventEmitter({ captureRejections: true })
+                : new EventEmitterX({ captureRejections: true });
             const failure = new Error('once rejection');
             const received = new Promise<unknown[]>(resolve => {
-                if (hook) emitter[captureRejectionSymbol] = function(error, event, ...args) {
-                    expect(this).toBe(emitter);
-                    resolve([error === failure, event, ...args]);
-                };
-                else emitter.on('error', error => { resolve([error === failure]); });
+                if (hook) {
+                    emitter[captureRejectionSymbol] = function(error, event, ...args) {
+                        expect(this).toBe(emitter);
+                        resolve([ error === failure, event, ...args ]);
+                    };
+                }
+                else {
+                    emitter.on('error', error => {
+                        resolve([ error === failure ]);
+                    });
+                }
             });
-            emitter.once('data', async () => { throw failure; });
+            emitter.once('data', async () => {
+                throw failure;
+            });
             emitter.emit('data', 42);
             // Use a bounded assertion so a missing rejection delivery fails rather than hanging the suite.
             const limit = Promise.withResolvers<never>();
-            using deadline = setTimeout(() => { limit.reject(new Error('rejection was not delivered')); }, 1000);
-            using cleanup = { [Symbol.dispose]() { emitter.removeAllListeners(); } };
-            return await Promise.race([received, limit.promise]);
+            using deadline = setTimeout(() => {
+                limit.reject(new Error('rejection was not delivered'));
+            }, 1000);
+            using cleanup = {
+                [Symbol.dispose]() {
+                    emitter.removeAllListeners();
+                },
+            };
+            return await Promise.race([ received, limit.promise ]);
         }
-        return Promise.all([sequence(false), sequence(true)]).then(([custom, native]) => { expect(custom).toEqual(native); });
+
+        return Promise.all([ sequence(false), sequence(true) ]).then(([ custom, native ]) => {
+            expect(custom).toEqual(native);
+        });
     });
     it('preserves synchronous ordering, this and duplicate listeners', () => {
         function sequence(make: Factory) {
@@ -265,19 +327,24 @@ describe('native Node emitter contracts', () => {
     });
 
     it.each(factories)('%s cleans once listeners on success, error and abort', async (_name, make) => {
-        const awaitEvent = make === nativeFactory ? nodeOnce : once;
         const emitter = make();
-        const successful = awaitEvent(emitter, 'data');
+        const awaitEvent = (eventName: string, options?: { signal: AbortSignal }) => {
+            return make === nativeFactory
+                ? nodeOnce(emitter, eventName, options)
+                : once(emitter, eventName, options)
+            ;
+        };
+        const successful = awaitEvent('data');
         emitter.emit('data', 1, 'ready');
         expect(await successful).toEqual([ 1, 'ready' ]);
         expect(emitter.listenerCount('data')).toBe(0);
         expect(emitter.listenerCount('error')).toBe(0);
         const failure = new Error('event failure');
-        const failing = awaitEvent(emitter, 'data');
+        const failing = awaitEvent('data');
         emitter.emit('error', failure);
         await expect(failing).rejects.toBe(failure);
         const owner = new AbortController();
-        const aborted = awaitEvent(emitter, 'data', { signal: owner.signal });
+        const aborted = awaitEvent('data', { signal: owner.signal });
         owner.abort();
         await expect(aborted).rejects.toMatchObject({ name: 'AbortError' });
         expect(emitter.listenerCount('data')).toBe(0);
@@ -331,4 +398,281 @@ describe('native Node emitter contracts', () => {
         expect(typeof Symbol.dispose).toBe('symbol');
         expect(typeof Promise.withResolvers).toBe('function');
     });
+});
+
+
+describe('remaining emitter subscription contracts', () => {
+    function withWarnings(make: Factory, action: (emitter: EventEmitter) => void) {
+        const emitter = make();
+        const warnings: { name?: string; emitter?: unknown; type?: unknown; count?: number }[] = [];
+        const channel = make === nativeFactory ? runInThisContext('process') as NodeJS.Process : process;
+        const intercept = jest.spyOn(channel, 'emitWarning').mockImplementation(warning => {
+            warnings.push(warning as unknown as typeof warnings[number]);
+        });
+        using cleanup = {
+            [Symbol.dispose]() {
+                intercept.mockRestore();
+                emitter.removeAllListeners();
+            },
+        };
+        action(emitter);
+        return warnings.map(warning => ({
+            name: warning.name,
+            owner: warning.emitter === emitter,
+            type: warning.type,
+            count: warning.count,
+        }));
+    }
+
+    it.each([ 'data', '', Symbol('limited') ])('warns only after exceeding the limit and once per group (%p)', key => {
+        const sequence = (make: Factory) => withWarnings(make, emitter => {
+            emitter.setMaxListeners(2);
+            for (let i = 0 ; i < 6 ; ++i) emitter.on(key, () => {
+            });
+            expect(emitter.listenerCount(key)).toBe(6);
+        });
+        const native = sequence(nativeFactory);
+        expect(native).toEqual([ { name: 'MaxListenersExceededWarning', owner: true, type: key, count: 3 } ]);
+        expect(sequence(customFactory)).toEqual(native);
+    });
+
+    it.each([ 0, Infinity ])('disables warnings with limit %p', limit => {
+        for (const [ , make ] of factories) {
+            expect(withWarnings(make, emitter => {
+                expect(emitter.setMaxListeners(limit)).toBe(emitter);
+                expect(emitter.getMaxListeners()).toBe(limit);
+                for (let i = 0 ; i < 15 ; ++i) emitter.on('data', () => {
+                });
+            })).toEqual([]);
+        }
+    });
+
+    it.each([
+        'prepend', 'remove', 'recreate', 'once', 'fractional', 'collapse', 'limit-change',
+    ])('preserves native warning lifetime (%s)', mode => {
+        const sequence = (make: Factory) => withWarnings(make, emitter => {
+            emitter.setMaxListeners(mode === 'fractional' ? 0.5 : 1);
+            const a = () => {
+            };
+            const b = () => {
+            };
+            emitter.on('data', a).on('data', b).on('data', () => {
+            });
+            if (mode === 'prepend') {
+                emitter.prependListener('data', () => {
+                });
+            }
+            if (mode === 'collapse') {
+                emitter.removeListener('data', a);
+                emitter.removeListener('data', b);
+                emitter.on('data', a);
+            }
+            if (mode === 'limit-change') {
+                emitter.setMaxListeners(2);
+                emitter.on('data', a);
+            }
+            if (mode === 'remove') {
+                emitter.removeListener('data', a);
+                emitter.on('data', a);
+            }
+            if (mode === 'recreate') {
+                emitter.removeAllListeners('data');
+                emitter.on('data', a).on('data', b);
+            }
+            if (mode === 'once') {
+                emitter.once('data', a);
+                emitter.emit('data');
+                emitter.once('data', a);
+            }
+        });
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it.each([
+        -1, NaN, '2', null, undefined, {}, true,
+    ])('rejects invalid listener limits (%p) without changing the value', value => {
+        function sequence(make: Factory) {
+            const emitter = make().setMaxListeners(3);
+            using cleanup = {
+                [Symbol.dispose]() {
+                    emitter.removeAllListeners();
+                },
+            };
+            try {
+                emitter.setMaxListeners(value as number);
+                throw new Error('invalid limit accepted');
+            }
+            catch (error) {
+                const failure = error as { name: string; code?: string };
+                return { name: failure.name, code: failure.code, limit: emitter.getMaxListeners() };
+            }
+        }
+
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it('validates constructor limits and preserves the existing unlimited default', () => {
+        using emitter = new EventEmitterX();
+        expect(emitter.getMaxListeners()).toBe(Infinity);
+        expect(() => new EventEmitterX({ maxListeners: -1 })).toThrow(RangeError);
+        expect(() => new EventEmitterX({ maxListeners: NaN })).toThrow(RangeError);
+        using zeroEmitter = new EventEmitterX({ maxListeners: 0 });
+        expect(zeroEmitter.getMaxListeners()).toBe(0);
+    });
+
+    it.each([
+        'insert', 'replace', 'clear', 'once', 'limit',
+    ])('reloads subscription state after newListener (%s)', mode => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            const calls: string[] = [];
+            const existing = () => {
+                calls.push('existing');
+            };
+            const inserted = () => {
+                calls.push('inserted');
+            };
+            emitter.on('data', existing);
+            emitter.once('newListener', event => {
+                if (event !== 'data') {
+                    return;
+                }
+                if (mode === 'replace') {
+                    emitter.removeAllListeners('data');
+                }
+                if (mode === 'clear') {
+                    emitter.removeAllListeners();
+                }
+                if (mode === 'once') {
+                    emitter.once('data', inserted);
+                }
+                else if (mode === 'limit') {
+                    emitter.setMaxListeners(0);
+                }
+                else {
+                    emitter.on('data', inserted);
+                }
+            });
+            emitter.on('data', () => {
+                calls.push('outer');
+            });
+            emitter.emit('data');
+            emitter.emit('data');
+            const count = emitter.listenerCount('data');
+            emitter.removeAllListeners();
+            return { calls, count };
+        }
+
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it('removes the most recently added duplicate even without any once wrapper', () => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            const calls: string[] = [];
+            const a = () => {
+                calls.push('a');
+            };
+            emitter.on('data', a).on('data', () => {
+                calls.push('b');
+            }).on('data', a);
+            emitter.removeListener('data', a);
+            emitter.emit('data');
+            emitter.removeAllListeners();
+            return calls;
+        }
+
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+
+    it.each([
+        'single', 'mixed', 'raw', 'absent',
+    ])('counts a specified callback including once identity (%s)', mode => {
+        function sequence(make: Factory) {
+            const emitter = make();
+            const callback = () => {
+            };
+            emitter.once('data', callback);
+            if (mode === 'mixed') {
+                emitter.on('data', callback).prependOnceListener('data', callback).on('data', () => {
+                });
+            }
+            const selected = mode === 'raw' ? emitter.rawListeners('data')[0] : mode === 'absent' ? () => {
+            } : callback;
+            const before = emitter.listenerCount('data', selected);
+            emitter.emit('data');
+            const after = emitter.listenerCount('data', callback);
+            emitter.removeAllListeners();
+            return { before, after, absent: emitter.listenerCount('missing', callback) };
+        }
+
+        expect(sequence(customFactory)).toEqual(sequence(nativeFactory));
+    });
+});
+
+
+describe('static listener inspection contracts', () => {
+    it.each([ 'Node', 'custom', 'target' ])('returns detached original-listener snapshots (%s)', kind => {
+        const first = () => {
+        };
+        const second = () => {
+        };
+        const emitter: EventTarget | EventEmitter = kind === 'target' ? new EventTarget() : kind === 'Node'
+            ? new EventEmitter()
+            : new EventEmitterX();
+        if (emitter instanceof EventTarget) {
+            emitter.addEventListener('data', first, { once: true });
+        }
+        else {
+            emitter.once('data', first);
+        }
+        const nativeSnapshot = emitter instanceof EventTarget
+            ? nodeGetEventListeners(emitter, 'data') : nodeGetEventListeners(emitter, 'data');
+        expect(getEventListeners(emitter, 'data')).toEqual(nativeSnapshot);
+        const snapshot = getEventListeners(emitter, 'data');
+        snapshot.pop();
+        expect(getEventListeners(emitter, 'data')).toEqual([ first ]);
+        if (emitter instanceof EventTarget) {
+            emitter.addEventListener('data', second);
+            emitter.dispatchEvent(new Event('data'));
+        }
+        else {
+            emitter.on('data', second);
+            emitter.emit('data');
+        }
+        expect(getEventListeners(emitter, 'data')).toEqual([ second ]);
+        if (emitter instanceof EventTarget) {
+            emitter.removeEventListener('data', second);
+        }
+        else {
+            emitter.removeAllListeners();
+        }
+    });
+});
+
+
+it('uses the current limit after newListener changes it', () => {
+    for (const [ , make ] of factories) {
+        const emitter = make().setMaxListeners(1);
+        const channel = make === nativeFactory ? runInThisContext('process') as NodeJS.Process : process;
+        const intercept = jest.spyOn(channel, 'emitWarning').mockImplementation(() => {
+        });
+        using cleanup = {
+            [Symbol.dispose]() {
+                intercept.mockRestore();
+                emitter.removeAllListeners();
+            },
+        };
+        emitter.on('data', () => {
+        });
+        emitter.once('newListener', event => {
+            if (event === 'data') {
+                emitter.setMaxListeners(0);
+            }
+        });
+        emitter.on('data', () => {
+        });
+        expect(intercept).not.toHaveBeenCalled();
+        expect(emitter.listenerCount('data')).toBe(2);
+    }
 });

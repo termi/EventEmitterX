@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:55:40.798Z"
-timestamp: 1791500140798
+iso date: "2026-10-09T12:36:23.600Z"
+timestamp: 1791549383600
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "types, scripts, tests, docs"
+area: "api, types, tests, docs"
 ---
 
 # Проверка исправленной базы — 2026-10-07
@@ -88,10 +88,20 @@ Pipeline воспроизводим с этим установленным toolc
 
 ## Продолжение контрактов emitter — 2026-10-09
 
-Предыдущие результат/таблица выше сохраняют базу 2026-10-07. Текущий `pnpm verify`: 11 успешных наборов,
+Предыдущие результат/таблица выше сохраняют базу 2026-10-07. Предыдущая контрольная точка контрактов emitter: 11 успешных наборов,
 480 успешных тестов, ноль ошибок/todo и один прежний skip распространения ошибок EventSignal. Шесть proxy todo
 заменены исполняемыми ownership-тестами в `spec/modules/EventEmitterEx/EventEmitterSimpleProxy_spec.ts` и
 `spec/modules/EventEmitterEx/EventEmitterProxy_spec.ts` с общим `spec_utils/proxySubscriptionOwnership.ts`.
 Контракты исходников/деклараций дают ноль диагностик; обе сборки, реальный CJS output, 24 порядка загрузки emitter
 в отдельных процессах и native/fallback GC проходят. Node 26.8.1, TypeScript 5.9.3, Windows x64; прежнее ts-jest peer предупреждение сохраняется.
 [Совместимость и миграция](../../docs/EVENT_COMPATIBILITY_RU.md), [владение proxy](../../docs/PROXY_SUBSCRIPTIONS_RU.md).
+
+## Проверка контрактов слушателей — 2026-10-09
+
+Текущий полный `_dev/verify.cjs`: 519 pass, один прежний EventSignal skip, ноль ошибок/todo; одиннадцать наборов.
+39 дополнительных runtime-случаев покрывают лимиты, reentrancy, callback identity, static inspection и браузерные
+warning/lifecycle контракты. Первый расширенный Node-прогон воспроизвёл 23 ошибки; все исправлены. Строгая библиотека
+и source/emitted tuple/proxy/interface fixtures без диагностик в CommonJS, NodeNext и Bundler. Обе сборки,
+выполнение CJS, 24 порядка импорта и native/fallback GC проходят. Новых ts-jest TS-диагностик нет; прежнее peer-warning
+TypeScript и console-вывод EventSignal сохранены. Среда: Node 26.8.1 / TS 5.9.3, Windows x64.
+[Контракты и ограничения](../../docs/EVENT_COMPATIBILITY_RU.md); другие версии/CI остаются этапом 01.

@@ -65,6 +65,10 @@ export interface IMinimumCompatibleEmitter {
 }
 
 // type NodeEventEmitter = EventEmitter;
+interface ListenerList extends Array<Listener> {
+    warned?: true;
+}
+
 interface ListenerMetadata {
     [kOnceListenerWrappedHandler]?: Listener;
     /** Original callback on a once wrapper, compatible with Node rawListeners(). */
@@ -335,13 +339,18 @@ type InnerListeners = {
 // }
 // declare type EventListenerOrEventListenerObject = Listener | EventListenerObject;
 
+/** Convert mutable/readonly Node-style payload tuples without changing legacy event-map generics. */
+export type EventMapFromTuples<Tuples extends { [Key in keyof Tuples]: readonly unknown[] }> = {
+    [Key in keyof Tuples]: ((this: EventEmitterX | undefined, ...args: [...Tuples[Key]]) => void) & ListenerMetadata;
+};
+
 /** EventMap with default listeners */
 export type EMD<EventMap extends DefaultEventMap = DefaultEventMap> = EventMap & InnerListeners;
 // /** EventMap any key */
 // type EMK<EventMap extends DefaultEventMap=DefaultEventMap, _T= EMD<EventMap>> = _T[keyof _T];
 
 export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMap> {
-    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: any[] | Parameters<EMD<EventMap>[EventKey]>): boolean;
+    emit<EventKey extends keyof EMD<EventMap>>(event: EventKey, ...args: Parameters<EMD<EventMap>[EventKey]>): boolean;
     on<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
     once<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
     addListener<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey, listener: EMD<EventMap>[EventKey]): this;
@@ -355,7 +364,7 @@ export interface IEventEmitter<EventMap extends DefaultEventMap = DefaultEventMa
     listeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
     rawListeners<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): EMD<EventMap>[EventKey][];
     eventNames(): NodeEventName[];
-    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey): number;
+    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(type: EventKey, listener?: EMD<EventMap>[EventKey]): number;
 }
 // noinspection JSUnusedGlobalSymbols
 /** cast type of any event emitter to typed event emitter */
@@ -445,6 +454,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
             } = options;
 
             if (maxListeners !== void 0) {
+                _checkMaxListeners(maxListeners);
                 this._maxListeners = maxListeners;
             }
             if (listenerOncePerEventType !== void 0) {
@@ -790,22 +800,14 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         prepend: boolean,
         once: boolean,
     ): boolean {
-        const {
-            _events,
-            _maxListeners,
-            _f,
-            __onceWrappers,
-        } = this;
+        const { __onceWrappers, _f: pre_newListener_flags } = this;
 
-        _checkListener(listener, _checkBit(_f, EventEmitterX_Flags_supportEventListenerObject));
+        _checkListener(listener, _checkBit(pre_newListener_flags, EventEmitterX_Flags_supportEventListenerObject));
 
-        const has_newListener_listener = _checkBit(_f, EventEmitterX_Flags_has_newListener_listener);
-        const isDebugTraceListeners = _checkBit(_f, EventEmitterX_Flags_emitCounter_isDebugTraceListeners);
-        const hasAnyOnceListener = __onceWrappers.size > 0;
+        const has_newListener_listener = _checkBit(pre_newListener_flags, EventEmitterX_Flags_has_newListener_listener);
+        const isDebugTraceListeners = _checkBit(pre_newListener_flags, EventEmitterX_Flags_emitCounter_isDebugTraceListeners);
         // todo: add handleEvent support
         const listenerAs_objectWith_handleEvent = false;// supportHandleEvent && typeof listener === 'object';
-        const handler = _events[event];
-        const existedHandlerIsFunction = typeof handler === 'function';
         let newLen: number;
 
         if (has_newListener_listener) {
@@ -814,6 +816,17 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
             // @ts-ignore `TS2345: Argument of type [ EventKey, EMD<EventMap>[EventKey] ] is not assignable to parameter of type Parameters<EMD<EventMap>["newListener"]`
             this.emit('newListener', event, listener);
         }
+
+        // Lifecycle callbacks can replace the entire table or add/remove this event's listeners.
+        const { _events, _maxListeners, _f } = this;
+
+        if (_checkBit(_f, EventEmitterX_Flags_destroyed)) {
+            return false;
+        }
+
+        const handler = _events[event];
+        const existedHandlerIsFunction = typeof handler === 'function';
+        const hasAnyOnceListener = __onceWrappers.size > 0;
 
         if (_checkBit(_f, EventEmitterX_Flags_listenerOncePerEventType) && handler) {
             // note: Судя по тестам EventTarget:
@@ -923,7 +936,11 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         }
         else {
             if (prepend) {
-                const newArray = _arrayClone3(handler, listener) as Listener[];
+                const newArray = _arrayClone3(handler, listener) as ListenerList;
+
+                if ((handler as ListenerList).warned) {
+                    newArray.warned = true;
+                }
 
                 newLen = newArray.length;
 
@@ -934,10 +951,31 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
             }
         }
 
-        if (_maxListeners !== Number.POSITIVE_INFINITY && _maxListeners <= newLen) {
-            // todo: EventEmitterX.sOnMaxListeners = Symbol('sOnMaxListeners');
-            //  emit(EventEmitterX.sOnMaxListeners, newLen, event, `Maximum event listeners for "${event}" event!`);
-            console.warn(`Maximum event listeners for "${String(event)}" event!`);
+        if (_maxListeners > 0 && newLen > _maxListeners) {
+            const current = _events[event];
+
+            if (Array.isArray(current) && !(current as ListenerList).warned) {
+                (current as ListenerList).warned = true;
+
+                const warning = Object.assign(
+                    new Error(
+                        `Possible EventEmitter memory leak detected. ${newLen} ${String(event)} listeners added. MaxListeners is ${_maxListeners}.`,
+                    ),
+                    {
+                        name: 'MaxListenersExceededWarning',
+                        emitter: this,
+                        type: event,
+                        count: newLen,
+                    },
+                );
+
+                if (isNodeJS && typeof process.emitWarning === 'function') {
+                    process.emitWarning(warning);
+                }
+                else {
+                    console.warn(warning);
+                }
+            }
         }
 
         return true;
@@ -999,7 +1037,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                 return this;
             }
         }
-        else {// remove only first link to listener
+        else {
             const listeners = handler as Listener[];
             let index = -1;
 
@@ -1032,7 +1070,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                 }
             }
             else {
-                index = listeners.indexOf(listener);
+                index = listeners.lastIndexOf(listener);
             }
 
             if (index !== -1) {
@@ -1054,6 +1092,12 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
                     else {
                         _events[event] = listeners.toSpliced(index, 1);
                     }
+                }
+
+                const remaining = _events[event];
+
+                if (Array.isArray(remaining) && (listeners as ListenerList).warned) {
+                    (remaining as ListenerList).warned = true;
                 }
             }
             else {
@@ -1266,6 +1310,7 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
     }
 
     setMaxListeners(n: number): this {
+        _checkMaxListeners(n);
         this._maxListeners = n;
 
         return this;
@@ -1408,7 +1453,10 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         return Reflect.ownKeys(this._events);
     }
 
-    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(event: EventKey): number {
+    listenerCount<EventKey extends keyof EMD<EventMap> = EventName>(
+        event: EventKey,
+        listener?: EMD<EventMap>[EventKey],
+    ): number {
         const handler = this._events[event];
 
         if (!handler) {
@@ -1416,10 +1464,27 @@ export class EventEmitterX<EventMap extends DefaultEventMap = DefaultEventMap> i
         }
 
         if (typeof handler === 'function') {
-            return 1;
+            return listener == null
+                || handler === listener
+                || handler.listener === listener
+                    ? 1
+                    : 0
+            ;
         }
 
-        return (handler as EMD<EventMap>[EventKey][]).length;
+        if (listener == null) {
+            return handler.length;
+        }
+
+        let count = 0;
+
+        for (const callback of handler as Listener[]) {
+            if (callback === listener || callback.listener === listener) {
+                ++count;
+            }
+        }
+
+        return count;
     }
 
     // todo:
@@ -2419,6 +2484,24 @@ function _enrichErrorStackToOnceTimeoutError(
 
 // https://nodejs.org/api/events.html#events_events_defaultmaxlisteners
 // todo: export function defaultMaxListeners(n: number){}
+
+/**
+ * Validate constructor/setter inputs without invoking an overridable method during construction.
+ */
+function _checkMaxListeners(n: number): void {
+    if (typeof (n as unknown) !== 'number') {
+        throw new EventsTypeError('The "n" argument must be a number.', ERR_INVALID_ARG_TYPE);
+    }
+
+    if (n < 0 || Number.isNaN(n)) {
+        throw Object.assign(
+            new RangeError('The "n" argument must be a non-negative number.'),
+            {
+                code: 'ERR_OUT_OF_RANGE',
+            }
+        );
+    }
+}
 
 /**
  * @param listener

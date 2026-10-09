@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:55:40.798Z"
-timestamp: 1791500140798
+iso date: "2026-10-09T12:36:23.600Z"
+timestamp: 1791549383600
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "docs, api, types, deps, tests"
+area: "api, types, tests, docs"
 ---
 
 # 03 — Public Contracts and Precise Types
@@ -80,14 +80,14 @@ retain their owner. Runtime portability and broader dependency lifecycle contrac
 The reference is `node:events` (the discussion's `node:event` spelling is corrected to the actual built-in). The alias
 exports the same constructor, not a wrapper or a different implementation.
 
-- [ ] A differential suite compares default configuration with native EventEmitter: ordering, synchronous emit, this,
+- [x] A differential suite compares default configuration with native EventEmitter: ordering, synchronous emit, this,
   duplicate listeners, once wrappers/rawListeners, prepend, removeListener/removeAllListeners,
   listeners/eventNames/listenerCount, listener changes during emit, newListener/removeListener, error/errorMonitor,
   captureRejections and maxListeners.
 - [x] Include symbols in eventNames; compare string, symbol and numeric-key enumeration with native Node.
-- [ ] Create a separate matrix for static once/on/addAbortListener/getEventListeners and options: implemented, extended,
+- [x] Create a separate matrix for static once/on/addAbortListener/getEventListeners and options: implemented, extended,
   different or absent. Do not promise the entire node:events module based on class compatibility.
-- [ ] Check event-map types, tuples/readonly tuples, symbol keys, this, overloads and structural compatibility with Node
+- [x] Check event-map types, tuples/readonly tuples via EventMapFromTuples, symbol keys, this, overloads and structural compatibility with Node
   EventEmitter.
 - [ ] Compare AbortSignal/stopImmediatePropagation, once cleanup on success/error/abort/timeout and EventTarget
   semantics separately from Node.
@@ -95,8 +95,8 @@ exports the same constructor, not a wrapper or a different implementation.
 The initial differential/DOM suite has 14 passing tests on Node 26.8.1. Closed event maps, symbol payloads, listener
 identity, rejection-hook typing and structural Node assignment have strict fixtures.
 The [compatibility matrix](../docs/EVENT_COMPATIBILITY.md) records covered contracts and open boundaries; README now
-links that matrix instead of claiming full compatibility. The complete differential suite, readonly tuples, static
-helper coverage and additional runtimes remain open.
+links that matrix instead of claiming full compatibility. The additional static helper/options coverage and additional runtimes remain open;
+configured limits and tuple adapters are covered in the continuation below.
 
 Official reference: [Node events](https://nodejs.org/api/events.html).
 
@@ -112,7 +112,8 @@ Official reference: [Node events](https://nodejs.org/api/events.html).
 Verification on Node 26.8.1 / TypeScript 5.9.3: 480 pass, zero fail/todo, one existing EventSignal skip; strict types,
 both builds, all 24 CJS entry orders and GC pass. [Proxy contracts](../docs/PROXY_SUBSCRIPTIONS.md) and
 [updated compatibility/migration](../docs/EVENT_COMPATIBILITY.md) describe the boundaries.
-The full differential/static helper matrix, maxListeners, readonly tuples and additional runtimes remain open.
+The following continuation covers listener limits, the static helper scope matrix and tuple adapters;
+additional helper/options parity and runtime versions remain open.
 Proxy extraction is separately committed as `adaa15d`; its history merge/rename commits must not be squashed.
 
 ## Completion
@@ -120,3 +121,22 @@ Proxy extraction is separately committed as `adaa15d`; its history merge/rename 
 Every public form has a precise runtime/type example, negative type checks, documented cleanup and an async contract.
 Junct consumers do not need a reduced interface, a StateSignal wrapper or forced reads after set. Breaking changes have
 migration examples.
+
+## Listener Contract Matrix Continuation — 2026-10-09
+
+- [x] Configured listener limits: input validation, strict threshold, zero/Infinity disablement, structured warning channels,
+  group lifetime through prepend/removal/collapse/recreation, once and limit changes. Preserve unlimited library default.
+- [x] Reentrant newListener insertion/replacement/clearing; current limit/deduplication and disposal during registration.
+- [x] Most-recent duplicate removal and optional callback-specific listenerCount, including original/raw once identity.
+- [x] Detached getEventListeners snapshots for native/custom emitters and native EventTarget.
+- [x] Mutable/readonly tuple adapter EventMapFromTuples, optional/rest/empty/symbol keys, both proxies, this and strict
+  IEventEmitter payloads in source and emitted contracts.
+- [ ] Consider direct tuple/heterogeneous class generics only with a separate migration design; the adapter is the current API.
+- [ ] Refine static once/on inferred payloads and complete untested Node helper/options boundaries and version matrices.
+
+[Compatibility and static helper matrix](../docs/EVENT_COMPATIBILITY.md) records implemented/extended/different/absent
+contracts. [Limits](../changelogs/reasons/EventEmitterX_LISTENER_LIMITS.md),
+[reentrancy](../changelogs/reasons/EventEmitterX_REENTRANT_SUBSCRIPTIONS.md) and
+[tuple adapter](../changelogs/reasons/EventEmitterX_TUPLE_MAP_ADAPTER.md) record decisions, migration and alternatives.
+519 pass, zero fail/todo, one existing skip; strict source/declarations, both builds, 24 import orders and GC pass.
+Node 26.8.1 / TypeScript 5.9.3 only. Other defaults/runtime versions and EventAwait extraction remain separate work.

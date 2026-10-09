@@ -7,7 +7,7 @@ import { performance as nodePerformance } from 'node:perf_hooks';
 
 import ServerTiming from 'termi@ServerTiming';
 
-import { once, addAbortListener } from '../../modules/events';
+import { EventEmitterX, once, addAbortListener } from '../../modules/events';
 
 describe('DOM event waits with explicit timing capability', () => {
     it('uses a once-only disposable browser abort registration', () => {
@@ -43,7 +43,9 @@ describe('DOM event waits with explicit timing capability', () => {
 
     it('documents the browser stopImmediatePropagation limitation', () => {
         const owner = new AbortController();
-        owner.signal.addEventListener('abort', event => { event.stopImmediatePropagation(); });
+        owner.signal.addEventListener('abort', event => {
+            event.stopImmediatePropagation();
+        });
         const callback = jest.fn();
         using registration = addAbortListener(owner.signal, callback);
         owner.abort();
@@ -51,8 +53,10 @@ describe('DOM event waits with explicit timing capability', () => {
     });
 
     it('rejects invalid browser abort registration arguments', () => {
-        expect(() => addAbortListener(null as unknown as AbortSignal, () => {})).toThrow();
-        expect(() => addAbortListener(new AbortController().signal, null as unknown as (event: Event) => void)).toThrow();
+        expect(() => addAbortListener(null as unknown as AbortSignal, () => {
+        })).toThrow();
+        expect(() => addAbortListener(new AbortController().signal, null as unknown as (event: Event) => void))
+            .toThrow();
     });
 
     it('keeps DOM performance intact and measures success through the injected backend', async () => {
@@ -84,4 +88,88 @@ describe('DOM event waits with explicit timing capability', () => {
         add.mockRestore();
         remove.mockRestore();
     });
+});
+
+
+describe('browser emitter listener limits', () => {
+    it('reports structured warnings once per group without enforcing a hard limit', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {
+        });
+        using cleanup = {
+            [Symbol.dispose]() {
+                warn.mockRestore();
+            },
+        };
+        using emitter = new EventEmitterX({ maxListeners: 1 });
+        const key = Symbol('browser');
+        emitter.on(key, () => {
+        }).on(key, () => {
+        }).prependListener(key, () => {
+        });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0]?.[0])
+            .toMatchObject({ name: 'MaxListenersExceededWarning', emitter, type: key, count: 2 });
+        expect(emitter.listenerCount(key)).toBe(3);
+        emitter.removeAllListeners(key);
+        emitter.on(key, () => {
+        }).on(key, () => {
+        });
+        expect(warn).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not publish warnings for the default or zero limit', () => {
+        const warn = jest.spyOn(console, 'warn').mockImplementation(() => {
+        });
+        using cleanup = {
+            [Symbol.dispose]() {
+                warn.mockRestore();
+            },
+        };
+        using defaultEmitter = new EventEmitterX();
+        using zeroEmitter = new EventEmitterX({ maxListeners: 0 });
+        for (let i = 0 ; i < 15 ; ++i) {
+            defaultEmitter.on('data', () => {
+            });
+            zeroEmitter.on('data', () => {
+            });
+        }
+        expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not finish registration after a lifecycle callback destroys the emitter', () => {
+        using emitter = new EventEmitterX();
+        emitter.once('newListener', () => {
+            emitter.destructor();
+        });
+        emitter.once('data', () => {
+        });
+        expect(emitter.eventNames()).toEqual([]);
+        expect(emitter.__onceWrappers.size).toBe(0);
+    });
+
+    it('applies duplicate suppression to the listener installed by newListener', () => {
+        using emitter = new EventEmitterX({ listenerOncePerEventType: true });
+        const callback = jest.fn();
+        emitter.once('newListener', event => {
+            if (event === 'data') {
+                emitter.on('data', callback);
+            }
+        });
+        emitter.on('data', callback);
+        emitter.emit('data');
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(emitter.listenerCount('data', callback)).toBe(1);
+    });
+});
+
+
+it('does not invoke an overridable listener-limit setter while constructing', () => {
+    class ConfiguredEmitter extends EventEmitterX {
+        override setMaxListeners(_n: number): this {
+            throw new Error('setter requires initialized subclass fields');
+        }
+    }
+
+    using emitter = new ConfiguredEmitter({ maxListeners: 2 });
+    expect(emitter.getMaxListeners()).toBe(2);
 });

@@ -1,9 +1,9 @@
 ---
-iso date: "2026-10-08T22:55:40.798Z"
-timestamp: 1791500140798
+iso date: "2026-10-09T12:36:23.600Z"
+timestamp: 1791549383600
 ai_model: "GPT6"
 git user: "\"Egor Halimonenko\" <termi_uc@inbox.ru>"
-area: "docs, api, types, deps, tests"
+area: "api, types, tests, docs"
 ---
 
 # EventEmitterX / EventSignal Roadmap
@@ -14,7 +14,7 @@ audit. Documentation compliance update: 2026-10-06.
 Goal: an independently installable event and signal library with reliable lifecycle management, precise types, CJS/ESM
 and TypeScript sources, separately published dependencies, and a clear consumer contract.
 
-Current status: the core of 03.1/03.2 is implemented and library checks pass: 480 tests and zero strict diagnostics.
+Current status: the core of 03.1/03.2 is implemented and library checks pass: 519 tests and zero strict diagnostics.
 See [baseline verification](verification/BASELINE_VERIFICATION.md) and [signal contract](03_SIGNAL_CONTRACT.md). Stage
 02 retains global channels with weak callbacks. The reducer result below is a historical snapshot of the earlier
 implementation.
@@ -129,3 +129,10 @@ not modified.
 Update task status in the relevant stage: `[ ]` means incomplete, `[x]` means completed with evidence, and “deferred”
 needs a reason and target release. Completed work is recorded with evidence in the relevant documents. English files are originals;
 adjacent `_RU.md` files contain equivalent Russian translations.
+
+## Listener Group Continuation — 2026-10-09
+
+Stage 03 now covers configured listener limits/warnings, reentrant registration, most-recent duplicate removal,
+callback-specific counts, detached static inspection and typed tuple adapters. 519 tests pass, zero failures/todo,
+one existing skip; all strict/build/import-order/GC checks pass. The unlimited default stays explicit; direct tuple
+class generics and broader static/runtime matrices remain open. See [stage 03](03_API_TYPES.md) and its reason links.
